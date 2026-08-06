@@ -183,7 +183,38 @@
 - 所有 API 请求需带 `Authorization: Bearer <token>`
 - 可选：按用户分配不同 token，实现简单的权限隔离
 
-## 7. 扩展性考虑
+## 7. 模型分工（执行层）
+
+本项目由两个模型驱动的 Agent 协作执行，按能力长板分配：
+
+### DeepSeek V4 Flash 0731 — 后端代码工程师
+长板：终端编码（Terminal Bench 82.7）、工具调用（Toolathlon 70.3）
+
+负责任务卡：
+- task_005 当前网关迁移（P0）
+- task_006 补齐渠道（P1）
+- task_003 飞书同步实现（P2）
+- task_004 GitHub 集成（P2）
+
+执行指令：`05_执行指令/DeepSeek_V4_Flash_执行指令.md`
+
+### Gemini 3.6 Flash — Agent 自动化与前端工程师
+长板：Agent 链式任务（BenchAlign 83.0）、电脑操控（OSWorld 83.0）、长文本检索（128K 91.8%）、快速迭代（231 tok/s）
+
+负责任务卡：
+- task_007 多轮对话搜索（P0）
+- task_002 管理面板 UI（P1）
+- task_001 网关模板生成器（P1）
+- 附带：修复豆包/Kimi 引擎已知问题
+
+执行指令：`05_执行指令/Gemini_3.6_Flash_执行指令.md`
+
+### 分工原则
+> 写代码找 DeepSeek，操控浏览器/跑 Agent 找 Gemini。
+
+---
+
+## 8. 扩展性考虑
 
 - 网关数量增加：registry.py 支持动态注册，无需重启中央平台
 - 用户量增加：token 认证可升级为 JWT + 用户数据库
