@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal AI Hub</title>
+<style>
+:root{
+  --bg:#f6f7fa; --text:#050505; --muted:#2c2c30; --hairline:#b8bcc8;
+  --blue:#0052cc; --green:#16882d; --amber:#d97706; --red:#d32f2f;
+  --fill:#e9ebf0; --card-border:#aab0bc;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",Roboto,sans-serif;
+  background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased;
+  display:flex; flex-direction:column; min-height:100vh; font-weight:500;
+}
+/* ---------- 导航 ---------- */
+.nav{
+  position:sticky; top:0; z-index:50; background:rgba(255,255,255,.96);
+  backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1.5px solid var(--card-border);
+}
+.nav-inner{width:80%;max-width:1400px;margin:0 auto;padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
+.brand{font-size:18px;font-weight:700;letter-spacing:-.01em;color:#000}
+.brand b{font-weight:800}
+.brand span{color:var(--muted);font-weight:600;margin-left:8px;font-size:14px}
+.endpoint{font-size:14px;color:#000;font-weight:600;cursor:pointer;user-select:none}
+.endpoint:hover{color:var(--blue)}
+/* ---------- 分段控件（tab） ---------- */
+.seg-wrap{display:flex;justify-content:center;padding:22px 0 10px}
+.seg{
+  display:inline-flex; background:var(--fill); border-radius:14px; padding:5px;
+  gap:6px; border:1.5px solid var(--hairline);
+}
+.seg button{
+  border:none;background:transparent;color:var(--muted);font-size:16px;font-weight:700;
+  padding:10px 26px;border-radius:10px;cursor:pointer;font-family:inherit;
+  transition:all .15s ease; white-space:nowrap;
+}
+.seg button:hover{color:#000;background:rgba(255,255,255,.6)}
+.seg button.active{background:#000;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+/* ---------- 面板 ---------- */
+.wrap{width:80%;max-width:1400px;margin:0 auto;padding:12px 24px 40px;flex:1}
+.panel{display:none}
+.panel.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* ---------- 卡片 ---------- */
+.card{
+  background:#fff;border:1.5px solid var(--hairline);border-radius:20px;padding:30px;
+  box-shadow:0 4px 18px rgba(0,0,0,.06);
+}
+h2{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px;color:#000}
+.sub{font-size:15px;color:var(--muted);margin-bottom:22px;line-height:1.7;font-weight:600}
+label{font-size:14px;color:#000;font-weight:700;display:block;margin:16px 0 8px}
+select,input,textarea{
+  width:100%;padding:12px 16px;border:1.5px solid var(--hairline);border-radius:12px;
+  font-size:16px;font-weight:600;color:#000;background:#fff;font-family:inherit;outline:none;
+  transition:border-color .15s;
+}
+select:focus,input:focus,textarea:focus{border-color:#000;box-shadow:0 0 0 3px rgba(0,0,0,.1)}
+textarea{min-height:96px;resize:vertical;font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:15px;line-height:1.7;font-weight:600}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.row select{flex:1;min-width:0}
+.row .model{flex:1.4;min-width:0}
+.btn{
+  background:#000;color:#fff;border:none;padding:12px 28px;border-radius:980px;
+  font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;
+}
+.btn:hover{background:#222;transform:translateY(-1px)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn-sm{background:transparent;color:var(--blue);border:none;font-size:14px;font-weight:700;cursor:pointer;padding:4px 10px;font-family:inherit}
+.btn-sm:hover{text-decoration:underline}
+.reply{
+  margin-top:18px;background:#fff;border:1.5px solid var(--hairline);border-radius:14px;padding:18px 22px;min-height:90px;
+  font-size:16px;line-height:1.8;color:#000;white-space:pre-wrap;font-weight:600;
+  font-family:ui-monospace,"SF Mono",Consolas,monospace;
+}
+.reply.placeholder{color:var(--muted)}
+/* ---------- 搜索卡片 ---------- */
+.search-bar{display:flex;gap:12px;margin-bottom:24px}
+.search-bar input{flex:1;border-radius:980px;padding:14px 24px;font-size:16px;border:2px solid #aab0bc;font-weight:600;color:#000}
+.results-grid{display:grid;grid-template-columns:1fr;gap:20px}
+@media(max-width:720px){.results-grid{grid-template-columns:1fr}}
+.node-card{background:#fff;border:1.5px solid var(--hairline);border-radius:18px;padding:24px;display:flex;flex-direction:column;min-height:280px;box-shadow:0 4px 16px rgba(0,0,0,.04)}
+.node-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.node-name{font-size:19px;font-weight:800;color:#000}
+.node-badge{font-size:13px;color:var(--muted);font-weight:600;background:var(--fill);padding:3px 10px;border-radius:6px}
+.node-body{
+  flex:1;font-size:16px;line-height:1.85;color:#000;white-space:pre-wrap;font-weight:500;
+  background:#fafbfc;border:1.5px solid var(--hairline);border-radius:12px;padding:20px;overflow-y:auto;max-height:540px;
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+}
+.node-foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:14px;color:#000;font-weight:700}
+.cursor-blink{display:inline-block;width:8px;height:16px;background:var(--blue);margin-left:3px;vertical-align:middle;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.hint{font-size:14px;color:var(--amber);background:#fff8e9;border:1.5px solid #ffe3a8;padding:10px 14px;border-radius:12px;margin-top:12px;line-height:1.6;font-weight:600}
+/* ---------- 渠道表 ---------- */
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{font-size:14px;color:#000;font-weight:700;text-align:left;padding:12px 14px;border-bottom:2px solid #000;background:var(--fill)}
+td{padding:16px 14px;border-bottom:1.5px solid var(--card-border);vertical-align:top;color:#000;font-weight:500}
+tr:last-child td{border-bottom:none}
+.ch-name{font-weight:800;font-size:16px;color:#000}
+.ch-id{font-size:13px;color:var(--muted);margin-top:3px;font-weight:600}
+.ch-models{color:#000;font-size:14px;font-family:ui-monospace,"SF Mono",Consolas,monospace;word-break:break-all;font-weight:600}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:middle}
+.dot.ok{background:var(--green)} .dot.pending{background:var(--amber)} .dot.err{background:var(--red)}
+/* ---------- Markdown 格式与表格样式 ---------- */
+.node-body table{width:100%;border-collapse:collapse;margin:16px 0;font-size:15px;border:1.5px solid #aab2c0}
+.node-body th{background:#eef1f6;color:#000;font-weight:800;border:1.5px solid #aab2c0;padding:10px 14px;text-align:left}
+.node-body td{border:1px solid #c8ceda;padding:10px 14px;background:#fff;font-weight:500;color:#000}
+.node-body tr:nth-child(even) td{background:#f8fafc}
+.node-body code{background:#eef1f6;color:#0052cc;padding:3px 7px;border-radius:6px;font-family:Consolas,monospace;font-size:14px;font-weight:700}
+.node-body pre{background:#1e1e24;color:#fff;padding:16px;border-radius:12px;overflow-x:auto;margin:16px 0}
+.node-body pre code{background:transparent;color:#fff;padding:0}
+.node-body h1,.node-body h2,.node-body h3,.node-body h4{color:#000;margin:18px 0 10px;font-weight:800}
+.node-body ul,.node-body ol{padding-left:24px;margin:12px 0;list-style-position:inside}
+.node-body li{margin-bottom:6px;line-height:1.75;display:list-item;word-break:break-word}
+.node-body p{margin-bottom:12px;line-height:1.8}
+.footer{margin-top:32px;text-align:center;font-size:14px;color:var(--muted);padding-bottom:28px;font-weight:600}
+.mobile-code{background:var(--fill);border-radius:12px;padding:16px 18px;font-size:14px;line-height:1.8;font-family:ui-monospace,"SF Mono",Consolas,monospace;color:#000;font-weight:600}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="brand">Universal <b>AI Hub</b><span>个人 API 中转站 · 多渠道免费 API 统一封装</span></div>
+    <div class="endpoint" onclick="copyEndpoint()" title="点击复制我的统一 API 地址">📡 我的中转站 API: <b style="color:var(--blue);font-family:monospace;">http://localhost:3000/v1</b> <span style="font-size:11px;background:var(--fill);padding:2px 6px;border-radius:4px;border:1px solid var(--hairline)">点击复制</span></div>
+  </div>
+</nav>
+
+<div class="seg-wrap">
+  <div class="seg">
+    <button data-tab="search" class="active">🌐 AI 搜索</button>
+    <button data-tab="chat">💬 渠道对话</button>
+    <button data-tab="channels">📡 渠道管理与中转路由</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ============ 渠道对话 ============ -->
+  <section id="panel-chat" class="panel">
+    <div class="card">
+      <h2>多渠道 AI 对话中转</h2>
+      <p class="sub">通过本地中转站统一转发请求，当所选渠道失败或额度用尽时，自动无感回退到下一个可用免费渠道。</p>
+      <div class="row">
+        <select id="chat-channel"></select>
+        <select id="chat-model" class="model"></select>
+        <button type="button" class="btn-sm" id="refresh-ch">刷新渠道</button>
+      </div>
+      <label for="chat-prompt">提示词</label>
+      <textarea id="chat-prompt" placeholder="输入问题…">你好，用一句话介绍你自己</textarea>
+      <div style="margin-top:12px"><button type="button" class="btn" id="chat-send">发送</button></div>
+      <div id="chat-reply" class="reply placeholder">等待发送…</div>
+    </div>
+  </section>
+
+  <!-- ============ AI 搜索自由画布空间 ============ -->
+  <section id="panel-search" class="panel active">
+    <!-- 顶部控制条 -->
+    <div class="search-bar" style="margin-bottom:14px;">
+      <input id="query-input" value="" placeholder="输入问题发起画布中已选择的 AI 组合检索…">
+      <button type="button" class="btn" id="search-go" onclick="startUnifiedSearch(event)">搜索</button>
+      <button type="button" class="btn" id="open-history-btn" onclick="openHistoryModal()" style="background:var(--fill);color:var(--text);border:1.5px solid var(--hairline);">📜 搜索历史</button>
+      <button type="button" class="btn" onclick="clearCanvas()" style="background:var(--fill);color:var(--text);border:1.5px solid var(--hairline);">🧹 清空画布</button>
+      <button type="button" class="btn" onclick="autoAlignCanvas()" style="background:var(--fill);color:var(--text);border:1.5px solid var(--hairline);">📐 自动整齐排列</button>
+    </div>
+
+    <!-- 画布工作区：左侧组件库 + 右侧自由放置画布区域 -->
+    <div style="display:flex;gap:18px;min-height:580px;align-items:stretch;">
+      <!-- 左侧组件池 -->
+      <div style="width:260px;background:var(--card-bg,#fff);border:1.5px solid var(--card-border,#e5e7eb);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 4px 16px rgba(0,0,0,0.03);">
+        <div>
+          <h3 style="font-size:15px;font-weight:800;margin:0;display:flex;align-items:center;gap:6px;color:#000;">
+            🧩 AI 搜索引擎组件库
+          </h3>
+          <p style="font-size:12px;color:var(--muted,#6b7280);margin:4px 0 0;">按住下方任意 AI 组件卡片拖拽入右侧画布，或点击【+ 拖入】即可使用。</p>
+        </div>
+        <div id="canvas-palette" style="display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;">
+          <!-- 动态加载 5 大 AI 引擎组件 -->
+        </div>
+      </div>
+
+      <!-- 右侧自由画布区域 -->
+      <div id="search-canvas" ondragover="handleCanvasDragOver(event)" ondrop="handleCanvasDrop(event)"
+           style="flex:1;background:var(--fill,#f9fafb);background-image:radial-gradient(var(--hairline,#e5e7eb) 1.5px, transparent 1.5px);background-size:24px 24px;border:1.5px dashed var(--card-border,#d1d5db);border-radius:16px;padding:18px;position:relative;display:grid;grid-template-columns:repeat(auto-fill, minmax(360px, 1fr));gap:18px;align-content:start;min-height:580px;box-shadow:inset 0 2px 8px rgba(0,0,0,0.02);">
+        <!-- 动态拖入放置的 AI 搜索卡片 -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ AI 搜索历史二级页面/弹窗 (Modal) ============ -->
+  <div id="history-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.45);z-index:1000;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);align-items:center;justify-content:center;">
+    <div class="card" style="width:82%;max-width:1100px;height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,0.18);">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:1.5px solid var(--card-border);">
+        <div>
+          <h2 style="font-size:22px;margin:0;">📜 AI 搜索历史记录</h2>
+          <p style="font-size:13px;color:var(--muted);margin:4px 0 0;">滚动保存近 6 小时内的检索记录，超时自动清理销毁。</p>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <button type="button" class="btn-sm" id="clear-modal-history" style="color:var(--red);font-size:14px;">🗑️ 清空所有历史</button>
+          <button type="button" class="btn" id="close-modal-btn" style="padding:8px 22px;font-size:15px;">✕ 关闭</button>
+        </div>
+      </div>
+
+      <!-- 历史记录内容体：左侧历史列表 + 右侧完整问题与回答详情 -->
+      <div style="display:flex;flex:1;min-height:0;margin-top:16px;gap:20px;">
+        <!-- 左侧列表 -->
+        <div id="modal-history-list" style="width:34%;border-right:1.5px solid var(--hairline);padding-right:14px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+        </div>
+
+        <!-- 右侧详情 -->
+        <div id="modal-history-detail" style="flex:1;overflow-y:auto;background:var(--fill);border-radius:14px;padding:22px;display:flex;flex-direction:column;">
+          <div style="color:var(--muted);font-size:15px;text-align:center;margin:auto;">👈 请在左侧选择任意一条历史检索查看完整问题与回答</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 渠道管理与中转站 ============ -->
+  <section id="panel-channels" class="panel">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <h2>📡 渠道管理与中转路由中心</h2>
+        <button class="btn-sm" onclick="copyEndpoint()" style="background:var(--blue);color:#fff;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600">📋 复制中转站 API 地址</button>
+      </div>
+      <p class="sub">中转站将各大平台的白嫖免费 API 及自用 Key 统一打包为标准 OpenAI 兼容接口，供你的 Chatbox、Pi Agent、VS Code 等全电脑软件统一调用。</p>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>渠道与来源域名</th><th>扣费风险与类型</th><th>状态 / 实时余额</th><th>可用模型</th><th>说明</th><th style="text-align:right">操作</th></tr></thead>
+          <tbody id="ch-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    
+    <!-- 统一中转站使用说明 -->
+    <div class="card" style="margin-top:18px">
+      <h2>🔌 电脑各软件接入中转站指引</h2>
+      <p class="sub" style="line-height:1.8">
+        在任何支持 OpenAI 格式的软件（如 Chatbox / LobeChat / Cursor / Python 脚本 / 网页插件）中填入以下通用中转配置：<br>
+        • <b>接口地址 (Base URL)</b>: <code style="background:var(--fill);padding:2px 8px;border-radius:6px;font-weight:600">http://localhost:3000/v1</code><br>
+        • <b>API Key</b>: <code style="background:var(--fill);padding:2px 8px;border-radius:6px;font-weight:600">sk-my-custom-hub</code> (任意填写即可)<br>
+        • <b>优先配额原则</b>: 中转站默认优先调配<b>免费白嫖 API</b>，当免费额度用完或响应超时时，自动无感 fallback 到下一个可用渠道。
+      </p>
+    </div>
+  </section>
+
+</div>
+
+<div class="footer">Universal AI Hub · 个人 API 中转网关 · 聚合白嫖 API · 数据不出本机</div>
+
+<script>
+/* ---------- 常量 ---------- */
+const ENGINES = [
+  {id:"yuanbao",name:"腾讯元宝 AI 搜索",icon:"🐧",badge:"微信公众号生态 + 腾讯全网实时检索"}
+];
+const HISTORY_TTL = 6 * 60 * 60 * 1000; // 6 小时过期时间 (ms)
+let channelCache = {};
+
+/* ---------- Tab 切换（事件委托，无内联 onclick） ---------- */
+function openTab(id){
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-'+id));
+  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+  if (id === 'search') { renderCanvasGrid(); }
+  if (id === 'channels') refreshChannels();
+}
+window.openTab = openTab;
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => openTab(b.dataset.tab)));
+
+function copyEndpoint(){ navigator.clipboard.writeText('http://' + location.host + '/v1'); }
+
+/* ---------- 渠道对话 ---------- */
+async function refreshChannels(){
+  try{
+    const d = await (await fetch('/api/channels')).json();
+    channelCache = d.channels || {};
+    const sel = document.getElementById('chat-channel');
+    sel.innerHTML = '';
+    Object.entries(channelCache).forEach(([id,ch]) => {
+      const ok = ch.key_set && ch.reachable;
+      const tag = ch.billing_type === 'paid' ? ' [付费按量]' : ' [免费]';
+      sel.innerHTML += '<option value="'+id+'">'+(ok?'✓ ':'')+ch.name+tag+(ok?'':'（待配置）')+'</option>';
+    });
+    loadChannelModels();
+    renderChannelTable();
+  }catch(e){}
+}
+/* ---------- 渠道管理表格渲染 ---------- */
+function renderChannelTable(){
+  const tbody = document.getElementById('ch-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = '';
+  let rows = '';
+  Object.entries(channelCache || {}).forEach(([id, ch]) => {
+    const ok = ch.key_set && ch.reachable;
+    const dot = ok ? 'ok' : (ch.key_set ? 'err' : 'pending');
+    const status = ok ? '已连接' : (ch.key_set ? '异常' : '待配置');
+    const models = (ch.models && ch.models.length) ? ch.models.join(', ') : '—';
+    const note = ch.note || ch.error || '';
+    let actions = '';
+    if (ch.can_fill) {
+      actions += '<button class="btn-sm" onclick="fillKey(\''+id+'\')">🔑 填 Key</button>';
+    } else {
+      actions += '<span style="font-size:13px;color:var(--muted);font-weight:600">env 配置</span>';
+    }
+    rows += '<tr>'
+      + '<td><div class="ch-name">'+ch.icon+' '+ch.name+'</div><div class="ch-id">'+ch.id+'</div>'
+      + '<div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:2px">'+ (ch.provider||'') +'</div></td>'
+      + '<td style="font-size:13px">'+ (ch.billing_tag||'') +'</td>'
+      + '<td><span class="dot '+dot+'"></span><span style="font-weight:700">'+status+'</span>'
+      + '<div style="font-size:13px;color:var(--muted);font-weight:600;margin-top:4px">'+ (ch.balance||'') +'</div></td>'
+      + '<td class="ch-models">'+models+'</td>'
+      + '<td style="font-size:13px">'+note+'</td>'
+      + '<td style="text-align:right;white-space:nowrap">'+actions+'</td>'
+      + '</tr>';
+  });
+  tbody.innerHTML = rows;
+}
+/* ---------- 填入渠道 Key ---------- */
+async function fillKey(id){
+  const name = ((channelCache||{})[id]||{}).name || id;
+  const key = prompt('为「'+name+'」填入 API Key：');
+  if(!key) return;
+  try{
+    const r = await fetch('/api/channels/'+id+'/key', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({key: key.trim()})
+    });
+    const d = await r.json();
+    if(d && d.status === 'ok'){
+      alert('✅ '+name+' 已保存'+(d.reachable ? '，探测正常' : ('，但探测失败：'+(d.error||''))));
+      refreshChannels();
+    } else {
+      alert('保存失败：' + ((d&&d.error)||'未知错误'));
+    }
+  }catch(e){
+    alert('请求失败：' + e.message);
+  }
+}
+function loadChannelModels(){
+  const cid = document.getElementById('chat-channel').value;
+  const ch = channelCache[cid]; if(!ch) return;
+  const msel = document.getElementById('chat-model');
+  msel.innerHTML = '';
+  const models = (ch.models && ch.models.length) ? ch.models : [ch.default_model || '—'];
+  models.forEach(m => msel.innerHTML += '<option value="'+m+'">'+m+'</option>');
+}
+function chatSend(){
+  const model = document.getElementById('chat-model').value;
+  const prompt = document.getElementById('chat-prompt').value;
+  const out = document.getElementById('chat-reply');
+  out.classList.remove('placeholder');
+  out.innerText = '正在请求 ' + model + ' …';
+  const es = new EventSource('/v1/sse?model=' + encodeURIComponent(model) + '&prompt=' + encodeURIComponent(prompt));
+  let buf = '';
+  es.onmessage = ev => {
+    if (ev.data === '[DONE]'){ es.close(); return; }
+    try{
+      const o = JSON.parse(ev.data);
+      const c = o.choices[0].delta.content;
+      if (c){ buf += c; out.innerText = buf; }
+    }catch(e){}
+  };
+  es.onerror = () => { es.close(); if(!buf){ out.innerText = '请求失败：渠道未就绪或模型不可用'; } };
+}
+
+/* ---------- 6小时自动过期 AI 搜索历史 (二级页面/Modal 模式) ---------- */
+function getValidHistory(){
+  const now = Date.now();
+  let list = [];
+  try{ list = JSON.parse(localStorage.getItem('ai_search_history_v1') || '[]'); }catch(e){}
+  // 自动过滤掉超过 6 小时 (6 * 3600 * 1000) 的记录
+  const valid = list.filter(item => item.timestamp && (now - item.timestamp < HISTORY_TTL));
+  if (valid.length !== list.length) {
+    localStorage.setItem('ai_search_history_v1', JSON.stringify(valid));
+  }
+  return valid;
+}
+
+function saveSearchHistory(query, resultsData){
+  if (!query || !query.trim()) return;
+  let list = getValidHistory();
+  list = list.filter(item => item.query !== query);
+  const now = new Date();
+  const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  list.unshift({
+    id: String(Date.now()),
+    query: query.trim(),
+    timestamp: Date.now(),
+    time_str: timeStr,
+    results: resultsData
+  });
+  if (list.length > 20) list = list.slice(0, 20);
+  localStorage.setItem('ai_search_history_v1', JSON.stringify(list));
+}
+
+function openHistoryModal(){
+  document.getElementById('history-modal').style.display = 'flex';
+  renderModalHistoryList();
+}
+function closeHistoryModal(){
+  document.getElementById('history-modal').style.display = 'none';
+}
+window.openHistoryModal = openHistoryModal;
+window.closeHistoryModal = closeHistoryModal;
+
+function renderModalHistoryList(){
+  const list = getValidHistory();
+  const container = document.getElementById('modal-history-list');
+  const detail = document.getElementById('modal-history-detail');
+  container.innerHTML = '';
+  
+  if (list.length === 0) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:14px;padding:16px;text-align:center;">暂无 6 小时内的搜索历史</div>';
+    detail.innerHTML = '<div style="color:var(--muted);font-size:15px;text-align:center;margin:auto;">暂无检索记录</div>';
+    return;
+  }
+
+  list.forEach((item, idx) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--fill);border:1px solid var(--hairline);border-radius:12px;padding:14px 16px;cursor:pointer;transition:all .15s;';
+    card.innerHTML = '<div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;word-break:break-all;">🔍 ' + item.query + '</div>' +
+      '<div style="font-size:13px;color:var(--muted);display:flex;justify-content:space-between;"><span>时间: ' + item.time_str + '</span><span style="color:var(--blue);">查看完整回答 ➔</span></div>';
+    card.onclick = () => {
+      document.querySelectorAll('#modal-history-list > div').forEach(d => d.style.borderColor = 'var(--hairline)');
+      card.style.borderColor = 'var(--blue)';
+      showHistoryDetail(item);
+    };
+    container.appendChild(card);
+    if (idx === 0) {
+      card.style.borderColor = 'var(--blue)';
+      showHistoryDetail(item);
+    }
+  });
+}
+
+function cleanBulletFormat(txt){
+  if (!txt) return '';
+  // 修复项目符号 • 或 - 被换行误切断隔开的问题
+  return txt.replace(/([•\-*])\s*\n+/g, '$1 ').replace(/\n+\s*([•\-*])/g, '\n$1 ');
+}
+
+function renderResultHTML(thinkingText, answerText, answerHTML){
+  let html = '';
+  if (thinkingText && thinkingText.trim()) {
+    html += '<details style="margin-bottom:16px;background:#eef1f6;border:1.5px solid #aab2c0;border-radius:12px;padding:12px 16px;">' +
+      '<summary style="font-weight:800;color:#0052cc;cursor:pointer;user-select:none;font-size:15px;outline:none;">' +
+        '🧠 深度思考过程 <span style="font-weight:600;color:#2c2c30;font-size:13px;">(已自动缩起 · 点击展开)</span>' +
+      '</summary>' +
+      '<div style="margin-top:10px;padding-top:10px;border-top:1.5px dashed #bcc4d4;font-size:15px;color:#111;line-height:1.75;white-space:pre-wrap;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-weight:500;">' +
+        cleanBulletFormat(thinkingText).trim() +
+      '</div>' +
+    '</details>';
+  }
+  
+  let formattedBody = '';
+  const cleanAnsText = cleanBulletFormat(answerText);
+
+  if (answerHTML && (answerHTML.indexOf('<table') > -1 || answerHTML.indexOf('<h3') > -1)) {
+    formattedBody = answerHTML;
+  } else if (typeof marked !== 'undefined' && typeof marked.parse === 'function' && cleanAnsText) {
+    try { formattedBody = marked.parse(cleanAnsText); } catch(e) { formattedBody = '<div style="white-space:pre-wrap;">' + cleanAnsText + '</div>'; }
+  } else {
+    formattedBody = '<div style="white-space:pre-wrap;">' + (cleanAnsText || '无正文回答') + '</div>';
+  }
+
+  html += '<div class="markdown-rendered" style="font-size:16px;line-height:1.85;color:#000;font-weight:500;">' + formattedBody + '</div>';
+  return html;
+}
+
+function showHistoryDetail(item){
+  const detail = document.getElementById('modal-history-detail');
+  const firstRes = Object.values(item.results || {})[0] || { thinking: '', answer: '无回答内容' };
+  const contentHTML = firstRes.html || renderResultHTML(firstRes.thinking, firstRes.answer || firstRes.text, firstRes.answer_html);
+  
+  detail.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:14px;border-bottom:1.5px solid var(--hairline);">' +
+    '<div style="flex:1;margin-right:12px;"><div style="font-size:13px;color:var(--muted);font-weight:700;">搜索问题</div><div style="font-size:18px;font-weight:800;color:#000;margin-top:4px;">' + item.query + '</div></div>' +
+    '<button type="button" class="btn-sm" id="load-to-main-btn" style="background:var(--blue);color:#fff;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:700;white-space:nowrap;">在主视图加载</button>' +
+    '</div>' +
+    '<div style="font-size:14px;font-weight:700;color:var(--muted);margin-bottom:10px;">检索结果 (' + item.time_str + ')：</div>' +
+    '<div style="flex:1;overflow-y:auto;">' + contentHTML + '</div>';
+    
+  document.getElementById('load-to-main-btn').onclick = () => {
+    restoreHistoryItem(item);
+    closeHistoryModal();
+  };
+}
+
+/* ---------- AI 自由画布交互 ---------- */
+window.ENGINES_ALL = {
+  "yuanbao": { id: "yuanbao", name: "腾讯元宝", icon: "🐧", badge: "微信公众号生态 + 全网检索", site: "yuanbao.tencent.com" },
+  "doubao": { id: "doubao", name: "字节豆包", icon: "🧩", badge: "字节抖音全网实时检索", site: "doubao.com" },
+  "kimi": { id: "kimi", name: "月之暗面 Kimi", icon: "🌙", badge: "200万字长上下文 + 深度联网", site: "kimi.moonshot.cn" },
+  "qianwen": { id: "qianwen", name: "通义千问", icon: "🎈", badge: "阿里通义全网智搜", site: "tongyi.aliyun.com" },
+  "metaai": { id: "metaai", name: "Meta AI", icon: "🪩", badge: "Llama 3 国际化实时检索", site: "meta.ai" }
+};
+
+window.activeCanvasEngineIds = JSON.parse(localStorage.getItem('canvas_active_engines_v1') || '["yuanbao", "doubao", "kimi"]');
+
+function saveCanvasState(){
+  localStorage.setItem('canvas_active_engines_v1', JSON.stringify(window.activeCanvasEngineIds));
+}
+
+function renderCanvasPalette(){
+  const palette = document.getElementById('canvas-palette');
+  if(!palette) return;
+  palette.innerHTML = '';
+
+  Object.values(window.ENGINES_ALL).forEach(eng => {
+    const isAdded = window.activeCanvasEngineIds.includes(eng.id);
+    const item = document.createElement('div');
+    item.className = 'palette-item';
+    item.draggable = true;
+    item.ondragstart = (e) => handlePaletteDragStart(e, eng.id);
+    item.style.cssText = 'background:#fff;border:1.5px solid var(--hairline);border-radius:10px;padding:12px;cursor:grab;display:flex;flex-direction:column;gap:6px;transition:all 0.2s;user-select:none;box-shadow:0 2px 6px rgba(0,0,0,0.03);';
+    
+    item.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+        '<span style="font-weight:800;font-size:14px;color:#000;">' + eng.icon + ' ' + eng.name + '</span>' +
+        '<button type="button" class="btn-sm" onclick="addEngineToCanvas(\'' + eng.id + '\')" style="font-size:11px;padding:3px 8px;' + (isAdded ? 'background:#f3f4f6;color:#9ca3af;cursor:default;' : 'background:var(--blue);color:#fff;') + '" ' + (isAdded ? 'disabled' : '') + '>' + (isAdded ? '已在画布' : '+ 拖入') + '</button>' +
+      '</div>' +
+      '<span style="font-size:11px;color:var(--muted);">' + eng.badge + '</span>';
+
+    palette.appendChild(item);
+  });
+}
+
+function renderCanvasGrid(){
+  const canvas = document.getElementById('search-canvas');
+  if(!canvas) return;
+  canvas.innerHTML = '';
+
+  if (!window.activeCanvasEngineIds || window.activeCanvasEngineIds.length === 0) {
+    canvas.innerHTML = '<div style="grid-column:1/-1;margin:auto;padding:60px 20px;text-align:center;color:var(--muted);user-select:none;">' +
+        '<div style="font-size:42px;margin-bottom:12px;">🧩</div>' +
+        '<div style="font-size:16px;font-weight:700;color:#000;">自由画布空间目前为空</div>' +
+        '<div style="font-size:13px;margin-top:6px;">请从左侧【AI 搜索引擎组件库】按住拖拽任意 AI 引擎放入本画布中发起组合检索</div>' +
+      '</div>';
+    return;
+  }
+
+  window.activeCanvasEngineIds.forEach(id => {
+    const eng = window.ENGINES_ALL[id] || { id, name: id, icon: '🤖', badge: 'AI 引擎' };
+    const card = document.createElement('div');
+    card.className = 'node-card canvas-card';
+    card.dataset.id = id;
+    card.style.cssText = 'background:#fff;border:1.5px solid var(--hairline);border-radius:14px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:12px;';
+    card.innerHTML = '<div class="node-head" style="display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1.5px solid var(--hairline);">' +
+        '<div style="display:flex;align-items:center;gap:8px;"><span class="node-name" style="font-weight:800;font-size:15px;color:#000;">' + eng.icon + ' ' + eng.name + '</span><span class="node-badge" style="font-size:11px;background:var(--fill);padding:2px 8px;border-radius:6px;color:var(--muted);">' + eng.badge + '</span></div>' +
+        '<button type="button" class="btn-sm" onclick="removeEngineFromCanvas(\'' + id + '\')" style="background:transparent;color:var(--muted);border:none;font-size:15px;cursor:pointer;padding:2px 6px;" title="从画布中移除">✕</button>' +
+      '</div>' +
+      '<div class="node-body" id="body-' + id + '" style="min-height:200px;max-height:480px;overflow-y:auto;font-size:15px;line-height:1.75;color:#000;">等待发起搜索…</div>' +
+      '<div class="node-foot" style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--hairline);">' +
+        '<span id="status-' + id + '" style="font-size:12px;color:var(--muted);font-weight:600;">就绪</span>' +
+      '</div>';
+    canvas.appendChild(card);
+  });
+
+  renderCanvasPalette();
+}
+
+function handlePaletteDragStart(ev, engineId){
+  ev.dataTransfer.setData('text/plain', engineId);
+  ev.dataTransfer.effectAllowed = 'copy';
+}
+
+function handleCanvasDragOver(ev){
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'copy';
+}
+
+function handleCanvasDrop(ev){
+  ev.preventDefault();
+  const engineId = ev.dataTransfer.getData('text/plain');
+  if (engineId && window.ENGINES_ALL[engineId]) {
+    addEngineToCanvas(engineId);
+  }
+}
+
+function addEngineToCanvas(engineId){
+  if (!window.activeCanvasEngineIds.includes(engineId)) {
+    window.activeCanvasEngineIds.push(engineId);
+    saveCanvasState();
+    renderCanvasGrid();
+  }
+}
+
+function removeEngineFromCanvas(engineId){
+  window.activeCanvasEngineIds = window.activeCanvasEngineIds.filter(id => id !== engineId);
+  saveCanvasState();
+  renderCanvasGrid();
+}
+
+function clearCanvas(){
+  if (!window.activeCanvasEngineIds || window.activeCanvasEngineIds.length === 0) return;
+  window.activeCanvasEngineIds = [];
+  saveCanvasState();
+  renderCanvasGrid();
+}
+
+function autoAlignCanvas(){
+  renderCanvasGrid();
+}
+
+window.addEngineToCanvas = addEngineToCanvas;
+window.removeEngineFromCanvas = removeEngineFromCanvas;
+window.clearCanvas = clearCanvas;
+window.autoAlignCanvas = autoAlignCanvas;
+window.handlePaletteDragStart = handlePaletteDragStart;
+window.handleCanvasDragOver = handleCanvasDragOver;
+window.handleCanvasDrop = handleCanvasDrop;
+
+function restoreHistoryItem(item){
+  const input = document.getElementById('query-input');
+  if(input) input.value = item.query;
+  const resKeys = Object.keys(item.results || {});
+  if (resKeys.length > 0) {
+    window.activeCanvasEngineIds = resKeys;
+    saveCanvasState();
+  }
+  renderCanvasGrid();
+  window.activeCanvasEngineIds.forEach(id => {
+    const b = document.getElementById('body-' + id);
+    const s = document.getElementById('status-' + id);
+    const res = (item.results || {})[id];
+    if (b && res) {
+      b.innerHTML = res.html || renderResultHTML(res.thinking, res.answer || res.text, res.answer_html);
+      if (s) s.innerText = '历史记录 · 引用 ' + (res.refs || 0) + ' 条';
+    }
+  });
+}
+
+function startUnifiedSearch(ev){
+  if (ev && ev.preventDefault) ev.preventDefault();
+  const inputEl = document.getElementById('query-input');
+  const prompt = inputEl ? inputEl.value.trim() : '';
+  if (!prompt) {
+    alert('请输入搜索内容');
+    return;
+  }
+
+  if (!window.activeCanvasEngineIds || window.activeCanvasEngineIds.length === 0) {
+    alert('画布中暂无 AI 组件！请先从左侧拖入至少一个 AI 搜索引擎。');
+    return;
+  }
+
+  window.activeCanvasEngineIds.forEach(id => {
+    const eng = window.ENGINES_ALL[id];
+    const body = document.getElementById('body-' + id);
+    const status = document.getElementById('status-' + id);
+    if (body) body.innerHTML = '正在连接 ' + (eng ? eng.name : id) + '…<span class="cursor-blink"></span>';
+    if (status) status.innerText = '检索中…';
+  });
+
+  const currentResults = {};
+  const enginesParam = encodeURIComponent(window.activeCanvasEngineIds.join(','));
+  const es = new EventSource('/api/unified_stream?prompt=' + encodeURIComponent(prompt) + '&engines=' + enginesParam);
+
+  es.onmessage = ev => {
+    if (ev.data === '[DONE]'){
+      es.close();
+      window.activeCanvasEngineIds.forEach(id => {
+        const b = document.getElementById('body-' + id);
+        const c = b ? b.querySelector('.cursor-blink') : null;
+        if(c) c.remove();
+        if (!currentResults[id]) {
+          currentResults[id] = {
+            answer: b ? b.innerText.trim() : '',
+            html: b ? b.innerHTML : '',
+            refs: 0
+          };
+        }
+      });
+      saveSearchHistory(prompt, currentResults);
+      return;
+    }
+    try {
+      const d = JSON.parse(ev.data);
+      if (d.id && window.activeCanvasEngineIds.includes(d.id)) {
+        const b = document.getElementById('body-' + d.id);
+        const s = document.getElementById('status-' + d.id);
+        if (d.status === 'progress' && b) {
+          b.innerText = d.msg;
+        } else if (d.status === 'done' && b) {
+          const answerText = d.answer || d.text || '';
+          const answerHTML = d.answer_html || '';
+          b.innerHTML = renderResultHTML(d.thinking, answerText, answerHTML);
+          currentResults[d.id] = {
+            thinking: d.thinking || '',
+            answer: answerText,
+            answer_html: answerHTML,
+            html: b.innerHTML,
+            refs: d.refs || 0
+          };
+          if (s) s.innerText = d.refs ? '完成 · 引用 ' + d.refs + ' 条' : '完成';
+        }
+      }
+    } catch(e){}
+  };
+  es.onerror = () => es.close();
+}
+
+window.startUnifiedSearch = startUnifiedSearch;
+window.renderCanvasGrid = renderCanvasGrid;
+window.renderCanvasPalette = renderCanvasPalette;
+
+window.onload = () => { openTab('search'); renderCanvasGrid(); refreshChannels(); };
+</script>
+</body>
+</html>

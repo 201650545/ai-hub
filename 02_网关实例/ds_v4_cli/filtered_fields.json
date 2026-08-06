@@ -1,0 +1,8 @@
+[
+  {"name": "厂商/平台", "type": "text"},
+  {"name": "核心活动与免费额度", "type": "text"},
+  {"name": "活动有效期与重置规则", "type": "text"},
+  {"name": "价格与超出后计费标准", "type": "text"},
+  {"name": "防扣费安全机制(风险评分)", "type": "text"},
+  {"name": "实用性评估(筛选规则)", "type": "text"}
+]

@@ -1,0 +1,22 @@
+{
+  "fields": ["厂商/平台", "分类", "免费额度/规则", "Base URL / Model ID", "特点与适用场景"],
+  "rows": [
+    ["OpenRouter", "完全免费", "200 请求/天 免费 (充值$10升1000/天)", "https://openrouter.ai/api/v1\ndeepseek/deepseek-v4-flash:free", "支持全网模型对比，无需信用卡绑定"],
+    ["NVIDIA NIM", "完全免费", "40 RPM (每分钟40请求)", "https://integrate.api.nvidia.com/v1\ndeepseek-ai/deepseek-r1 / v3", "注册 NVIDIA 开发者账号即送，1M 超长上下文"],
+    ["Cline (Coding Agent)", "完全免费", "V4-Flash 完全免费，额度翻3倍", "CLI / VSCode Extension", "开源 CLI & Coding Agent，装 npm 包即跑，无需 Key"],
+    ["OpenCode / Zen", "完全免费", "Free tier 约 200次/天 (每天重置)", "CLI / Extension", "适配 Cursor、Claude Code、Codex 工作流，不限死客户端"],
+    ["ZenMux", "完全免费", "限时免费，无限次", "API / CLI", "适配 Codex 工作流，国内访问极快，无需实名"],
+    ["BazaarLink", "完全免费", "150 次/天 (充值后 450 次)", "API", "邮箱注册，无需绑定银行卡"],
+    ["Hugging Face", "完全免费", "免费共享推理端点 (有限速)", "HF Inference API", "适合原型验证，开源权重可本地部署"],
+    ["DeepSeek 官方网页/App", "完全免费", "快速模式 (即 V4-Flash) 完全免费", "网页/App 交互 (无 API)", "最省事，但仅限于网页和 Mobile App 问答"],
+    ["硅基流动 SiliconFlow ⭐⭐⭐⭐⭐", "国内云平台", "新用户送约 200万 tokens (¥14)", "https://api.siliconflow.cn/v1\ndeepseek-ai/DeepSeek-V3", "国内访问极快，性价比极高，推荐日常出题/批改"],
+    ["阿里云百炼 DashScope ⭐⭐⭐⭐⭐", "国内云平台", "每模型送 100万 tokens (90天有效)", "https://dashscope.aliyuncs.com/compatible-mode/v1\ndeepseek-v3 / deepseek-r1", "OpenAI 兼容，阿里云原生稳定网关"],
+    ["腾讯云 TokenHub ⭐⭐⭐⭐", "国内云平台", "Flash 单独 100万 tokens (90天)", "腾讯云 API 网关", "双协议支持 (OpenAI + Anthropic)，峰谷定价"],
+    ["商汤 Token Plan ⭐⭐⭐⭐", "国内云平台", "500 次/5 小时，公测期完全免费", "https://platform.sensenova.cn/", "手机号一键注册，免绑卡免企业认证"],
+    ["火山方舟 (字节) ⭐⭐⭐⭐", "国内云平台", "新用户 50万 tokens，月度重置", "https://ark.cn-beijing.volces.com/api/v3", "字节跳动方舟大模型服务平台"],
+    ["国家超算互联网 SCNet ⭐⭐⭐", "国内云平台", "API 调用 + 模型文件下载", "国家级算力平台", "科研、政务、高校场景首选"],
+    ["DeepSeek 官方 API ⭐⭐⭐⭐⭐", "海外低价/生产", "缓存命中 $0.0028 / 未命中 $0.14 / 输出 $0.28", "https://api.deepseek.com/v1\ndeepseek-chat", "生产首推！TTFT 最短 (2.6s)，速度最快 (106 tok/s)"],
+    ["Nano-GPT", "海外低价/生产", "$0.01 / $0.02 (每百万 tokens)", "https://nano-gpt.com/api", "支持 Thinking 模式，极低价格"],
+    ["DeepInfra / Vercel AI", "海外低价/生产", "$0.09 / $0.18 (每百万 tokens)", "API / Vercel AI Gateway", "比官方低 30%-50%，适合全栈/前端项目"]
+  ]
+}

@@ -35,3 +35,10 @@
 ## 依赖
 - 中央平台 `server.py` 已运行（用于注册）
 - 模板文件已准备好
+
+## 完成记录
+- 完成时间：2026-08-06 14:42
+- 执行模型：Gemini 3.6 Flash
+- 验收结果：已准备好 `01_网关模板/template/` 下全部 5 个标准模板文件（含升级后的多轮对话 `engines.py`）。实现 `create_gateway.py` 命令行生成器，成功运行 `python create_gateway.py my_hub --port 3001` 生成可运行的 `my_hub` 网关实例并附带 `config.json` 与自动向中央平台 POST 注册机制。语法与编译验证通过。
+- 遗留问题：无
+

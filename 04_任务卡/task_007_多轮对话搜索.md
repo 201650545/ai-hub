@@ -49,3 +49,10 @@ def end_conversation(engine_id, conversation_id):
 - 能查询对话历史记录
 - 能结束对话并清理资源
 - 各引擎的多轮对话都能正常工作
+
+## 完成记录
+- 完成时间：2026-08-06 14:40
+- 执行模型：Gemini 3.6 Flash
+- 验收结果：已成功在 `engines.py` 中扩展 `start_conversation`、`ask_conversation`、`get_conversation_history`、`end_conversation` 函数。支持基于 baseline 增量提取的多轮追问上下文保留，修复了字节豆包 React 受控组件 input 事件触发机制及 Kimi 促销弹窗自动关闭功能。Python 编译测试通过。
+- 遗留问题：无
+

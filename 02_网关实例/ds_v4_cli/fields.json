@@ -1,0 +1,7 @@
+[
+  {"name": "厂商/平台", "type": "text"},
+  {"name": "分类", "type": "text"},
+  {"name": "免费额度/规则", "type": "text"},
+  {"name": "Base URL / Model ID", "type": "text"},
+  {"name": "特点与适用场景", "type": "text"}
+]

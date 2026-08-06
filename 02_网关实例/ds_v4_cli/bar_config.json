@@ -1,0 +1,7 @@
+{
+  "table_name": "实用性精选与黑名单",
+  "count_all": true,
+  "group_by": [
+    { "field_name": "防扣费安全机制(风险评分)", "mode": "integrated" }
+  ]
+}

@@ -7,6 +7,7 @@ AI Hub 中央管理平台 — FastAPI 主服务
 依赖: pip install fastapi uvicorn httpx
 """
 
+import asyncio
 import json
 import os
 import subprocess
@@ -203,36 +204,142 @@ async def gateway_health(gid: str):
 
 # ---------------------------------------------------------------- GitHub 集成
 
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+import github_manager
 
 
 @app.get("/api/github/repos")
 async def github_repos():
     """GitHub 仓库列表。"""
-    import httpx
-    if not GITHUB_TOKEN:
-        return {"error": "未配置 GITHUB_TOKEN 环境变量", "repos": []}
-    async with httpx.AsyncClient() as client:
-        r = await client.get(
-            "https://api.github.com/user/repos?per_page=30&sort=updated",
-            headers={"Authorization": f"token {GITHUB_TOKEN}",
-                     "Accept": "application/vnd.github.v3+json"}
-        )
-        if r.status_code == 200:
-            repos = [{"name": x["name"], "url": x["html_url"],
-                      "language": x.get("language"), "description": x.get("description"),
-                      "updated_at": x["updated_at"]} for x in r.json()]
-            return {"repos": repos}
-        return {"error": f"GitHub API 错误: {r.status_code}", "repos": []}
+    return await github_manager.list_repos()
+
+
+@app.post("/api/github/repos")
+async def github_create_repo(request: Request):
+    """创建仓库。"""
+    body = await request.json()
+    return await github_manager.create_repo(body.get("name", ""),
+                                            body.get("description", ""),
+                                            body.get("private", True))
+
+
+# ---- task_004：仓库文件读取 ----
+
+@app.get("/api/github/repos/{owner}/{repo}/contents")
+async def github_repo_contents(owner: str, repo: str, path: str = "", ref: str = ""):
+    """读取仓库文件/目录内容（供分析）。"""
+    return await github_manager.get_repo_contents(owner, repo, path, ref)
+
+
+@app.get("/api/github/repos/{owner}/{repo}/contents/{path:path}")
+async def github_repo_contents_path(owner: str, repo: str, path: str, ref: str = ""):
+    """读取仓库指定路径内容（支持多级路径）。"""
+    return await github_manager.get_repo_contents(owner, repo, path, ref)
+
+
+# ---- task_004：Issue 管理 ----
+
+@app.get("/api/github/repos/{owner}/{repo}/issues")
+async def github_issues(owner: str, repo: str, state: str = "open"):
+    """Issue 列表。"""
+    return await github_manager.list_issues(owner, repo, state)
+
+
+@app.post("/api/github/repos/{owner}/{repo}/issues")
+async def github_create_issue(owner: str, repo: str, request: Request):
+    """创建 Issue。"""
+    body = await request.json()
+    return await github_manager.create_issue(owner, repo, body.get("title", ""),
+                                             body.get("body", ""))
+
+
+@app.patch("/api/github/repos/{owner}/{repo}/issues/{number}")
+async def github_update_issue(owner: str, repo: str, number: int, request: Request):
+    """更新 Issue（关闭等）。"""
+    body = await request.json()
+    if body.get("state") == "closed":
+        return await github_manager.close_issue(owner, repo, number,
+                                                body.get("comment", ""))
+    return {"error": "仅支持 state=closed"}
+
+
+@app.post("/api/github/repos/{owner}/{repo}/issues/{number}/comments")
+async def github_issue_comment(owner: str, repo: str, number: int, request: Request):
+    """添加 Issue 评论。"""
+    body = await request.json()
+    return await github_manager.add_issue_comment(owner, repo, number, body.get("body", ""))
+
+
+@app.get("/api/github/repos/{owner}/{repo}/issues/{number}/comments")
+async def github_issue_comments(owner: str, repo: str, number: int):
+    """列出 Issue 评论。"""
+    return await github_manager.list_issue_comments(owner, repo, number)
+
+
+@app.post("/api/github/repos/{owner}/{repo}/issues/{number}/labels")
+async def github_issue_labels(owner: str, repo: str, number: int, request: Request):
+    """添加 Issue 标签。"""
+    body = await request.json()
+    return await github_manager.add_issue_labels(owner, repo, number,
+                                                 body.get("labels", []))
+
+
+# ---- task_004：PR 管理 ----
+
+@app.get("/api/github/repos/{owner}/{repo}/pulls")
+async def github_pulls(owner: str, repo: str, state: str = "open"):
+    """PR 列表。"""
+    return await github_manager.list_pull_requests(owner, repo, state)
+
+
+@app.get("/api/github/repos/{owner}/{repo}/pulls/{number}")
+async def github_pull_detail(owner: str, repo: str, number: int):
+    """PR 详情。"""
+    return await github_manager.get_pull_request(owner, repo, number)
+
+
+@app.post("/api/github/repos/{owner}/{repo}/pulls")
+async def github_create_pull(owner: str, repo: str, request: Request):
+    """创建 PR。"""
+    body = await request.json()
+    return await github_manager.create_pull_request(owner, repo,
+                                                    body.get("title", ""),
+                                                    body.get("head", ""),
+                                                    body.get("base", "main"),
+                                                    body.get("body", ""))
+
+
+@app.put("/api/github/repos/{owner}/{repo}/pulls/{number}/merge")
+async def github_merge_pull(owner: str, repo: str, number: int, request: Request):
+    """合并 PR。"""
+    body = await request.json()
+    return await github_manager.merge_pull_request(owner, repo, number,
+                                                   body.get("commit_title", ""),
+                                                   body.get("merge_method", "merge"))
 
 
 # ---------------------------------------------------------------- 飞书同步
 
+import feishu_sync
+
+
 @app.post("/api/feishu/sync")
-async def feishu_sync():
+async def feishu_sync_trigger():
     """手动触发飞书数据同步。"""
-    # TODO: 实现飞书同步逻辑
-    return {"ok": True, "message": "同步功能待实现"}
+    result = await feishu_sync.sync_all()
+    if result.get("error"):
+        raise HTTPException(400, result["error"])
+    return result
+
+
+@app.get("/api/feishu/tables")
+async def feishu_tables():
+    """飞书表格配置信息（脱敏）。"""
+    cfg = feishu_sync.load_feishu_config()
+    return {
+        "app_token": cfg.get("app_token", ""),
+        "tables": cfg.get("tables", {}),
+        "configured": bool(cfg.get("app_token") and cfg.get("tables", {}).get("gateways")),
+    }
 
 
 # ---------------------------------------------------------------- 统计
@@ -250,6 +357,13 @@ async def stats():
 
 
 # ---------------------------------------------------------------- 启动
+
+@app.on_event("startup")
+async def on_startup():
+    """启动时注册：每 5 分钟自动飞书同步一次（后台任务，失败不阻塞）。"""
+    loop = asyncio.get_event_loop()
+    feishu_sync.schedule_sync(interval_seconds=300, loop=loop)
+
 
 if __name__ == "__main__":
     print("🌐 AI Hub 中央平台启动中...")

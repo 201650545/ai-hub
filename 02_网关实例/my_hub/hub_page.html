@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Gateway</title>
+<style>
+:root{
+  --bg:#090a0f; --text:#f3f4f6; --muted:#9ca3af; --hairline:#222436;
+  --blue:#6366f1; --green:#10b981; --amber:#f59e0b; --red:#f43f5e;
+  --fill:#12131c; --card-border:#222436;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased;
+  display:flex; flex-direction:column; min-height:100vh; font-weight:500;
+}
+.nav{
+  position:sticky; top:0; z-index:50; background:rgba(18,19,28,.96);
+  backdrop-filter:blur(20px); border-bottom:1px solid var(--card-border);
+}
+.nav-inner{width:90%;max-width:1400px;margin:0 auto;padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
+.brand{font-size:18px;font-weight:700;color:#fff}
+.endpoint{font-size:14px;color:var(--blue);font-weight:600}
+.wrap{width:90%;max-width:1400px;margin:0 auto;padding:24px;flex:1}
+.card{background:var(--fill);border:1px solid var(--hairline);border-radius:16px;padding:30px}
+h2{font-size:24px;font-weight:700;margin-bottom:8px;color:#fff}
+.sub{font-size:14px;color:var(--muted);margin-bottom:20px}
+.search-bar{display:flex;gap:12px;margin-bottom:24px}
+.search-bar input{flex:1;border-radius:10px;padding:14px 20px;font-size:15px;background:#090a0f;border:1px solid var(--hairline);color:#fff;outline:none}
+.btn{background:var(--blue);color:#fff;border:none;padding:12px 24px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+.btn:hover{opacity:.9}
+.results-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:20px}
+.node-card{background:#0e0f17;border:1px solid var(--hairline);border-radius:14px;padding:20px;display:flex;flex-direction:column}
+.node-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.node-name{font-size:16px;font-weight:700;color:#fff}
+.node-body{flex:1;font-size:14px;line-height:1.7;color:#e0e0e0;white-space:pre-wrap;background:#090a0f;border:1px solid var(--hairline);border-radius:8px;padding:14px;min-height:160px}
+</style>
+</head>
+<body>
+<div class="nav">
+  <div class="nav-inner">
+    <div class="brand">🌐 <span>AI Search Gateway</span></div>
+    <div class="endpoint">OpenAI API: http://localhost:3000/v1</div>
+  </div>
+</div>
+<div class="wrap">
+  <div class="card">
+    <h2>多引擎并发 AI 搜索</h2>
+    <p class="sub">无感操控本地已登录浏览器会话，同时调度多款 AI 搜索引擎</p>
+    <div class="search-bar">
+      <input type="text" id="prompt-input" placeholder="输入搜索问题，按 Enter 发送..." onkeydown="if(event.key==='Enter') runSearch()">
+      <button class="btn" onclick="runSearch()">一键智搜</button>
+    </div>
+    <div class="results-grid" id="results-grid">
+      <!-- 动态数据 -->
+    </div>
+  </div>
+</div>
+<script>
+async function runSearch() {
+  const input = document.getElementById('prompt-input');
+  const prompt = input.value.trim();
+  if(!prompt) return;
+  const grid = document.getElementById('results-grid');
+  grid.innerHTML = '<p style="color:#888">正在并发调用引擎处理中...</p>';
+  
+  const es = new EventSource('/api/unified_stream?prompt=' + encodeURIComponent(prompt));
+  const cards = {};
+
+  es.onmessage = (e) => {
+    if(e.data === '[DONE]') { es.close(); return; }
+    try {
+      const data = JSON.parse(e.data);
+      const eid = data.id;
+      if(!cards[eid]) {
+        const card = document.createElement('div');
+        card.className = 'node-card';
+        card.innerHTML = `<div class="node-head"><div class="node-name">${eid}</div></div><div class="node-body" id="body-${eid}"></div>`;
+        if(grid.querySelector('p')) grid.innerHTML = '';
+        grid.appendChild(card);
+        cards[eid] = document.getElementById('body-' + eid);
+      }
+      if(data.status === 'stream') {
+        cards[eid].innerText += data.chunk;
+      } else if(data.status === 'done') {
+        cards[eid].innerText = data.answer || '无结果';
+      }
+    } catch(err) {}
+  };
+}
+</script>
+</body>
+</html>

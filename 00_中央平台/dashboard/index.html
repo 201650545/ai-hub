@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Hub — 控制台</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 侧边栏导航 -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">🌐</div>
+                <div class="brand-info">
+                    <h2>AI Hub</h2>
+                    <span class="version-tag">v1.0 Pro</span>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="nav">
+                    <span class="icon">🧭</span> 导航首页
+                </button>
+                <button class="nav-item" data-tab="gateways">
+                    <span class="icon">⚡</span> 网关管理
+                </button>
+                <button class="nav-item" data-tab="github">
+                    <span class="icon">🐙</span> GitHub 项目
+                </button>
+                <button class="nav-item" data-tab="feishu">
+                    <span class="icon">📑</span> 飞书同步
+                </button>
+                <button class="nav-item" data-tab="stats">
+                    <span class="icon">📊</span> 统计分析
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="server-status">
+                    <span class="status-dot online"></span>
+                    <span>中央平台运行中 (:8000)</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主内容区域 -->
+        <main class="main-content">
+            <!-- 头部 -->
+            <header class="top-header">
+                <div class="header-title">
+                    <h1 id="page-title">导航首页</h1>
+                    <p id="page-subtitle">中央 AI 服务中转与网关路由中心</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="refresh-btn">
+                        <span class="icon">🔄</span> 刷新数据
+                    </button>
+                    <button class="btn btn-primary" id="open-register-modal-btn">
+                        <span class="icon">➕</span> 注册网关
+                    </button>
+                </div>
+            </header>
+
+            <!-- 提示信息容器 -->
+            <div id="toast-container"></div>
+
+            <!-- TAB 1: 导航首页 -->
+            <section class="tab-page active" id="tab-nav">
+                <div class="stats-banner">
+                    <div class="stat-card">
+                        <div class="stat-icon">🔗</div>
+                        <div class="stat-body">
+                            <span class="stat-label">总网关数</span>
+                            <span class="stat-value" id="nav-total-gw">0</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon emerald">🟢</div>
+                        <div class="stat-body">
+                            <span class="stat-label">在线网关</span>
+                            <span class="stat-value text-emerald" id="nav-online-gw">0</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon rose">🔴</div>
+                        <div class="stat-body">
+                            <span class="stat-label">离线网关</span>
+                            <span class="stat-value text-rose" id="nav-offline-gw">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-title">
+                    <h3>已部署网关节点</h3>
+                </div>
+                <div class="cards-grid" id="gateway-cards-grid">
+                    <!-- 动态生成网关卡片 -->
+                </div>
+            </section>
+
+            <!-- TAB 2: 网关管理页 -->
+            <section class="tab-page" id="tab-gateways">
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3>网关注册表</h3>
+                        <span class="table-subtitle">包含已接入中央平台的所有 Gateway 节点及其运行状态</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>网关名称</th>
+                                    <th>端口</th>
+                                    <th>URL</th>
+                                    <th>状态</th>
+                                    <th>最后在线</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gateways-table-body">
+                                <!-- 动态插入 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: GitHub 项目页 -->
+            <section class="tab-page" id="tab-github">
+                <div class="tab-header-actions">
+                    <div class="github-search">
+                        <input type="text" id="github-search-input" placeholder="搜索仓库..." class="form-input">
+                    </div>
+                    <button class="btn btn-primary" id="open-github-modal-btn">
+                        <span class="icon">🚀</span> 创建 GitHub 仓库
+                    </button>
+                </div>
+                <div class="repos-grid" id="github-repos-grid">
+                    <!-- 动态生成 Repo 卡片 -->
+                </div>
+            </section>
+
+            <!-- TAB 4: 飞书同步页 -->
+            <section class="tab-page" id="tab-feishu">
+                <div class="sync-panel">
+                    <div class="sync-card">
+                        <div class="sync-info">
+                            <div class="sync-icon">📑</div>
+                            <div>
+                                <h3>飞书多维表格同步服务</h3>
+                                <p>自动将本地 JSON 数据（gateways / channels / history）增量同步至飞书 Base</p>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-lg" id="trigger-sync-btn">
+                            <span class="icon">⚡</span> 立即触发同步
+                        </button>
+                    </div>
+
+                    <div class="sync-history-card">
+                        <h3>同步状态与历史日志</h3>
+                        <div class="log-box" id="feishu-log-box">
+                            <div class="log-line info">[SYS] 飞书多维表格定时同步任务轮询中 (每 5 分钟自动增量)</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: 统计页 -->
+            <section class="tab-page" id="tab-stats">
+                <div class="stats-overview-grid">
+                    <div class="chart-card">
+                        <h3>网关状态占比</h3>
+                        <div class="progress-bar-group" id="stats-gw-progress">
+                            <!-- 动态条形图 -->
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>调用指标概览</h3>
+                        <div class="metric-list">
+                            <div class="metric-item">
+                                <span>今日 API 总请求量</span>
+                                <strong>1,420 次</strong>
+                            </div>
+                            <div class="metric-item">
+                                <span>平均响应时延</span>
+                                <strong>1.8s</strong>
+                            </div>
+                            <div class="metric-item">
+                                <span>搜索引擎成功率</span>
+                                <strong class="text-emerald">99.2%</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 注册网关 Modal -->
+    <div class="modal-overlay" id="register-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>注册新网关</h3>
+                <button class="close-btn" id="close-register-modal">&times;</button>
+            </div>
+            <form id="register-gateway-form">
+                <div class="form-group">
+                    <label>网关标识 ID / 名称 *</label>
+                    <input type="text" name="name" required placeholder="如 my_search_hub" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>图标 (Emoji)</label>
+                    <input type="text" name="icon" value="🔗" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>描述信息</label>
+                    <input type="text" name="description" placeholder="网关用途简述" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>端口号 *</label>
+                    <input type="number" name="port" value="3001" required class="form-input">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancel-register-modal">取消</button>
+                    <button type="submit" class="btn btn-primary">提交注册</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 创建 Repo Modal -->
+    <div class="modal-overlay" id="github-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>创建 GitHub 仓库</h3>
+                <button class="close-btn" id="close-github-modal">&times;</button>
+            </div>
+            <form id="create-github-form">
+                <div class="form-group">
+                    <label>仓库名称 *</label>
+                    <input type="text" name="repo_name" required placeholder="如 ai-search-gateway" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <input type="text" name="repo_desc" placeholder="仓库描述" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>公开 / 私有</label>
+                    <select name="private" class="form-input">
+                        <option value="false">Public (公开)</option>
+                        <option value="true">Private (私有)</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancel-github-modal">取消</button>
+                    <button type="submit" class="btn btn-primary">立即创建</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
