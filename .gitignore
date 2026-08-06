@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific - 敏感信息绝不进 Git
+config/channels.json
+config/gateways.json
+config/feishu.json
+*.log
+gateway.log
+gateway_err.log
+
+# 网关实例数据（各网关本地运行数据）
+02_网关实例/*/channels.json
+02_网关实例/*/history.json
+02_网关实例/*/quota.json
+02_网关实例/*/__pycache__/
+
+# 临时文件
+_tmp/
+*.tmp

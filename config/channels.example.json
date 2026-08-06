@@ -1,0 +1,11 @@
+{
+  "keys": {
+    "deepseek": "sk-your-deepseek-key-here",
+    "gemini": "AIzaSy-your-gemini-key-here",
+    "openrouter": "sk-or-v1-your-openrouter-key-here",
+    "groq": "",
+    "siliconflow": "",
+    "dashscope": "",
+    "zhipu": ""
+  }
+}
