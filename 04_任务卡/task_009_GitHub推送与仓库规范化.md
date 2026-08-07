@@ -41,4 +41,12 @@ git push -u origin main
 - README 含 AI 协作者导读
 
 ## 完成记录
-（执行后填写）
+- 2026-08-06 完成（本地部分；push 待认证）
+- 远程：`git remote add origin https://github.com/201650545/ai-hub.git` 已配置
+- `.gitattributes`：`* text=auto eol=crlf` 统一行尾；`.gitignore` 已确认生效（channels/gateways/feishu/history/quota/*.json.lock 均不入库）
+- 敏感扫描：`git grep sk-/AIza/Bearer` 仅命中示例/占位符，无真实 key
+- README 增强：项目状态徽章、「给 AI 协作者的导读」、当前进度表、核心目录速览
+- ⚠️ PUSH 未完成：本机无 credential manager / gh / token，git push 提示认证。需用户终端执行：
+  `git config --global credential.helper manager && git push -u origin main`
+- 本地已提交 4 张卡全部工作（008/009本地/010/011），待 push 一次性同步
+- 遗留：push 成功前 remote 未同步；推送后建议 `git ls-remote origin` 复核文件树（应无 channels/auth/feishu/quota/history JSON）
