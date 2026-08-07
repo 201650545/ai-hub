@@ -76,3 +76,32 @@
 - opencli daemon 运行中，Chrome 扩展已连接（v1.0.22）
 - 引擎单次问答已稳定（元宝/Kimi 稳定，豆包偶发不稳，MetaAI 待登录）
 - 后端 GitHub/飞书 API 框架已搭好，你只需在前端调用
+
+---
+
+## 第二阶段：运维操作任务（task_001/002/007 完成后执行）
+
+以下 4 项是线上配置操作，按顺序执行：
+
+### 运维-1：Grok / Perplexity 引擎绑定
+- 运行 `cd D:\项目\02_网关实例\ds_v4_cli && python setup_engines.py`
+- 引导用户在弹出的 Chrome 标签页完成 grok.com 和 perplexity.ai 登录
+- 重跑脚本确认 connected=True, input_found=True
+- 若页面 DOM 与适配器选择器不匹配，微调 engines.py 中 grok/perplexity 的 fill_selector/probe_js/extract_js
+
+### 运维-2：4 渠道 key 填入与验证
+- 用户在网页「渠道管理」页填入 groq/siliconflow/dashscope/zhipu 的 key（或提供给你写入 config/channels.json）
+- 运行 `python test_channels.py --ping groq --ping siliconflow --ping dashscope --ping zhipu` 逐个验证
+- 全部 reachable=True 后运行 `--fallback` 确认路由链
+
+### 运维-3：飞书凭据配置与真实同步验证
+- 引导用户设置环境变量 FEISHU_APP_ID / FEISHU_APP_SECRET
+- 在 `D:\项目\config\feishu.json` 填入 app_token 和 4 张表 table_id
+- 调用 `POST http://localhost:8000/api/feishu/sync`，验证飞书 4 张表真实写入且增量无重复
+- 若多维表格尚未创建，先用飞书 API 创建 gateways/api_channels/conversations/daily_stats 4 张表（字段结构见 ARCHITECTURE.md 第 5 节）
+
+### 运维-4：引擎面板联调
+- 在管理面板（:8000/dashboard）和网关页（:3000）做一轮完整操作：引擎卡片状态、多轮对话实测、渠道状态展示
+- 发现 UI 问题直接修复
+
+每项完成后在 `04_任务卡\README.md` 的运维区打勾记录。
