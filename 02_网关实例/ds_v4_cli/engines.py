@@ -2,83 +2,31 @@
 """
 引擎适配层 (engine adapters) —— 通过本地 opencli 浏览器会话无感操控已登录的 AI 搜索引擎网页端。
 Engine adapter layer: controls logged-in AI search engine web sessions via opencli.
-
-Design:
-- One engine = one subprocess controlled by `opencli browser <session>`.
-- Use subprocess.list2cmdline + shell=True; JS injection uses single quotes only.
-- Unbound sessions return connected=False; no fake response generated.
+Supports single-turn and multi-turn conversations.
 """
 
 import json
-import os
 import re
-import shutil
 import subprocess
 import threading
 import time
+import uuid
 
-# OPENCLI 执行方式：优先环境变量，其次自动检测，绝不硬编码本机路径。
-#   环境变量 OPENCLI_SCRIPT   → 直接指定 opencli main.js 的完整路径
-#   环境变量 OPENCLI          → 直接指定 opencli 命令名或 main.js 路径
-#   否则自动检测 node 可执行文件 + npm 全局安装的 @jackwener/opencli
-OPENCLI_ENV = os.environ.get("OPENCLI", "").strip()
-OPENCLI_SCRIPT_ENV = os.environ.get("OPENCLI_SCRIPT", "").strip()
-
-_OPENCLI_PREFIX = None
-
-
-def _detect_node():
-    """自动检测 node 可执行文件路径。"""
-    p = os.environ.get("NODE_BIN") or os.environ.get("NODE_PATH")
-    if p and os.path.isfile(p):
-        return p
-    p = shutil.which("node")
-    if p:
-        return p
-    for cand in (
-        r"C:\Program Files\nodejs\node.exe",
-        r"C:\Program Files (x86)\nodejs\node.exe",
-        os.path.expanduser(r"~\AppData\Roaming\nvm\node.exe"),
-    ):
-        if os.path.isfile(cand):
-            return cand
-    return "node"
-
-
-def _detect_opencli_prefix():
-    """解析执行 opencli 的前缀命令列表，如 ['node', 'main.js'] 或 ['opencli']。"""
-    if OPENCLI_SCRIPT_ENV:
-        return [_detect_node(), OPENCLI_SCRIPT_ENV]
-    if OPENCLI_ENV:
-        if os.path.isfile(OPENCLI_ENV):
-            return [_detect_node(), OPENCLI_ENV]
-        return [OPENCLI_ENV]
-    which = shutil.which("opencli")
-    if which:
-        if which.lower().endswith(".js"):
-            return [_detect_node(), which]
-        return [which]
-    home = os.path.expanduser("~")
-    for cand in (
-        os.path.join(home, "AppData", "Roaming", "npm", "node_modules",
-                     "@jackwener", "opencli", "dist", "src", "main.js"),
-        os.path.join(home, ".npm-global", "node_modules",
-                     "@jackwener", "opencli", "dist", "src", "main.js"),
-    ):
-        if os.path.isfile(cand):
-            return [_detect_node(), cand]
-    return ["opencli"]
-
-
-def _cli_prefix():
-    global _OPENCLI_PREFIX
-    if _OPENCLI_PREFIX is None:
-        _OPENCLI_PREFIX = _detect_opencli_prefix()
-    return _OPENCLI_PREFIX
+OPENCLI = "opencli"
+_NODE = "D:/Program Files/nodejs/node.exe"
+_OPENCLI_SCRIPT = "C:/Users/郭永涛/AppData/Roaming/npm/node_modules/@jackwener/opencli/dist/src/main.js"
 
 EXTRACT_POLL_INTERVAL = 2.0
 EXTRACT_POLL_MAX = 45
 SUBMIT_SETTLE_DELAY = 1.2
+
+def _cli_prefix():
+    return [_NODE, _OPENCLI_SCRIPT]
+
+
+# 全局多轮对话上下文存储
+# conversation_id -> {"engine_id": str, "history": [{"role": "user"|"assistant", "content": str, "thinking": str}], "created_at": str}
+CONVERSATIONS = {}
 
 # ---------------------------------------------------------------- Extract JS
 
@@ -120,7 +68,7 @@ YUANBAO_EXTRACT_JS = """(function(){
 
 GENERIC_EXTRACT_JS = """(function(){
   function textOf(e){ return (e.innerText||'').trim(); }
-  var candidates = Array.from(document.querySelectorAll('.markdown-body, [class*=markdown], [class*=response], [class*=answer], article'));
+  var candidates = Array.from(document.querySelectorAll('.markdown-body, [class*=markdown], [class*=response], [class*=answer], [class*=prose], article'));
   var best = '';
   for (var i=0;i<candidates.length;i++){
     var t = textOf(candidates[i]);
@@ -173,13 +121,35 @@ KIMI_EXTRACT_JS = """(function(){
   return JSON.stringify({found:false, answer:'', refs:0});
 })()"""
 
+PERPLEXITY_EXTRACT_JS = """(function(){
+  function textOf(e){ return (e.innerText||'').trim(); }
+  var els = Array.from(document.querySelectorAll('[class*=prose], .markdown-body, [class*=answer]'));
+  var best = '';
+  for(var i=0; i<els.length; i++){
+    var t = textOf(els[i]);
+    if(t.length > 20 && t.length > best.length) best = t;
+  }
+  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
+})()"""
+
+GROK_EXTRACT_JS = """(function(){
+  function textOf(e){ return (e.innerText||'').trim(); }
+  var els = Array.from(document.querySelectorAll('.markdown-body, [class*=message-content], [class*=prose]'));
+  var best = '';
+  for(var i=0; i<els.length; i++){
+    var t = textOf(els[i]);
+    if(t.length > 20 && t.length > best.length) best = t;
+  }
+  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
+})()"""
+
 # ---------------------------------------------------------------- Engine registry
 
 ENGINES = {
     "yuanbao": {
-        "name": "\u817e\u8baf\u5143\u5b9d",
-        "icon": "\U0001f427",
-        "badge": "\u5fae\u4fe1\u516c\u4f17\u53f7\u751f\u6001 + \u5168\u7f51\u68c0\u7d22",
+        "name": "腾讯元宝",
+        "icon": "🐧",
+        "badge": "微信公众号生态 + 全网检索",
         "session": "yuanbao",
         "site_url": "https://yuanbao.tencent.com/chat",
         "site_host": "yuanbao.tencent.com",
@@ -187,28 +157,30 @@ ENGINES = {
         "submit": {"js_click": "document.querySelector('#yuanbao-send-btn') && document.querySelector('#yuanbao-send-btn').click()"},
         "probe_js": "!!document.querySelector('[contenteditable=true]')",
         "extract_js": YUANBAO_EXTRACT_JS,
+        "new_chat_js": "(function(){ var btn = document.querySelector('[class*=new-chat], [class*=new_chat]'); if(btn) btn.click(); })()",
     },
     "doubao": {
-        "name": "\u5b57\u8282\u8c46\u5305",
-        "icon": "\U0001f9e9",
-        "badge": "\u5b57\u8282\u6296\u97f3\u5168\u7f51\u5b9e\u65f6\u68c0\u7d22",
+        "name": "字节豆包",
+        "icon": "🧩",
+        "badge": "字节抖音全网实时检索",
         "session": "doubao",
         "site_url": "https://www.doubao.com/chat",
         "site_host": "doubao.com",
         "fill_selector": "textarea",
         "fill_nth": 0,
-        "input_method": "type",
+        "input_method": "react_input",
         "submit": {
             "js_click": "document.getElementById('flow-end-msg-send') && document.getElementById('flow-end-msg-send').click()",
             "keys": "Enter",
         },
         "probe_js": "!!document.querySelector('textarea')",
         "extract_js": DOUBAO_EXTRACT_JS,
+        "new_chat_js": "(function(){ var btn = document.querySelector('[class*=new-chat-button], [data-testid*=new_chat]'); if(btn) btn.click(); })()",
     },
     "kimi": {
-        "name": "\u6708\u4e4b\u6697\u9762 Kimi",
-        "icon": "\U0001f319",
-        "badge": "200\u4e07\u5b57\u957f\u4e0a\u4e0b\u6587 + \u6df1\u5ea6\u8054\u7f51",
+        "name": "月之暗面 Kimi",
+        "icon": "🌙",
+        "badge": "200万字长上下文 + 深度联网",
         "session": "kimi",
         "site_url": "https://www.kimi.com/",
         "site_host": "kimi",
@@ -216,11 +188,13 @@ ENGINES = {
         "submit": {"js_click": "(function(){ var s=document.querySelector('svg[name=Send]'); var btn=s?s.closest('button,div[role=button]'):null; if(btn)btn.click(); })()"},
         "probe_js": "!!document.querySelector('[contenteditable=true]')",
         "extract_js": KIMI_EXTRACT_JS,
+        "dismiss_popup_js": "(function(){ var btns=Array.from(document.querySelectorAll('button, div[role=button]')); for(var i=0;i<btns.length;i++){ if((btns[i].innerText||'').indexOf('稍后再说')>-1){ btns[i].click(); return true; } } return false; })()",
+        "new_chat_js": "(function(){ var btn = document.querySelector('svg[name=NewChat]') ? document.querySelector('svg[name=NewChat]').closest('button, div[role=button]') : null; if(btn) btn.click(); })()",
     },
     "qianwen": {
-        "name": "\u901a\u4e49\u5343\u95ee",
-        "icon": "\U0001f388",
-        "badge": "\u963f\u91cc\u901a\u4e49\u5168\u7f51\u667a\u641c",
+        "name": "通义千问",
+        "icon": "🎈",
+        "badge": "阿里通义全网智搜",
         "session": "qianwen",
         "site_url": "https://tongyi.aliyun.com/qianwen/",
         "site_host": "qianwen",
@@ -228,48 +202,53 @@ ENGINES = {
         "submit": {"enter": True},
         "probe_js": "!!document.querySelector('textarea, [contenteditable=true]')",
         "extract_js": GENERIC_EXTRACT_JS,
+        "new_chat_js": "(function(){ var btn = document.querySelector('[class*=new-chat]'); if(btn) btn.click(); })()",
     },
     "grok": {
         "name": "Grok",
-        "icon": "\U0001f916",
+        "icon": "🤖",
         "badge": "xAI Grok real-time search",
         "session": "grok",
         "site_url": "https://grok.com/",
         "site_host": "grok.com",
         "fill_selector": "textarea, [contenteditable=true]",
         "input_method": "type",
-        "submit": {"keys": "Enter", "js_click": "(function(){var el=document.querySelector('button[type=submit], button[aria-label*=send i], [data-testid*=Send]'); if(el) el.click();})()"},
+        "submit": {
+            "keys": "Enter",
+            "js_click": "(function(){ var el=document.querySelector('button[type=submit], button[aria-label*=send i], [data-testid*=Send]'); if(el) el.click(); })()"
+        },
         "probe_js": "!!document.querySelector('textarea, [contenteditable=true]')",
-        "extract_js": GENERIC_EXTRACT_JS,
+        "extract_js": GROK_EXTRACT_JS,
+        "new_chat_js": "(function(){ var btn = document.querySelector('a[href=\"/\"], button[aria-label*=\"New\"]'); if(btn) btn.click(); })()",
     },
     "perplexity": {
         "name": "Perplexity",
-        "icon": "\U0001f50d",
+        "icon": "🔍",
         "badge": "Perplexity real-time search",
         "session": "perplexity",
         "site_url": "https://www.perplexity.ai/",
         "site_host": "perplexity.ai",
         "fill_selector": "textarea, [contenteditable=true]",
         "input_method": "type",
-        "submit": {"js_click": "(function(){var el=document.querySelector('button[type=submit], button[aria-label*=Submit], button[aria-label*=send]'); if(el) el.click();})()", "keys": "Enter"},
+        "submit": {
+            "js_click": "(function(){ var el=document.querySelector('button[type=submit], button[aria-label*=Submit], button[aria-label*=send]'); if(el) el.click(); })()",
+            "keys": "Enter"
+        },
         "probe_js": "!!document.querySelector('textarea, [contenteditable=true]')",
-        "extract_js": GENERIC_EXTRACT_JS,
+        "extract_js": PERPLEXITY_EXTRACT_JS,
+        "new_chat_js": "(function(){ var btn = document.querySelector('a[href=\"/\"], button[aria-label*=\"New\"]'); if(btn) btn.click(); })()",
     },
 }
 
 ENGINE_ORDER = ["yuanbao", "doubao", "kimi", "qianwen", "grok", "perplexity"]
 
+
 # ---------------------------------------------------------------- 工具函数
 
-
 def run_cli(args, timeout=90):
-    """运行 opencli 命令。args 为参数列表；JS 一律只用单引号，避免 cmd 引号转义。
-
-    注意：cmd.exe 会把参数内的换行截断（实测导致 JS 'Unexpected end of input'），
-    所以对每个参数统一把换行替换为空格（JS 换行只是空白，不影响语义）。
-    """
+    """运行 opencli 命令。args 为参数列表；JS 一律只用单引号，避免 cmd 引号转义。"""
     safe_args = [a.replace("\r", " ").replace("\n", " ") if isinstance(a, str) else a for a in args]
-    cmdline = subprocess.list2cmdline(_cli_prefix() + safe_args)
+    cmdline = subprocess.list2cmdline([_NODE, _OPENCLI_SCRIPT] + safe_args)
     try:
         proc = subprocess.run(
             cmdline, shell=True, capture_output=True,
@@ -281,12 +260,12 @@ def run_cli(args, timeout=90):
         return {"ok": False, "code": -1, "stdout": "", "stderr": "opencli 超时"}
     except FileNotFoundError:
         return {"ok": False, "code": -2, "stdout": "", "stderr": "opencli 未找到"}
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return {"ok": False, "code": -3, "stdout": "", "stderr": str(e)}
 
 
 def _parse_state_url(stdout):
-    """从 `state` 输出中解析当前 URL（兼容大写 URL: / 小写 url:）。"""
+    """从 state 输出中解析当前 URL。"""
     for line in stdout.splitlines():
         if line.lower().startswith("url:"):
             return line.split(":", 1)[1].strip()
@@ -308,7 +287,7 @@ def extract_answer(sess, eng):
                 "answer_html": data.get("answer_html", ""),
                 "refs": int(data.get("refs") or 0)
             }
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass
     return {"found": False, "thinking": "", "answer": "", "answer_html": "", "refs": 0}
 
@@ -327,7 +306,6 @@ def engine_health(engine_id, auto_recover=True):
     url = _parse_state_url(st["stdout"])
     connected = eng["site_host"] in url
 
-    # 若检测到掉线或停留在 about:blank，自动进行打开网页自愈重连
     if not connected and auto_recover and eng.get("site_url"):
         run_cli(["browser", sess, "open", eng["site_url"]], timeout=40)
         time.sleep(2.5)
@@ -338,6 +316,8 @@ def engine_health(engine_id, auto_recover=True):
 
     input_found = False
     if connected:
+        if eng.get("dismiss_popup_js"):
+            run_cli(["browser", sess, "eval", eng["dismiss_popup_js"]], timeout=15)
         p = run_cli(["browser", sess, "eval", eng["probe_js"]], timeout=30)
         input_found = p["ok"] and p["stdout"].strip() == "true"
     return {"id": engine_id, "session": sess, "connected": connected, "url": url,
@@ -345,12 +325,12 @@ def engine_health(engine_id, auto_recover=True):
 
 
 def health_all():
-    """并发探测所有引擎会话，避免串行 opencli 调用阻塞启动。"""
+    """并发探测所有引擎会话。"""
     results = {}
     def _probe(eid):
         try:
             results[eid] = engine_health(eid)
-        except Exception:  # noqa: BLE001
+        except Exception:
             results[eid] = {"id": eid, "session": ENGINES.get(eid, {}).get("session"),
                             "connected": False, "url": "", "input_found": False, "error": "探测异常"}
     threads = [threading.Thread(target=_probe, args=(eid,), daemon=True) for eid in ENGINE_ORDER]
@@ -361,8 +341,10 @@ def health_all():
     return {eid: results.get(eid) for eid in ENGINE_ORDER}
 
 
+# ---------------------------------------------------------------- 单轮问答
+
 def ask_engine(engine_id, prompt, baseline=None, progress=None):
-    """向指定 AI 搜索引擎发送 prompt，等待文本稳定后提取思考过程与正文回答。"""
+    """单次问答接口。"""
     t0 = time.time()
     eng = ENGINES.get(engine_id)
     if not eng:
@@ -375,6 +357,9 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
                 "error": f"{eng['name']} 会话未绑定，请运行 setup_engines.py 打开页面完成登录",
                 "elapsed": time.time() - t0}
 
+    if eng.get("dismiss_popup_js"):
+        run_cli(["browser", sess, "eval", eng["dismiss_popup_js"]], timeout=15)
+
     baseline_ans = ""
     baseline_think = ""
     if baseline is None:
@@ -382,12 +367,33 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
         if cur["found"]:
             baseline_ans = cur.get("answer", "")
             baseline_think = cur.get("thinking", "")
+    else:
+        baseline_ans = baseline.get("answer", "")
+        baseline_think = baseline.get("thinking", "")
 
     if progress:
         progress(f"连接 {eng['name']}…")
 
     input_method = eng.get("input_method", "fill")
-    if input_method == "type":
+    if input_method == "react_input":
+        react_fill_js = ("(function(){"
+                         "  var el = document.querySelector('%s');"
+                         "  if(!el) return false;"
+                         "  el.focus();"
+                         "  var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;"
+                         "  nativeSetter.call(el, %s);"
+                         "  el.dispatchEvent(new Event('input', { bubbles: true }));"
+                         "  el.dispatchEvent(new Event('change', { bubbles: true }));"
+                         "  return true;"
+                         "})()") % (eng["fill_selector"], json.dumps(prompt))
+        typed = run_cli(["browser", sess, "eval", react_fill_js], timeout=30)
+        if not typed["ok"] or typed["stdout"].strip() != "true":
+            type_args = ["browser", sess, "type"]
+            if eng.get("fill_nth") is not None:
+                type_args += ["--nth", str(eng["fill_nth"])]
+            type_args += [eng["fill_selector"], prompt]
+            run_cli(type_args, timeout=60)
+    elif input_method == "type":
         focus_js = ("(function(){var el=document.querySelector('%s');"
                     "if(el){el.focus();document.execCommand('selectAll',false,null);"
                     "document.execCommand('insertText',false,'');}return true;})()"
@@ -417,9 +423,6 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
             return {"status": "error", "answer": "", "refs": 0,
                     "error": f"输入失败: {(fill['stderr'] or fill['stdout'])[:160]}",
                     "elapsed": time.time() - t0}
-
-
-    # Search tool toggle: removed (contained Chinese chars causing Windows cmd truncation)
 
     time.sleep(SUBMIT_SETTLE_DELAY)
     sub = eng["submit"]
@@ -451,7 +454,6 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
                     progress(f"正在思考与生成回答({curr_len}字)…")
             else:
                 stable_count += 1
-                # 连续 2 次轮询（4秒）文本长度无增长，说明回答已打印完成
                 if stable_count >= 2:
                     return {
                         "status": "ok",
@@ -463,7 +465,6 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
                         "elapsed": time.time() - t0
                     }
 
-    # 超时：返回最后一次能提取到的最完整内容
     if last["found"] and (last["answer"] or last["thinking"]):
         return {
             "status": "ok",
@@ -477,3 +478,71 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
     return {"status": "timeout", "answer": "", "answer_html": "", "refs": 0,
             "error": "等待回答超时（约 90s），可能是页面会话已失效或该站点未登录",
             "elapsed": time.time() - t0}
+
+
+# ---------------------------------------------------------------- 多轮对话 API (task_007)
+
+def start_conversation(engine_id):
+    """开始新对话，返回 conversation_id。"""
+    eng = ENGINES.get(engine_id)
+    if not eng:
+        raise ValueError(f"未知引擎 {engine_id}")
+    
+    cid = f"conv_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    
+    sess = eng["session"]
+    if eng.get("new_chat_js"):
+        run_cli(["browser", sess, "eval", eng["new_chat_js"]], timeout=15)
+        time.sleep(1.0)
+    
+    CONVERSATIONS[cid] = {
+        "engine_id": engine_id,
+        "history": [],
+        "created_at": time.strftime("%Y-%m-%d %H:%M:%S")
+    }
+    return cid
+
+
+def ask_conversation(engine_id, conversation_id, prompt):
+    """在已有对话中追问。"""
+    conv = CONVERSATIONS.get(conversation_id)
+    if not conv:
+        conversation_id = start_conversation(engine_id)
+        conv = CONVERSATIONS[conversation_id]
+    
+    eng = ENGINES.get(engine_id)
+    if not eng:
+        return {"status": "error", "answer": "", "error": f"未知引擎 {engine_id}"}
+    
+    sess = eng["session"]
+    baseline = extract_answer(sess, eng)
+    
+    res = ask_engine(engine_id, prompt, baseline=baseline)
+    
+    conv["history"].append({"role": "user", "content": prompt, "time": time.strftime("%H:%M:%S")})
+    if res["status"] == "ok":
+        conv["history"].append({
+            "role": "assistant",
+            "content": res.get("answer", ""),
+            "thinking": res.get("thinking", ""),
+            "refs": res.get("refs", 0),
+            "time": time.strftime("%H:%M:%S")
+        })
+    res["conversation_id"] = conversation_id
+    return res
+
+
+def get_conversation_history(engine_id, conversation_id):
+    """获取对话历史。"""
+    conv = CONVERSATIONS.get(conversation_id)
+    if not conv:
+        return []
+    return conv.get("history", [])
+
+
+def end_conversation(engine_id, conversation_id):
+    """结束对话，清理资源。"""
+    if conversation_id in CONVERSATIONS:
+        del CONVERSATIONS[conversation_id]
+        return True
+    return False

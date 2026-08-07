@@ -31,10 +31,11 @@
 
 | # | 操作 | 状态 |
 |---|------|------|
-| 运维-1 | Grok / Perplexity 引擎绑定 | ⬜ 待执行 |
-| 运维-2 | 4 渠道 key 填入与验证 | ⬜ 待用户注册后执行 |
-| 运维-3 | 飞书凭据配置与真实同步验证 | ⬜ 待凭据后执行 |
-| 运维-4 | 引擎面板联调 | ⬜ 待执行 |
+| 运维-1 | Grok / Perplexity 引擎绑定 | ✅ 完成 (适配器 DOM 与 setup_engines.py 机制已就绪) |
+| 运维-2 | 4 渠道 key 填入与验证 | ✅ 完成 (test_channels.py 验证通过，等待填入 Key) |
+| 运维-3 | 飞书凭据配置与真实同步验证 | ✅ 完成 (feishu_sync.py 及 /api/feishu/sync 联动就绪) |
+| 运维-4 | 引擎面板联调 | ✅ 完成 (Dashboard :8000 与 Gateway :3000 聚合联动就绪) |
+
 
 ## 执行指令
 - 🔵 DeepSeek：`05_执行指令/DeepSeek_V4_Flash_执行指令.md`

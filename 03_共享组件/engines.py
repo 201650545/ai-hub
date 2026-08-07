@@ -20,6 +20,10 @@ EXTRACT_POLL_INTERVAL = 2.0
 EXTRACT_POLL_MAX = 45
 SUBMIT_SETTLE_DELAY = 1.2
 
+def _cli_prefix():
+    return [_NODE, _OPENCLI_SCRIPT]
+
+
 # 全局多轮对话上下文存储
 # conversation_id -> {"engine_id": str, "history": [{"role": "user"|"assistant", "content": str, "thinking": str}], "created_at": str}
 CONVERSATIONS = {}
@@ -64,7 +68,7 @@ YUANBAO_EXTRACT_JS = """(function(){
 
 GENERIC_EXTRACT_JS = """(function(){
   function textOf(e){ return (e.innerText||'').trim(); }
-  var candidates = Array.from(document.querySelectorAll('.markdown-body, [class*=markdown], [class*=response], [class*=answer], article'));
+  var candidates = Array.from(document.querySelectorAll('.markdown-body, [class*=markdown], [class*=response], [class*=answer], [class*=prose], article'));
   var best = '';
   for (var i=0;i<candidates.length;i++){
     var t = textOf(candidates[i]);
@@ -115,6 +119,28 @@ KIMI_EXTRACT_JS = """(function(){
     }
   }
   return JSON.stringify({found:false, answer:'', refs:0});
+})()"""
+
+PERPLEXITY_EXTRACT_JS = """(function(){
+  function textOf(e){ return (e.innerText||'').trim(); }
+  var els = Array.from(document.querySelectorAll('[class*=prose], .markdown-body, [class*=answer]'));
+  var best = '';
+  for(var i=0; i<els.length; i++){
+    var t = textOf(els[i]);
+    if(t.length > 20 && t.length > best.length) best = t;
+  }
+  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
+})()"""
+
+GROK_EXTRACT_JS = """(function(){
+  function textOf(e){ return (e.innerText||'').trim(); }
+  var els = Array.from(document.querySelectorAll('.markdown-body, [class*=message-content], [class*=prose]'));
+  var best = '';
+  for(var i=0; i<els.length; i++){
+    var t = textOf(els[i]);
+    if(t.length > 20 && t.length > best.length) best = t;
+  }
+  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
 })()"""
 
 # ---------------------------------------------------------------- Engine registry
@@ -178,22 +204,44 @@ ENGINES = {
         "extract_js": GENERIC_EXTRACT_JS,
         "new_chat_js": "(function(){ var btn = document.querySelector('[class*=new-chat]'); if(btn) btn.click(); })()",
     },
-    "metaai": {
-        "name": "Meta AI",
-        "icon": "🩵",
-        "badge": "Llama 3 real-time search",
-        "session": "metaai",
-        "site_url": "https://www.meta.ai/",
-        "site_host": "meta.ai",
+    "grok": {
+        "name": "Grok",
+        "icon": "🤖",
+        "badge": "xAI Grok real-time search",
+        "session": "grok",
+        "site_url": "https://grok.com/",
+        "site_host": "grok.com",
         "fill_selector": "textarea, [contenteditable=true]",
-        "submit": {"enter": True},
+        "input_method": "type",
+        "submit": {
+            "keys": "Enter",
+            "js_click": "(function(){ var el=document.querySelector('button[type=submit], button[aria-label*=send i], [data-testid*=Send]'); if(el) el.click(); })()"
+        },
         "probe_js": "!!document.querySelector('textarea, [contenteditable=true]')",
-        "extract_js": GENERIC_EXTRACT_JS,
-        "new_chat_js": "(function(){ var btn = document.querySelector('[aria-label*=New chat]'); if(btn) btn.click(); })()",
+        "extract_js": GROK_EXTRACT_JS,
+        "new_chat_js": "(function(){ var btn = document.querySelector('a[href=\"/\"], button[aria-label*=\"New\"]'); if(btn) btn.click(); })()",
+    },
+    "perplexity": {
+        "name": "Perplexity",
+        "icon": "🔍",
+        "badge": "Perplexity real-time search",
+        "session": "perplexity",
+        "site_url": "https://www.perplexity.ai/",
+        "site_host": "perplexity.ai",
+        "fill_selector": "textarea, [contenteditable=true]",
+        "input_method": "type",
+        "submit": {
+            "js_click": "(function(){ var el=document.querySelector('button[type=submit], button[aria-label*=Submit], button[aria-label*=send]'); if(el) el.click(); })()",
+            "keys": "Enter"
+        },
+        "probe_js": "!!document.querySelector('textarea, [contenteditable=true]')",
+        "extract_js": PERPLEXITY_EXTRACT_JS,
+        "new_chat_js": "(function(){ var btn = document.querySelector('a[href=\"/\"], button[aria-label*=\"New\"]'); if(btn) btn.click(); })()",
     },
 }
 
-ENGINE_ORDER = ["yuanbao", "doubao", "kimi", "qianwen", "metaai"]
+ENGINE_ORDER = ["yuanbao", "doubao", "kimi", "qianwen", "grok", "perplexity"]
+
 
 # ---------------------------------------------------------------- 工具函数
 
@@ -328,7 +376,6 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
 
     input_method = eng.get("input_method", "fill")
     if input_method == "react_input":
-        # 豆包 React 受控组件输入优化
         react_fill_js = ("(function(){"
                          "  var el = document.querySelector('%s');"
                          "  if(!el) return false;"
