@@ -1,7 +1,7 @@
 {
   "gateways": {
     "ds_v4_cli": {
-      "name": "DS V4 CLI",
+      "name": "智能聚合网关 DS V4 CLI",
       "icon": "🤖",
       "description": "AI 搜索 + LLM 聚合网关",
       "port": 3000,

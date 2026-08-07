@@ -146,7 +146,7 @@ class CentralRegistry:
     def register(self):
         return self._post("/api/gateways", {
             "id": self.gid,
-            "name": os.environ.get("GATEWAY_NAME", "DS V4 CLI"),
+            "name": os.environ.get("GATEWAY_NAME", "智能聚合网关 DS V4 CLI"),
             "port": self.port,
             "url": f"http://localhost:{self.port}",
             "icon": "🤖",
