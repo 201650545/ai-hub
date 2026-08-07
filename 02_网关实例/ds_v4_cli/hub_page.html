@@ -202,9 +202,10 @@ tr:last-child td{border-bottom:none}
           <p style="font-size:13px;color:var(--muted);margin:4px 0 0;">滚动保存近 6 小时内的检索记录，超时自动清理销毁。</p>
         </div>
         <div style="display:flex;gap:12px;align-items:center;">
-          <button type="button" class="btn-sm" id="clear-modal-history" style="color:var(--red);font-size:14px;">🗑️ 清空所有历史</button>
-          <button type="button" class="btn" id="close-modal-btn" style="padding:8px 22px;font-size:15px;">✕ 关闭</button>
+          <button type="button" class="btn-sm" id="clear-modal-history" onclick="clearAllModalHistory()" style="color:var(--red);font-size:14px;cursor:pointer;">🗑️ 清空所有历史</button>
+          <button type="button" class="btn" id="close-modal-btn" onclick="closeHistoryModal()" style="padding:8px 22px;font-size:15px;cursor:pointer;">✕ 关闭</button>
         </div>
+
       </div>
 
       <!-- 历史记录内容体：左侧历史列表 + 右侧完整问题与回答详情 -->
@@ -374,7 +375,6 @@ function getValidHistory(){
   const now = Date.now();
   let list = [];
   try{ list = JSON.parse(localStorage.getItem('ai_search_history_v1') || '[]'); }catch(e){}
-  // 自动过滤掉超过 6 小时 (6 * 3600 * 1000) 的记录
   const valid = list.filter(item => item.timestamp && (now - item.timestamp < HISTORY_TTL));
   if (valid.length !== list.length) {
     localStorage.setItem('ai_search_history_v1', JSON.stringify(valid));
@@ -399,24 +399,40 @@ function saveSearchHistory(query, resultsData){
   localStorage.setItem('ai_search_history_v1', JSON.stringify(list));
 }
 
-function openHistoryModal(){
-  document.getElementById('history-modal').style.display = 'flex';
-  renderModalHistoryList();
+async function fetchServerHistory(){
+  try {
+    const res = await fetch('/api/history');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.history && Array.isArray(data.history)) {
+        return data.history;
+      }
+    }
+  } catch(e){}
+  return null;
 }
-function closeHistoryModal(){
-  document.getElementById('history-modal').style.display = 'none';
-}
-window.openHistoryModal = openHistoryModal;
-window.closeHistoryModal = closeHistoryModal;
 
-function renderModalHistoryList(){
-  const list = getValidHistory();
+async function renderModalHistoryList(){
   const container = document.getElementById('modal-history-list');
   const detail = document.getElementById('modal-history-detail');
+  if (container) container.innerHTML = '<div style="color:var(--muted);font-size:14px;padding:16px;text-align:center;">加载搜索历史中…</div>';
+  
+  let list = getValidHistory();
+  const serverList = await fetchServerHistory();
+  if (serverList && serverList.length > 0) {
+    const mergedMap = new Map();
+    serverList.forEach(item => mergedMap.set(item.query || item.question, item));
+    list.forEach(item => {
+      const q = item.query || item.question;
+      if (q && !mergedMap.has(q)) mergedMap.set(q, item);
+    });
+    list = Array.from(mergedMap.values());
+  }
+
   container.innerHTML = '';
   
   if (list.length === 0) {
-    container.innerHTML = '<div style="color:var(--muted);font-size:14px;padding:16px;text-align:center;">暂无 6 小时内的搜索历史</div>';
+    container.innerHTML = '<div style="color:var(--muted);font-size:14px;padding:16px;text-align:center;">暂无搜索历史记录</div>';
     detail.innerHTML = '<div style="color:var(--muted);font-size:15px;text-align:center;margin:auto;">暂无检索记录</div>';
     return;
   }
@@ -424,8 +440,10 @@ function renderModalHistoryList(){
   list.forEach((item, idx) => {
     const card = document.createElement('div');
     card.style.cssText = 'background:var(--fill);border:1px solid var(--hairline);border-radius:12px;padding:14px 16px;cursor:pointer;transition:all .15s;';
-    card.innerHTML = '<div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;word-break:break-all;">🔍 ' + item.query + '</div>' +
-      '<div style="font-size:13px;color:var(--muted);display:flex;justify-content:space-between;"><span>时间: ' + item.time_str + '</span><span style="color:var(--blue);">查看完整回答 ➔</span></div>';
+    const queryText = item.query || item.question || '搜索记录';
+    const timeText = item.time_str || (item.created_at ? item.created_at.slice(11,16) : '历史');
+    card.innerHTML = '<div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;word-break:break-all;">🔍 ' + queryText + '</div>' +
+      '<div style="font-size:13px;color:var(--muted);display:flex;justify-content:space-between;"><span>时间: ' + timeText + '</span><span style="color:var(--blue);">查看完整回答 ➔</span></div>';
     card.onclick = () => {
       document.querySelectorAll('#modal-history-list > div').forEach(d => d.style.borderColor = 'var(--hairline)');
       card.style.borderColor = 'var(--blue)';
@@ -439,57 +457,23 @@ function renderModalHistoryList(){
   });
 }
 
-function cleanBulletFormat(txt){
-  if (!txt) return '';
-  // 修复项目符号 • 或 - 被换行误切断隔开的问题
-  return txt.replace(/([•\-*])\s*\n+/g, '$1 ').replace(/\n+\s*([•\-*])/g, '\n$1 ');
+function openHistoryModal(){
+  document.getElementById('history-modal').style.display = 'flex';
+  renderModalHistoryList();
 }
-
-function renderResultHTML(thinkingText, answerText, answerHTML){
-  let html = '';
-  if (thinkingText && thinkingText.trim()) {
-    html += '<details style="margin-bottom:16px;background:#eef1f6;border:1.5px solid #aab2c0;border-radius:12px;padding:12px 16px;">' +
-      '<summary style="font-weight:800;color:#0052cc;cursor:pointer;user-select:none;font-size:15px;outline:none;">' +
-        '🧠 深度思考过程 <span style="font-weight:600;color:#2c2c30;font-size:13px;">(已自动缩起 · 点击展开)</span>' +
-      '</summary>' +
-      '<div style="margin-top:10px;padding-top:10px;border-top:1.5px dashed #bcc4d4;font-size:15px;color:#111;line-height:1.75;white-space:pre-wrap;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-weight:500;">' +
-        cleanBulletFormat(thinkingText).trim() +
-      '</div>' +
-    '</details>';
+function closeHistoryModal(){
+  document.getElementById('history-modal').style.display = 'none';
+}
+function clearAllModalHistory(){
+  if (confirm('确定要清空所有 AI 搜索历史记录吗？')) {
+    localStorage.removeItem('ai_search_history_v1');
+    renderModalHistoryList();
   }
-  
-  let formattedBody = '';
-  const cleanAnsText = cleanBulletFormat(answerText);
-
-  if (answerHTML && (answerHTML.indexOf('<table') > -1 || answerHTML.indexOf('<h3') > -1)) {
-    formattedBody = answerHTML;
-  } else if (typeof marked !== 'undefined' && typeof marked.parse === 'function' && cleanAnsText) {
-    try { formattedBody = marked.parse(cleanAnsText); } catch(e) { formattedBody = '<div style="white-space:pre-wrap;">' + cleanAnsText + '</div>'; }
-  } else {
-    formattedBody = '<div style="white-space:pre-wrap;">' + (cleanAnsText || '无正文回答') + '</div>';
-  }
-
-  html += '<div class="markdown-rendered" style="font-size:16px;line-height:1.85;color:#000;font-weight:500;">' + formattedBody + '</div>';
-  return html;
 }
+window.openHistoryModal = openHistoryModal;
+window.closeHistoryModal = closeHistoryModal;
+window.clearAllModalHistory = clearAllModalHistory;
 
-function showHistoryDetail(item){
-  const detail = document.getElementById('modal-history-detail');
-  const firstRes = Object.values(item.results || {})[0] || { thinking: '', answer: '无回答内容' };
-  const contentHTML = firstRes.html || renderResultHTML(firstRes.thinking, firstRes.answer || firstRes.text, firstRes.answer_html);
-  
-  detail.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:14px;border-bottom:1.5px solid var(--hairline);">' +
-    '<div style="flex:1;margin-right:12px;"><div style="font-size:13px;color:var(--muted);font-weight:700;">搜索问题</div><div style="font-size:18px;font-weight:800;color:#000;margin-top:4px;">' + item.query + '</div></div>' +
-    '<button type="button" class="btn-sm" id="load-to-main-btn" style="background:var(--blue);color:#fff;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:700;white-space:nowrap;">在主视图加载</button>' +
-    '</div>' +
-    '<div style="font-size:14px;font-weight:700;color:var(--muted);margin-bottom:10px;">检索结果 (' + item.time_str + ')：</div>' +
-    '<div style="flex:1;overflow-y:auto;">' + contentHTML + '</div>';
-    
-  document.getElementById('load-to-main-btn').onclick = () => {
-    restoreHistoryItem(item);
-    closeHistoryModal();
-  };
-}
 
 /* ---------- AI 自由画布交互 ---------- */
 window.ENGINES_ALL = {
@@ -497,8 +481,10 @@ window.ENGINES_ALL = {
   "doubao": { id: "doubao", name: "字节豆包", icon: "🧩", badge: "字节抖音全网实时检索", site: "doubao.com" },
   "kimi": { id: "kimi", name: "月之暗面 Kimi", icon: "🌙", badge: "200万字长上下文 + 深度联网", site: "kimi.moonshot.cn" },
   "qianwen": { id: "qianwen", name: "通义千问", icon: "🎈", badge: "阿里通义全网智搜", site: "tongyi.aliyun.com" },
-  "metaai": { id: "metaai", name: "Meta AI", icon: "🪩", badge: "Llama 3 国际化实时检索", site: "meta.ai" }
+  "grok": { id: "grok", name: "Grok", icon: "🤖", badge: "xAI Grok 实时检索", site: "grok.com" },
+  "perplexity": { id: "perplexity", name: "Perplexity", icon: "🔍", badge: "Perplexity 实时全网检索", site: "perplexity.ai" }
 };
+
 
 window.activeCanvasEngineIds = JSON.parse(localStorage.getItem('canvas_active_engines_v1') || '["yuanbao", "doubao", "kimi"]');
 
