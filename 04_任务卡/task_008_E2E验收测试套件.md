@@ -67,4 +67,10 @@
 - 无 key/未登录项正确标注 SKIP 而非 FAIL
 
 ## 完成记录
-（执行后填写）
+- 2026-08-06 完成（OpenCode / DeepSeek-V4-Flash）
+- 交付 `tests\common.py, test_central.py, test_gateway.py, test_engines.py, run_all.py`
+- 覆盖：中央平台 7 用例、网关 6 用例、引擎 2 用例、敏感信息扫描 1 用例；合计 16/16 通过
+- `python tests/run_all.py` 实测一键全绿；引擎未连接会话可正确 SKIP
+- 渠道测试：deepseek/gemini/openrouter reachable=True 且真实对话 OK；fallback 链正确
+- 敏感扫描：仅示例占位（channels.example.json:your-...-here）已过滤，无真实 key 入库
+- 遗留：groq/siliconflow/dashscope/zhipu 4 渠道未填 key，测试标注待填；e2e 注册的测试网关为运行时临时数据（不提交 config）
