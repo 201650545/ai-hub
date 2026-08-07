@@ -47,8 +47,10 @@ try:  # task_010：对话历史持久化模块（03_共享组件），缺失时�
         get_conversation as _get_conversation, \
         delete_conversation as _delete_conversation, \
         export_daily_stats as _export_daily_stats
+    from quota import get_usage as _get_usage, get_daily_summary as _get_daily_summary  # noqa: F401
 except Exception:  # noqa: BLE001
     _list_conversations = _get_conversation = _delete_conversation = _export_daily_stats = None
+    _get_usage = _get_daily_summary = None
 
 
 def get_history_records():
@@ -357,6 +359,18 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 })
                 return
             self._send_json(200, {"status": "ok", "history": get_history_records()})
+        elif path == "/api/quota":
+            # task_011：本地额度统计。?date=YYYY-MM-DD 指定日期（默认今天）
+            if _get_usage is None:
+                self._send_json(200, {"status": "err", "error": "quota 模块未加载"})
+                return
+            date = query.get("date", [None])[0] or None
+            self._send_json(200, {
+                "status": "ok",
+                "gateway": GATEWAY_ID,
+                "date": date,
+                "usage": _get_usage(gateway_id=GATEWAY_ID, date=date),
+            })
         elif path == "/v1/models":
             self._send_json(200, {"object": "list", "data": aggregate_models()})
         elif path == "/api/unified_stream":

@@ -32,6 +32,7 @@ gateway_err.log
 02_网关实例/*/channels.json
 02_网关实例/*/history.json
 02_网关实例/*/quota.json
+02_网关实例/*/*.json.lock
 02_网关实例/*/__pycache__/
 
 # 临时文件

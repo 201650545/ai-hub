@@ -45,6 +45,7 @@ def main() -> None:
     import test_gateway
     import test_engines
     import test_history
+    import test_quota
 
     all_results = []
     for suite, fn in (
@@ -52,6 +53,7 @@ def main() -> None:
         ("网关", test_gateway.run_all),
         ("引擎", test_engines.run_all),
         ("历史管理", test_history.run_all),
+        ("额度统计", test_quota.run_all),
     ):
         res = fn()
         print()

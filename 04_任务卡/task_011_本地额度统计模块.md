@@ -50,4 +50,10 @@ def reset_daily() -> None:
 - `get_daily_summary()` 输出格式与飞书 daily_stats 表字段对齐（见 ARCHITECTURE.md 第 5 节）
 
 ## 完成记录
-（执行后填写）
+- 2026-08-06 完成（OpenCode / DeepSeek-V4-Flash）
+- 交付 `03_共享组件/quota.py`：record_call / get_usage / get_daily_summary / reset_daily
+- 存储：`02_网关实例/{gateway_id}/quota.json`（按日分渠道累计 calls/input/output/errors）；保留最近 90 天自动裁剪；msvcrt 文件锁 + 线程锁
+- 集成①：`ds_v4_cli/channels.py` chat_completion 返回 `_QuotaResponse` 包装，响应成功后解析 usage 调 record_call（非流式取 usage，流式尽力从 SSE 尾部解析；容错 chunked 终止符）
+- 集成②：`ds_v4_cli/unified_gateway.py` 新增 `GET /api/quota?date=` 调 get_usage
+- 测试：`tests\test_quota.py` 5 用例（记录/日汇总/并发20/网关端点/真实渠道联动）全过；全套 run_all 26/26 通过
+- 遗留：deepseek 带 reasoning 的 token 详情未细分（暂按 prompt/completion 计）；厂商侧余额查询为后续 DeepSeek 可选增强；quota.json 为运行时数据不提交
