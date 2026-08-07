@@ -20,6 +20,8 @@ from common import Result, summarize  # noqa: E402
 def _load_engines():
     if not os.path.isfile(os.path.join(GATEWAY_DIR, "engines.py")):
         return None
+    sys.path.insert(0, GATEWAY_DIR)
+    sys.modules.pop("engines", None)
     import engines  # noqa: WPS433
     return engines
 
@@ -34,6 +36,32 @@ def _pick_connected(engines):
     except Exception:  # noqa: BLE001
         return None
     return None
+
+
+def test_engine_config_wiring(engines):
+    """静态配置校验：豆包/通义走专用提取器，通义使用 clipboard+enter 输入提交。"""
+    try:
+        checks = []
+        checks.append((
+            "豆包专用提取器",
+            engines.ENGINES["doubao"]["extract_js"] is engines.DOUBAO_EXTRACT_JS,
+            f"extract={engines.ENGINES['doubao']['extract_js'] is engines.DOUBAO_EXTRACT_JS}",
+        ))
+        qw = engines.ENGINES["qianwen"]
+        checks.append(("通义专用提取器", qw["extract_js"] is engines.QIANWEN_EXTRACT_JS,
+                       f"extract={qw['extract_js'] is engines.QIANWEN_EXTRACT_JS}"))
+        checks.append(("通义 clipboard 输入", qw.get("input_method") == "clipboard",
+                       f"method={qw.get('input_method')}"))
+        checks.append(("通义 enter 提交", qw.get("submit") == {"enter": True},
+                       f"submit={qw.get('submit')}"))
+
+        for name, ok, info in checks:
+            if not ok:
+                return Result("引擎输入/提取配置", Result.FAIL, f"{name}:{info}")
+        return Result("引擎输入/提取配置", Result.PASS,
+                      f"{len(checks)} 项配置正确(doubao+qianwen)")
+    except Exception as e:  # noqa: BLE001
+        return Result("引擎输入/提取配置", Result.FAIL, f"{type(e).__name__}: {e}")
 
 
 def test_a2a_auto_conversation(engines):
@@ -88,6 +116,7 @@ def run_all():
         return results
 
     results.append(test_a2a_auto_conversation(engines))
+    results.append(test_engine_config_wiring(engines))
 
     test_engine = _pick_connected(engines)
     if test_engine:

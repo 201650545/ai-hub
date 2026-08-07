@@ -89,22 +89,36 @@ GENERIC_EXTRACT_JS = """(function(){
   return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
 })()"""
 
+QIANWEN_EXTRACT_JS = """(function(){
+  function textOf(e){ return (e.innerText||'').trim(); }
+  var answers = Array.from(document.querySelectorAll('[class*=message-select-wrapper-answer]'));
+  var best = '';
+  for(var i=0; i<answers.length; i++){
+    var t = textOf(answers[i]);
+    if(t.length > 0) best = t;
+  }
+  if(!best){
+    var lastRound = document.querySelector('[class*=last-message-item]');
+    if(lastRound){
+      var as = lastRound.querySelectorAll('[class*=message-select-wrapper-answer]');
+      if(as.length) best = textOf(as[as.length-1]);
+    }
+  }
+  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
+})()"""
+
 DOUBAO_EXTRACT_JS = """(function(){
   function textOf(e){ return (e.innerText||'').trim(); }
-  var allMsgs = Array.from(document.querySelectorAll('[class*=message-content], [class*=bot-reply], [class*=answer-content], [class*=markdown]'));
+  var li = document.querySelector('[class*=list_items]') || document.querySelector('[class*=message-list]');
   var best = '';
-  var minLen = 10;
-  for(var i=0; i<allMsgs.length; i++){
-    var el = allMsgs[i];
-    var parent = el.parentElement;
-    var isUser = false;
-    while(parent && parent !== document.body){
-      if(parent.className && (String(parent.className).indexOf('human') > -1 || String(parent.className).indexOf('user') > -1)) { isUser=true; break; }
-      parent = parent.parentElement;
+  if(li){
+    var rows = Array.from(li.querySelectorAll(':scope > [class*=v_list_row], [class*=v_list_row]'));
+    var lastAnswer = '';
+    for(var i=0; i<rows.length; i++){
+      var t = textOf(rows[i]);
+      if(t.length >= 15) lastAnswer = t;
     }
-    if(isUser) continue;
-    var t = textOf(el);
-    if(t.length > minLen && t.length > best.length) best = t;
+    if(lastAnswer) best = lastAnswer;
   }
   if(!best){
     var divs = Array.from(document.querySelectorAll('main [class*=content]'));
@@ -210,10 +224,11 @@ ENGINES = {
         "session": "qianwen",
         "site_url": "https://tongyi.aliyun.com/qianwen/",
         "site_host": "qianwen",
-        "fill_selector": "textarea, [contenteditable=true]",
+        "fill_selector": "[contenteditable=true]",
+        "input_method": "clipboard",
         "submit": {"enter": True},
-        "probe_js": "!!document.querySelector('textarea, [contenteditable=true]')",
-        "extract_js": GENERIC_EXTRACT_JS,
+        "probe_js": "!!document.querySelector('[contenteditable=true]')",
+        "extract_js": QIANWEN_EXTRACT_JS,
         "new_chat_js": "(function(){ var btn = document.querySelector('[class*=new-chat]'); if(btn) btn.click(); })()",
     },
     "grok": {
@@ -387,7 +402,23 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
         progress(f"连接 {eng['name']}…")
 
     input_method = eng.get("input_method", "fill")
-    if input_method == "react_input":
+    if input_method == "clipboard":
+        paste_js = ("(function(){"
+                    "  var el = document.querySelector('%s');"
+                    "  if(!el) return false;"
+                    "  el.focus();"
+                    "  var dt=new DataTransfer();"
+                    "  dt.setData('text/plain', %s);"
+                    "  var ev=new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true});"
+                    "  el.dispatchEvent(ev);"
+                    "  return true;"
+                    "})()") % (eng["fill_selector"], json.dumps(prompt))
+        pasted = run_cli(["browser", sess, "eval", paste_js], timeout=30)
+        if not pasted["ok"] or pasted["stdout"].strip() != "true":
+            return {"status": "error", "answer": "", "refs": 0,
+                    "error": f"输入失败: {(pasted['stderr'] or pasted['stdout'])[:160]}",
+                    "elapsed": time.time() - t0}
+    elif input_method == "react_input":
         react_fill_js = ("(function(){"
                          "  var el = document.querySelector('%s');"
                          "  if(!el) return false;"
@@ -446,6 +477,8 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
         run_cli(["browser", sess, "click", sub["click"]], timeout=30)
     if sub.get("keys"):
         run_cli(["browser", sess, "keys", sub["keys"]], timeout=30)
+    if sub.get("enter"):
+        run_cli(["browser", sess, "keys", "Enter"], timeout=30)
 
     last = {"found": False, "thinking": "", "answer": "", "answer_html": "", "refs": 0}
     prev_len = 0

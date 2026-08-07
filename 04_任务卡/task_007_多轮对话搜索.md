@@ -56,3 +56,11 @@ def end_conversation(engine_id, conversation_id):
 - 验收结果：已成功在 `engines.py` 中扩展 `start_conversation`、`ask_conversation`、`get_conversation_history`、`end_conversation` 函数。支持基于 baseline 增量提取的多轮追问上下文保留，修复了字节豆包 React 受控组件 input 事件触发机制及 Kimi 促销弹窗自动关闭功能。Python 编译测试通过。
 - 遗留问题：无
 
+## 后续修复记录（2026-08-07）
+- 执行模型：DeepSeek-V4-Flash（OpenCode）
+- 背景：豆包搜索后不回正文、通义千问完全不搜索
+- **豆包**：豆包 UI 改版后旧提取选择器（`agent-chat__bubble`/`hyc-*`）失配。重写 `DOUBAO_EXTRACT_JS`：定位 `.list_items` 内的 `.v_list_row`，取文本≥15 字的最后一条（用户问题为短行，回答为长行），并保留旧式兜底。
+- **通义千问**：三处根因——① contenteditable 输入框用 `fill` 失败（verified=false），新增 `clipboard` 输入法（ClipboardEvent paste 触发 React onChange）；② `submit: {"enter": True}` 从未被调度，补齐 enter 提交分发；③ `GENERIC_EXTRACT_JS` 取页面最长文本会锁死在旧长回答上，新增 `QIANWEN_EXTRACT_JS` 取 `.message-select-wrapper-answer` 的最后一条回答。
+- 实测：豆包 29s、通义 19s 均正常返回正文；测试套件从 26/26 增至 27/27（新增引擎输入/提取配置用例）。
+- 修复 `tests/test_engines.py` 模块遮蔽：`channels` 引入 `03_共享组件` 到 sys.path[0]，`_load_engines` 现在重新插入网关目录并弹出缓存的 `engines` 模块。
+
