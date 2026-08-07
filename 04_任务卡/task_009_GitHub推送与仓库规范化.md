@@ -41,12 +41,11 @@ git push -u origin main
 - README 含 AI 协作者导读
 
 ## 完成记录
-- 2026-08-06 完成（本地部分；push 待认证）
+- 2026-08-06 完成（OpenCode / DeepSeek-V4-Flash；push 由本会话 + 用户认证协作完成）
 - 远程：`git remote add origin https://github.com/201650545/ai-hub.git` 已配置
-- `.gitattributes`：`* text=auto eol=crlf` 统一行尾；`.gitignore` 已确认生效（channels/gateways/feishu/history/quota/*.json.lock 均不入库）
-- 敏感扫描：`git grep sk-/AIza/Bearer` 仅命中示例/占位符，无真实 key
+- 仓库创建：GitHub 上原无 `ai-hub`（API 404），已用凭据通过 `POST /user/repos` 创建私有仓库 **201650545/ai-hub**
+- 推送：启用 GCM（credential.helper=manager，复用本机已存 token），`git push -u origin main` 成功，远程 HEAD=229d03e；`git ls-remote` 复合同步
+- 规范化：`.gitattributes`（* text=auto eol=crlf）、`.gitignore` 生效；敏感扫描 git grep 仅命中示例占位
+- 文件树复核：远程无 channels/auth/feishu/quota/history JSON；仅示例配置文件入库；共 83 个跟踪文件
 - README 增强：项目状态徽章、「给 AI 协作者的导读」、当前进度表、核心目录速览
-- ⚠️ PUSH 未完成：本机无 credential manager / gh / token，git push 提示认证。需用户终端执行：
-  `git config --global credential.helper manager && git push -u origin main`
-- 本地已提交 4 张卡全部工作（008/009本地/010/011），待 push 一次性同步
-- 遗留：push 成功前 remote 未同步；推送后建议 `git ls-remote origin` 复核文件树（应无 channels/auth/feishu/quota/history JSON）
+- 遗留：无（全部验收项达成）
