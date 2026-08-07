@@ -24,17 +24,93 @@ import socketserver
 import json
 import os
 import queue
+import sys
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 import channels
 import engines
 
 PORT = int(os.environ.get("GATEWAY_PORT", "3000"))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+HISTORY_FILE = Path(BASE_DIR) / "history.json"
+
+try:  # task_010：对话历史持久化模块（03_共享组件），缺失时降级
+    _SHARED = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "03_共享组件"))
+    if _SHARED not in sys.path:
+        sys.path.insert(0, _SHARED)
+    from history import list_conversations as _list_conversations, \
+        get_conversation as _get_conversation, \
+        delete_conversation as _delete_conversation, \
+        export_daily_stats as _export_daily_stats
+except Exception:  # noqa: BLE001
+    _list_conversations = _get_conversation = _delete_conversation = _export_daily_stats = None
+
+
+def get_history_records():
+    if not HISTORY_FILE.exists():
+        return []
+    try:
+        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("history", []) if isinstance(data, dict) else (data or [])
+    except Exception:
+        return []
+
+
+def save_history_record(query_str, done_items):
+    try:
+        records = get_history_records()
+        now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+        time_str = time.strftime("%H:%M")
+        
+        results_dict = {}
+        for item in done_items:
+            eid = item.get("id")
+            if eid:
+                results_dict[eid] = {
+                    "thinking": item.get("thinking", ""),
+                    "answer": item.get("answer", "") or item.get("text", ""),
+                    "answer_html": item.get("answer_html", ""),
+                    "refs": item.get("refs", 0)
+                }
+        
+        entry = {
+            "id": str(int(time.time() * 1000)),
+            "gateway": GATEWAY_ID,
+            "engine": ",".join(results_dict.keys()),
+            "question": query_str,
+            "query": query_str,
+            "answer": list(results_dict.values())[0]["answer"] if results_dict else "",
+            "results": results_dict,
+            "created_at": now_str,
+            "time_str": time_str,
+            "timestamp": int(time.time() * 1000)
+        }
+        
+        # Deduplicate same query if recently added
+        records = [r for r in records if r.get("query") != query_str]
+        records.insert(0, entry)
+        records = records[:100]
+        
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump({"history": records}, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Failed to save history: {e}")
+
+
+def clear_history_records():
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump({"history": []}, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
 
 # ================================================================ 中央平台注册（task_005）
 # 网关 ID、中央平台地址均可用环境变量覆盖；未配置时默认本地中央平台 :8000
@@ -266,6 +342,21 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             })
         elif path == "/api/channels":
             self._send_json(200, {"channels": channels.cached_health_all()})
+        elif path == "/api/history":
+            # task_010：支持 engine=/limit= 查询参数；未传参则返回旧的搜索历史（兼容）
+            if query.get("engine") or query.get("limit"):
+                if _list_conversations is None:
+                    self._send_json(200, {"status": "err", "error": "history 模块未加载"})
+                    return
+                engine = query.get("engine", [""])[0] or None
+                limit = int(query.get("limit", ["50"])[0] or 50)
+                self._send_json(200, {
+                    "status": "ok",
+                    "conversations": _list_conversations(
+                        gateway_id=GATEWAY_ID, engine_id=engine, limit=limit),
+                })
+                return
+            self._send_json(200, {"status": "ok", "history": get_history_records()})
         elif path == "/v1/models":
             self._send_json(200, {"object": "list", "data": aggregate_models()})
         elif path == "/api/unified_stream":
@@ -293,6 +384,7 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             for eid in active_eids:
                 threading.Thread(target=engine_thread, args=(eid, prompt, out_q), daemon=True).start()
             remaining = set(active_eids)
+            done_items = []
             while remaining:
                 try:
                     item = out_q.get(timeout=10)
@@ -301,10 +393,14 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 eid = item.get("id")
                 if item.get("status") == "done":
                     remaining.discard(eid)
+                    done_items.append(item)
                 self.wfile.write(f"data: {json.dumps(item, ensure_ascii=False)}\n\n".encode("utf-8"))
                 self.wfile.flush()
+            if done_items:
+                save_history_record(prompt, done_items)
             self.wfile.write(b"data: [DONE]\n\n")
             self.wfile.flush()
+
         elif path == "/v1/sse":
             # 网页渠道对话用：GET 转 chat，SSE 返回
             model = query.get("model", [""])[0]

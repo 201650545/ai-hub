@@ -52,4 +52,10 @@ def export_daily_stats(date: str = None) -> list:
 - 连续写入 100 轮无文件损坏
 
 ## 完成记录
-（执行后填写）
+- 2026-08-06 完成（OpenCode / DeepSeek-V4-Flash）
+- 交付 `03_共享组件/history.py`：save_turn / get_conversation / list_conversations / delete_conversation / export_daily_stats
+- 存储：`02_网关实例/{gateway_id}/history.json`；写入用 msvcrt 文件锁 + 线程锁；超 10MB 按月份归档 history_YYYY-MM.json
+- 集成①：`ds_v4_cli/engines.py` `ask_conversation()` 回答成功后调 save_turn 存 user+assistant 两轮（共享组件缺失时降级不报错）
+- 集成②：`ds_v4_cli/unified_gateway.py` 新增 `GET /api/history?engine=&limit=` 调 list_conversations；未传参时返回旧搜索历史（兼容）
+- 测试：`tests\test_history.py` 5 用例（写入/摘要/日统计/并发100轮/网关端点）全过；`run_all.py` 21/21 通过
+- 遗留：旧版 history.json 的历史搜索记录与新 conversation 结构并存，未做迁移；gateways.json 为运行时数据不提交

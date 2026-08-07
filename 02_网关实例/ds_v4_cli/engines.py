@@ -6,11 +6,23 @@ Supports single-turn and multi-turn conversations.
 """
 
 import json
+import os
 import re
 import subprocess
+import sys
 import threading
 import time
 import uuid
+
+GATEWAY_ID = os.environ.get("GATEWAY_ID", "ds_v4_cli")
+try:
+    _SHARED = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                            "..", "..", "03_共享组件"))
+    if _SHARED not in sys.path:
+        sys.path.insert(0, _SHARED)
+    from history import save_turn as _history_save_turn
+except Exception:  # noqa: BLE001 共享组件缺失时不影响主流程
+    _history_save_turn = None
 
 OPENCLI = "opencli"
 _NODE = "D:/Program Files/nodejs/node.exe"
@@ -529,6 +541,16 @@ def ask_conversation(engine_id, conversation_id, prompt):
             "time": time.strftime("%H:%M:%S")
         })
     res["conversation_id"] = conversation_id
+
+    # task_010：持久化到本地 history.json（共享组件），失败不影响返回
+    if _history_save_turn is not None:
+        try:
+            _history_save_turn(GATEWAY_ID, engine_id, conversation_id, "user", prompt)
+            if res["status"] == "ok" and res.get("answer"):
+                _history_save_turn(GATEWAY_ID, engine_id, conversation_id,
+                                   "assistant", res["answer"])
+        except Exception:  # noqa: BLE001
+            pass
     return res
 
 

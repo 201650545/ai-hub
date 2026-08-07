@@ -44,12 +44,14 @@ def main() -> None:
     import test_central
     import test_gateway
     import test_engines
+    import test_history
 
     all_results = []
     for suite, fn in (
         ("中央平台", test_central.run_all),
         ("网关", test_gateway.run_all),
         ("引擎", test_engines.run_all),
+        ("历史管理", test_history.run_all),
     ):
         res = fn()
         print()
