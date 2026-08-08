@@ -46,6 +46,7 @@ YUANBAO_EXTRACT_JS = """(function(){
   function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
   function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
   var cc = document.getElementById('chat-content') || document.body;
+
   var cotEls = Array.from(cc.querySelectorAll('.hyc-component-deepsearch-cot__think__content, [class*=deepsearch-cot__think]'));
   var thinking = '';
   for (var i=0; i<cotEls.length; i++){
@@ -53,16 +54,41 @@ YUANBAO_EXTRACT_JS = """(function(){
     if (ct.length > 5 && thinking.indexOf(ct.slice(0,30)) === -1)
       thinking += (thinking ? '\\n' : '') + ct;
   }
+
   var els = Array.from(cc.querySelectorAll('.hyc-common-markdown-style'));
   var answersText = []; var answersHTML = [];
   for (var i=0; i<els.length; i++){
     var cls = String(els[i].className);
     if (cls.indexOf('-cot') > -1) continue;
-    var t = textOf(els[i]); var h = htmlOf(els[i]);
+    var t = textOf(els[i]);
     if (t.length > 15 && answersText.indexOf(t) === -1) {
-      answersText.push(t); answersHTML.push(h);
+      answersText.push(t);
+      
+      var clone = els[i].cloneNode(true);
+      var icons = Array.from(clone.querySelectorAll('svg, img, [class*="icon"], [class*="ref"], a'));
+      icons.forEach(function(ic){
+        var url = ic.getAttribute('href') || ic.getAttribute('data-url') || ic.getAttribute('data-href');
+        var parentA = ic.closest('a');
+        if (!url && parentA) url = parentA.getAttribute('href');
+        
+        if (url && url.startsWith('http')) {
+          var a = document.createElement('a');
+          a.href = url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.className = 'ref-link';
+          a.style.cssText = 'font-size:12px;color:#0052cc;background:rgba(0,82,204,0.08);padding:2px 8px;border-radius:6px;text-decoration:none;margin:0 4px;display:inline-flex;align-items:center;gap:4px;vertical-align:middle;';
+          a.innerHTML = '🔗 查看原网页 ↗';
+          ic.replaceWith(a);
+        } else if (ic.tagName.toLowerCase() === 'svg' || ic.tagName.toLowerCase() === 'img') {
+          ic.remove();
+        }
+      });
+
+      answersHTML.push(clone.innerHTML.trim());
     }
   }
+
   if (!answersText.length) {
     var bubbles = Array.from(cc.querySelectorAll('.agent-chat__bubble--ai .agent-chat__bubble__content'));
     if (bubbles.length) {
@@ -71,12 +97,14 @@ YUANBAO_EXTRACT_JS = """(function(){
       if (t.length > 15) { answersText.push(t); answersHTML.push(h); }
     }
   }
+
   var answer = answersText.length > 0 ? answersText[answersText.length - 1] : '';
   var answer_html = answersHTML.length > 0 ? answersHTML[answersHTML.length - 1] : '';
   if (!answer && !thinking) return JSON.stringify({found: false});
   var m = (cc.innerText||'').match(/Found\\s*(\\d+)\\s*references/i);
   return JSON.stringify({found:true,thinking:thinking,answer:answer,answer_html:answer_html,refs:m?parseInt(m[1],10):0});
 })()"""
+
 
 GENERIC_EXTRACT_JS = """(function(){
   function textOf(e){ return (e.innerText||'').trim(); }
