@@ -48,6 +48,7 @@ def main() -> None:
     import test_quota
     import test_orchestrator
     import test_video_embed
+    import test_lesson_framework
 
     all_results = []
     for suite, fn in (
@@ -58,6 +59,7 @@ def main() -> None:
         ("额度统计", test_quota.run_all),
         ("编排器", test_orchestrator.run_all),
         ("视频组件", test_video_embed.run_all),
+        ("课件骨架", test_lesson_framework.run_all),
     ):
         res = fn()
         print()
