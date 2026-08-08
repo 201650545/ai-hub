@@ -73,6 +73,18 @@ def _registry(img_ok=True, vid_ok=True):
     }
 
 
+# ---------------------------------------------------------------- 组件全局快照
+# 单测会临时替换 image_gen 模块全局（inject/extract/run_cli），跑完需恢复，
+# 避免测试间相互污染（曾因未恢复导致后续用例拿到残留 fake 而误判）。
+try:
+    from components import image_gen as _image_gen
+    _REAL_INJECT = _image_gen.inject_and_generate
+    _REAL_EXTRACT = _image_gen.extract_image
+    _REAL_RUNCLI = _image_gen.run_cli
+except Exception:  # noqa: BLE001
+    _REAL_INJECT = _REAL_EXTRACT = _REAL_RUNCLI = None
+
+
 # ---------------------------------------------------------------- 测试用例
 
 def _write_html(ldir, lines):
@@ -275,6 +287,8 @@ def test_real_image_gen_two_arg_contract():
             "mode": "download", "lesson_dir": ldir}
     card = os.path.join(ORCH_DIR, "组件规则卡", "image_gen_doubao.yaml")
     r = image_gen.run(slot, card)
+    image_gen.inject_and_generate = _REAL_INJECT
+    image_gen.extract_image = _REAL_EXTRACT
     if not r.get("ok"):
         return Result("image_gen 两参数", Result.FAIL, f"run 返回 {r}")
     if not saved.get("prompt"):
@@ -283,6 +297,79 @@ def test_real_image_gen_two_arg_contract():
         return Result("image_gen 两参数", Result.FAIL, "资产未写入 lesson_dir")
     return Result("image_gen 两参数", Result.PASS,
                   f"run(slot,card) ok, asset={r['asset']}, 提示词已注入")
+
+
+def _b64png(seed: int) -> str:
+    """根据 seed 生成一个可靠的 >100 字节 PNG 的 data URL（含不同像素）。"""
+    import base64 as _b64
+    import io
+    from PIL import Image, ImageDraw
+    img = Image.new("RGB", (24, 24), (30, 90, 200))
+    draw = ImageDraw.Draw(img)
+    for i in range(24):
+        for j in range(16):
+            draw.point((i, j), ((seed * 13 + i * 7 + j * 3) % 256,
+                                (seed * 5 + i) % 256, (j * 11) % 256))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return "data:image/png;base64," + _b64.b64encode(buf.getvalue()).decode()
+
+
+def test_image_gen_slot_isolation_regression():
+    """回归：同一页面多槽位不得取同一张图（曾因共用 session + poll 命中旧图）。"""
+    ldir = tempfile.mkdtemp()
+    from components import image_gen
+
+    pages = {}
+
+    def fake_run_cli(args, timeout=90):
+        import json as _json
+        cmd = list(args)
+        if cmd[0] == "browser" and len(cmd) >= 4:
+            session, action = cmd[1], cmd[2]
+            if action == "open":
+                pages[session] = {"n": 0, "last": "", "generating": False}
+                return {"ok": True, "stdout": "", "stderr": ""}
+            if action == "keys":
+                if session in pages:
+                    pages[session]["generating"] = True
+                return {"ok": True, "stdout": "", "stderr": ""}
+            if action == "eval":
+                js = cmd[3]
+                page = pages.setdefault(session, {"n": 0, "last": "", "generating": False})
+                if "JSON.stringify({n:imgs.length" in js:
+                    if page["generating"]:
+                        page["n"] += 1
+                        page["last"] = _b64png(page["n"] + sum(map(ord, session)))
+                        page["generating"] = False
+                    return {"ok": True,
+                            "stdout": _json.dumps({"n": page["n"], "s": page["last"]}),
+                            "stderr": ""}
+                if "img.src" in js:  # extract_image: 返回末张 src
+                    return {"ok": True, "stdout": page["last"], "stderr": ""}
+        return {"ok": True, "stdout": "not handled", "stderr": ""}
+
+    image_gen.run_cli = fake_run_cli
+    card = os.path.join(ORCH_DIR, "组件规则卡", "image_gen_doubao.yaml")
+
+    def gen(slot_id, prompt):
+        slot = {"id": slot_id, "topic": "t", "prompt": prompt,
+                "mode": "download", "lesson_dir": ldir}
+        return image_gen.run(slot, card)
+
+    r1 = gen("p1_img", "red apple")
+    r2 = gen("p2_img", "blue sky")
+    image_gen.run_cli = _REAL_RUNCLI
+    image_gen.inject_and_generate = _REAL_INJECT
+    image_gen.extract_image = _REAL_EXTRACT
+    if not (r1.get("ok") and r2.get("ok")):
+        return Result("生图槽位隔离", Result.FAIL,
+                      f"r1={r1.get('error')} r2={r2.get('error')}")
+    b1 = open(os.path.join(ldir, "p1_img.png"), "rb").read()
+    b2 = open(os.path.join(ldir, "p2_img.png"), "rb").read()
+    if b1 == b2:
+        return Result("生图槽位隔离", Result.FAIL, "两个槽位图片内容相同(未隔离)")
+    return Result("生图槽位隔离", Result.PASS, "槽位会话隔离，图片互不相同")
 
 
 def test_rule_card_load():
@@ -308,6 +395,7 @@ def run_all():
         test_verify_residue_and_image,
         test_lesson_dir_injection,
         test_real_image_gen_two_arg_contract,
+        test_image_gen_slot_isolation_regression,
         test_rule_card_load,
     ]
     for t in tests:

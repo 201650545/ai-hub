@@ -67,14 +67,20 @@ def list_sites() -> list:
     return cards
 
 def inject_and_generate(session: str, url: str, prompt: str, card: dict) -> bool:
-    """打开站点 → 注入提示词 → 提交 → 轮询 poll_js 至超时"""
+    """打开站点 → 注入提示词 → 提交 → 轮询至出现「新图」或超时。
+
+    基线感知：提交前记录结果区 img 数量与末张 src；轮询改为等待
+    数量增加或末张 src 变化，避免同一页面多槽位时旧图命中即返回。
+    """
     inj = card.get("inject", {})
     wait_cfg = card.get("wait", {})
+    ext_cfg = card.get("extract", {})
     fill_selector = inj.get("fill_selector", "textarea")
     input_method = inj.get("input_method", "type")
     submit = inj.get("submit", "keys:Enter")
     timeout_s = wait_cfg.get("timeout_s", 90)
     poll_js = wait_cfg.get("poll_js", "!!document.querySelector('img')")
+    selector = ext_cfg.get("selector", "img")
 
     # 1. 确保打开页面
     if url:
@@ -112,6 +118,19 @@ def inject_and_generate(session: str, url: str, prompt: str, card: dict) -> bool
 
     time.sleep(1)
 
+    # 基线：提交前结果区图片数量与末张 src
+    base_js = ("(function(){var imgs=Array.from(document.querySelectorAll('%s'));"
+               "var last=imgs.length?imgs[imgs.length-1].src||'':'';"
+               "return JSON.stringify({n:imgs.length,s:last});})()") % selector
+    base_res = run_cli(["browser", session, "eval", base_js], timeout=15)
+    base_n, base_src = 0, ""
+    if base_res["ok"]:
+        try:
+            snap = json.loads(base_res["stdout"].strip())
+            base_n, base_src = int(snap.get("n", 0)), str(snap.get("s", ""))
+        except Exception:  # noqa: BLE001
+            pass
+
     # 3. 提交生成
     if submit == "keys:Enter":
         run_cli(["browser", session, "keys", "Enter"], timeout=15)
@@ -121,12 +140,26 @@ def inject_and_generate(session: str, url: str, prompt: str, card: dict) -> bool
     else:
         run_cli(["browser", session, "keys", "Enter"], timeout=15)
 
-    # 4. 轮询等待生成完成
+    # 4. 轮询等待「新图」出现（数量增加或末张 src 变化）
     poll_start = time.time()
     while time.time() - poll_start < timeout_s:
         time.sleep(2.5)
-        res = run_cli(["browser", session, "eval", poll_js], timeout=15)
-        if res["ok"] and res["stdout"].strip() == "true":
+        cur_res = run_cli(["browser", session, "eval", base_js], timeout=15)
+        if not cur_res["ok"]:
+            continue
+        cur_n, cur_src = 0, ""
+        try:
+            snap = json.loads(cur_res["stdout"].strip())
+            cur_n, cur_src = int(snap.get("n", 0)), str(snap.get("s", ""))
+        except Exception:  # noqa: BLE001
+            continue
+        if cur_n and (cur_n > base_n or (cur_n == base_n and cur_src not in ("", base_src))):
+            # 额外等 1 秒让图稳定，避免未渲染完整即提取
+            time.sleep(1)
+            return True
+        # 兜底：规则卡自带 poll_js 命中也算（兼容旧卡）
+        legacy = run_cli(["browser", session, "eval", poll_js], timeout=10)
+        if legacy["ok"] and legacy["stdout"].strip() == "true":
             return True
 
     return False
@@ -201,7 +234,9 @@ def run(slot: dict, rule_card_path: str, lesson_dir: str | None = None) -> dict:
 
     card = load_card(rule_card_path)
     site_name = card.get("site", "AI生图")
-    session = card.get("session", f"{slot_id}_image")
+    # 会话按槽位隔离：同页多槽位复用会导致 poll 命中旧图、prefer_last 取到同一张
+    base_session = card.get("session", f"{slot_id}_image")
+    session = f"{base_session}_{slot_id}" if slot_id not in base_session else base_session
     url = card.get("url", "")
     style_lock = card.get("style_lock", "")
     full_prompt = f"{base_prompt}, {style_lock}" if style_lock else base_prompt
@@ -234,6 +269,8 @@ def run(slot: dict, rule_card_path: str, lesson_dir: str | None = None) -> dict:
             fb_card = load_card(fallback_card_info["path"])
             fb_site = fb_card.get("site", "备用生图")
             fb_session = fb_card.get("session", "fallback_image")
+            if slot_id not in fb_session:
+                fb_session = f"fallback_{slot_id}"
             fb_url = fb_card.get("url", "")
             print(f"[Fallback 切换] -> {fb_site}...")
             fb_gen = inject_and_generate(fb_session, fb_url, full_prompt, fb_card)
