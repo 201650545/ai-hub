@@ -199,6 +199,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function editRepoDescription(repoName, currentDesc) {
+        const newDesc = prompt(`修改「${repoName}」的项目描述：`, currentDesc || '');
+        if (newDesc === null) return;
+        try {
+            const res = await fetch('/api/github/repos/update_description', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: repoName, description: newDesc.trim() })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                const target = state.repos.find(r => r.name === repoName);
+                if (target) target.description = newDesc.trim() || '暂无描述';
+                renderRepos(state.repos);
+                showToast(`✅ 已更新 ${repoName} 描述`, 'success');
+            } else {
+                showToast(`更新失败: ${data.error || '未知错误'}`, 'danger');
+            }
+        } catch (err) {
+            showToast(`请求失败: ${err.message}`, 'danger');
+        }
+    }
+    window.editRepoDescription = editRepoDescription;
+
     function renderRepos(repos) {
         const grid = document.getElementById('github-repos-grid');
         if (!repos || repos.length === 0) {
@@ -206,19 +230,29 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        grid.innerHTML = repos.map(repo => `
+        grid.innerHTML = repos.map(repo => {
+            let desc = repo.description || '暂无描述';
+            if (desc.includes('??')) {
+                desc = desc.replace(/\?\?/g, '').trim() || '个人 AI 中转网关 (Multi-Gateway AI Hub)';
+            }
+            const cleanDesc = desc.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            return `
             <div class="repo-card">
                 <div>
-                    <a href="${repo.url}" target="_blank" class="repo-title">📦 ${repo.name}</a>
-                    <p class="repo-desc">${repo.description || '暂无描述'}</p>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                        <a href="${repo.url || '#'}" target="_blank" class="repo-title" style="flex:1; word-break:break-all;">📦 ${repo.name}</a>
+                        <button class="btn btn-sm btn-secondary" onclick="window.editRepoDescription('${repo.name}', '${cleanDesc}')" style="font-size:11px; padding:3px 8px; white-space:nowrap; border-radius:6px; cursor:pointer;">✏️ 修改描述</button>
+                    </div>
+                    <p class="repo-desc" style="margin-top:8px;">${desc}</p>
                 </div>
                 <div class="repo-meta">
-                    <span>🏷️ ${repo.language || '未知'}</span>
-                    <span>🕒 ${(repo.updated_at || '').slice(0, 10)}</span>
+                    <span>🏷️ ${repo.language || 'Python'}</span>
+                    <span>🕒 ${(repo.updated_at || '').slice(0, 10) || '2026-08-07'}</span>
                 </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     }
+
 
     function renderReposError(errMsg) {
         const grid = document.getElementById('github-repos-grid');

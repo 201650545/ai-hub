@@ -1,0 +1,23 @@
+component: image_gen
+site: 豆包生图
+session: doubao_image
+url: https://www.doubao.com/chat/create-image
+style_lock: "flat cartoon, 儿童教材插画风, 明亮色调"
+inject:
+  fill_selector: "textarea"
+  fill_nth: 0
+  input_method: type        # 豆包是 React 受控输入，须真实键入（参考引擎适配经验）
+  submit: "keys:Enter"
+wait:
+  timeout_s: 90
+  poll_js: "!!document.querySelector('img[src*=imagex], img[class*=result], img[class*=image]')"
+extract:
+  method: img_src           # 若返回 blob: 则改 blob_canvas
+  selector: "img[src*=imagex], img[class*=result], img[class*=image]"
+  prefer_last: true         # 取最新一张
+fallback:
+  - 换提示词重试（去敏感词）
+  - 换备用站点（chatgpt_mirror / qianwen）
+budget:
+  max_retry: 2
+notes: 入口 URL 待勘探确认；豆包生图可能在对话流内返回多图，取最后一张。

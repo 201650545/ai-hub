@@ -3,686 +3,882 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>智能聚合网关 DS V4 CLI</title>
+<title>Universal AI Hub — 空间无限画布控制台</title>
 <style>
-:root{
-  --bg:#f6f7fa; --text:#050505; --muted:#2c2c30; --hairline:#b8bcc8;
-  --blue:#0052cc; --green:#16882d; --amber:#d97706; --red:#d32f2f;
-  --fill:#e9ebf0; --card-border:#aab0bc;
+:root {
+  --bg-canvas: #f1f3f8;
+  --bg-glass: rgba(255, 255, 255, 0.92);
+  --bg-card: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --hairline: #cbd5e1;
+  --card-border: #e2e8f0;
+  --primary: #0052cc;
+  --primary-hover: #0041a3;
+  --green: #16a34a;
+  --amber: #d97706;
+  --red: #dc2626;
+  --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
 }
-*{box-sizing:border-box;margin:0;padding:0}
-body{
-  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",Roboto,sans-serif;
-  background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased;
-  display:flex; flex-direction:column; min-height:100vh; font-weight:500;
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+  background: var(--bg-canvas);
+  color: var(--text-main);
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
 }
-/* ---------- 导航 ---------- */
-.nav{
-  position:sticky; top:0; z-index:50; background:rgba(255,255,255,.96);
-  backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px);
-  border-bottom:1.5px solid var(--card-border);
+
+/* ---------- 顶部全域悬浮控制栏 ---------- */
+.top-nav {
+  position: fixed;
+  top: 14px;
+  left: 16px;
+  right: 16px;
+  height: 60px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border: 1.5px solid var(--card-border);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  box-shadow: var(--shadow-sm);
 }
-.nav-inner{width:80%;max-width:1400px;margin:0 auto;padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
-.brand{font-size:18px;font-weight:700;letter-spacing:-.01em;color:#000}
-.brand b{font-weight:800}
-.brand span{color:var(--muted);font-weight:600;margin-left:8px;font-size:14px}
-.endpoint{font-size:14px;color:#000;font-weight:600;cursor:pointer;user-select:none}
-.endpoint:hover{color:var(--blue)}
-/* ---------- 分段控件（tab） ---------- */
-.seg-wrap{display:flex;justify-content:center;padding:22px 0 10px}
-.seg{
-  display:inline-flex; background:var(--fill); border-radius:14px; padding:5px;
-  gap:6px; border:1.5px solid var(--hairline);
+
+.brand {
+  font-size: 17px;
+  font-weight: 800;
+  color: #000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.seg button{
-  border:none;background:transparent;color:var(--muted);font-size:16px;font-weight:700;
-  padding:10px 26px;border-radius:10px;cursor:pointer;font-family:inherit;
-  transition:all .15s ease; white-space:nowrap;
+.brand span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: #e2e8f0;
+  padding: 3px 8px;
+  border-radius: 6px;
 }
-.seg button:hover{color:#000;background:rgba(255,255,255,.6)}
-.seg button.active{background:#000;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.25)}
-/* ---------- 面板 ---------- */
-.wrap{width:80%;max-width:1400px;margin:0 auto;padding:12px 24px 40px;flex:1}
-.panel{display:none}
-.panel.active{display:block;animation:fade .25s ease}
-@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-/* ---------- 卡片 ---------- */
-.card{
-  background:#fff;border:1.5px solid var(--hairline);border-radius:20px;padding:30px;
-  box-shadow:0 4px 18px rgba(0,0,0,.06);
+
+.global-search-box {
+  flex: 1;
+  max-width: 620px;
+  margin: 0 20px;
+  display: flex;
+  gap: 10px;
 }
-h2{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px;color:#000}
-.sub{font-size:15px;color:var(--muted);margin-bottom:22px;line-height:1.7;font-weight:600}
-label{font-size:14px;color:#000;font-weight:700;display:block;margin:16px 0 8px}
-select,input,textarea{
-  width:100%;padding:12px 16px;border:1.5px solid var(--hairline);border-radius:12px;
-  font-size:16px;font-weight:600;color:#000;background:#fff;font-family:inherit;outline:none;
-  transition:border-color .15s;
+.global-search-box input {
+  flex: 1;
+  padding: 10px 18px;
+  border-radius: 980px;
+  border: 1.5px solid var(--hairline);
+  font-size: 15px;
+  font-weight: 600;
+  outline: none;
+  background: #fff;
+  transition: all 0.15s;
 }
-select:focus,input:focus,textarea:focus{border-color:#000;box-shadow:0 0 0 3px rgba(0,0,0,.1)}
-textarea{min-height:96px;resize:vertical;font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:15px;line-height:1.7;font-weight:600}
-.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-.row select{flex:1;min-width:0}
-.row .model{flex:1.4;min-width:0}
-.btn{
-  background:#000;color:#fff;border:none;padding:12px 28px;border-radius:980px;
-  font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;
+.global-search-box input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.12);
 }
-.btn:hover{background:#222;transform:translateY(-1px)}
-.btn:disabled{opacity:.4;cursor:default}
-.btn-sm{background:transparent;color:var(--blue);border:none;font-size:14px;font-weight:700;cursor:pointer;padding:4px 10px;font-family:inherit}
-.btn-sm:hover{text-decoration:underline}
-.reply{
-  margin-top:18px;background:#fff;border:1.5px solid var(--hairline);border-radius:14px;padding:18px 22px;min-height:90px;
-  font-size:16px;line-height:1.8;color:#000;white-space:pre-wrap;font-weight:600;
-  font-family:ui-monospace,"SF Mono",Consolas,monospace;
+
+.btn {
+  background: #000;
+  color: #fff;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 980px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
 }
-.reply.placeholder{color:var(--muted)}
-/* ---------- 搜索卡片 ---------- */
-.search-bar{display:flex;gap:12px;margin-bottom:24px}
-.search-bar input{flex:1;border-radius:980px;padding:14px 24px;font-size:16px;border:2px solid #aab0bc;font-weight:600;color:#000}
-.results-grid{display:grid;grid-template-columns:1fr;gap:20px}
-@media(max-width:720px){.results-grid{grid-template-columns:1fr}}
-.node-card{background:#fff;border:1.5px solid var(--hairline);border-radius:18px;padding:24px;display:flex;flex-direction:column;min-height:280px;box-shadow:0 4px 16px rgba(0,0,0,.04)}
-.node-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.node-name{font-size:19px;font-weight:800;color:#000}
-.node-badge{font-size:13px;color:var(--muted);font-weight:600;background:var(--fill);padding:3px 10px;border-radius:6px}
-.node-body{
-  flex:1;font-size:16px;line-height:1.85;color:#000;white-space:pre-wrap;font-weight:500;
-  background:#fafbfc;border:1.5px solid var(--hairline);border-radius:12px;padding:20px;overflow-y:auto;max-height:540px;
-  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+.btn:hover { background: #222; transform: translateY(-1px); }
+.btn-secondary {
+  background: #f1f5f9;
+  color: var(--text-main);
+  border: 1.5px solid var(--card-border);
 }
-.node-foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:14px;color:#000;font-weight:700}
-.cursor-blink{display:inline-block;width:8px;height:16px;background:var(--blue);margin-left:3px;vertical-align:middle;animation:blink 1s steps(1) infinite}
-@keyframes blink{50%{opacity:0}}
-.hint{font-size:14px;color:var(--amber);background:#fff8e9;border:1.5px solid #ffe3a8;padding:10px 14px;border-radius:12px;margin-top:12px;line-height:1.6;font-weight:600}
-/* ---------- 渠道表 ---------- */
-table{width:100%;border-collapse:collapse;font-size:15px}
-th{font-size:14px;color:#000;font-weight:700;text-align:left;padding:12px 14px;border-bottom:2px solid #000;background:var(--fill)}
-td{padding:16px 14px;border-bottom:1.5px solid var(--card-border);vertical-align:top;color:#000;font-weight:500}
-tr:last-child td{border-bottom:none}
-.ch-name{font-weight:800;font-size:16px;color:#000}
-.ch-id{font-size:13px;color:var(--muted);margin-top:3px;font-weight:600}
-.ch-models{color:#000;font-size:14px;font-family:ui-monospace,"SF Mono",Consolas,monospace;word-break:break-all;font-weight:600}
-.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:middle}
-.dot.ok{background:var(--green)} .dot.pending{background:var(--amber)} .dot.err{background:var(--red)}
-/* ---------- Markdown 格式与表格样式 ---------- */
-.node-body table{width:100%;border-collapse:collapse;margin:16px 0;font-size:15px;border:1.5px solid #aab2c0}
-.node-body th{background:#eef1f6;color:#000;font-weight:800;border:1.5px solid #aab2c0;padding:10px 14px;text-align:left}
-.node-body td{border:1px solid #c8ceda;padding:10px 14px;background:#fff;font-weight:500;color:#000}
-.node-body tr:nth-child(even) td{background:#f8fafc}
-.node-body code{background:#eef1f6;color:#0052cc;padding:3px 7px;border-radius:6px;font-family:Consolas,monospace;font-size:14px;font-weight:700}
-.node-body pre{background:#1e1e24;color:#fff;padding:16px;border-radius:12px;overflow-x:auto;margin:16px 0}
+.btn-secondary:hover { background: #e2e8f0; }
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.endpoint-tag {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
+  background: rgba(0, 82, 204, 0.08);
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.endpoint-tag:hover { background: rgba(0, 82, 204, 0.15); }
+
+/* ---------- 左侧可折叠功能组件 Dock 抽屉 ---------- */
+.left-dock {
+  position: fixed;
+  top: 86px;
+  left: 16px;
+  bottom: 16px;
+  width: 280px;
+  z-index: 90;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid var(--card-border);
+  border-radius: 18px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.left-dock.collapsed {
+  transform: translateX(-310px);
+}
+.dock-toggle-btn {
+  position: absolute;
+  right: -36px;
+  top: 18px;
+  width: 34px;
+  height: 34px;
+  background: #fff;
+  border: 1.5px solid var(--card-border);
+  border-radius: 0 10px 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  font-size: 14px;
+}
+
+.dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1.5px solid var(--card-border);
+}
+.dock-header h3 { font-size: 15px; font-weight: 800; }
+
+.widget-library {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 2px;
+}
+.library-card {
+  background: #fff;
+  border: 1.5px solid var(--card-border);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: grab;
+  transition: all 0.2s;
+  user-select: none;
+}
+.library-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(0,82,204,0.08);
+  transform: translateY(-1px);
+}
+
+/* ---------- 无限空间画布 Viewport & Canvas ---------- */
+/* ---------- 无限空间画布 Viewport & Canvas ---------- */
+#canvas-viewport {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #f1f5f9;
+  background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+  background-position: 0 0;
+  cursor: grab;
+}
+#canvas-viewport:active { cursor: grabbing; }
+
+#spatial-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+
+/* ---------- 画布上的功能组件 Widget Card ---------- */
+.spatial-widget {
+  position: absolute;
+  pointer-events: auto;
+  background: var(--bg-card);
+
+  border: 1.5px solid var(--card-border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  resize: both;
+  overflow: hidden;
+  min-width: 320px;
+  min-height: 240px;
+  user-select: text;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.spatial-widget:focus-within, .spatial-widget.active-widget {
+  border-color: var(--primary);
+  box-shadow: 0 12px 36px rgba(0, 82, 204, 0.15);
+}
+
+.widget-head {
+  padding: 12px 16px;
+  background: #fafbfc;
+  border-bottom: 1.5px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: move;
+  user-select: none;
+}
+.widget-title {
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.widget-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-canvas);
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+.widget-actions {
+  display: flex;
+  gap: 6px;
+}
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.icon-btn:hover { background: #e2e8f0; color: #000; }
+
+.widget-body {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.widget-foot {
+  padding: 8px 14px;
+  border-top: 1.5px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  user-select: none;
+  background: #fafbfc;
+}
+
+/* ---------- 浮动画布视图控制 Toolbar ---------- */
+.canvas-controls-toolbar {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid var(--card-border);
+  border-radius: 14px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-lg);
+  user-select: none;
+}
+.zoom-badge {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-main);
+  min-width: 46px;
+}
+
+/* ---------- Markdown & 结果展示 ---------- */
+.node-body table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px;border:1.5px solid var(--hairline)}
+.node-body th{background:#eef1f6;color:#000;font-weight:800;border:1.5px solid var(--hairline);padding:8px 12px;text-align:left}
+.node-body td{border:1px solid var(--hairline);padding:8px 12px;background:#fff;font-weight:500;color:#000}
+.node-body code{background:#eef1f6;color:var(--primary);padding:2px 6px;border-radius:4px;font-family:Consolas,monospace;font-size:13px;font-weight:700}
+.node-body pre{background:#1e1e24;color:#fff;padding:14px;border-radius:10px;overflow-x:auto;margin:12px 0}
 .node-body pre code{background:transparent;color:#fff;padding:0}
-.node-body h1,.node-body h2,.node-body h3,.node-body h4{color:#000;margin:18px 0 10px;font-weight:800}
-.node-body ul,.node-body ol{padding-left:24px;margin:12px 0;list-style-position:inside}
-.node-body li{margin-bottom:6px;line-height:1.75;display:list-item;word-break:break-word}
-.node-body p{margin-bottom:12px;line-height:1.8}
-.footer{margin-top:32px;text-align:center;font-size:14px;color:var(--muted);padding-bottom:28px;font-weight:600}
-.mobile-code{background:var(--fill);border-radius:12px;padding:16px 18px;font-size:14px;line-height:1.8;font-family:ui-monospace,"SF Mono",Consolas,monospace;color:#000;font-weight:600}
+.cursor-blink{display:inline-block;width:7px;height:15px;background:var(--primary);margin-left:3px;vertical-align:middle;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ---------- 弹窗 Modal ---------- */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
 
-<nav class="nav">
-  <div class="nav-inner">
-    <div class="brand">智能聚合网关 <b>DS V4 CLI</b><span>个人 API 中转站 · 多渠道免费 API 统一封装</span></div>
-    <div class="endpoint" onclick="copyEndpoint()" title="点击复制我的统一 API 地址">📡 我的中转站 API: <b style="color:var(--blue);font-family:monospace;">http://localhost:3000/v1</b> <span style="font-size:11px;background:var(--fill);padding:2px 6px;border-radius:4px;border:1px solid var(--hairline)">点击复制</span></div>
+<!-- 1. 顶部悬浮控制与全域搜索 Bar -->
+<header class="top-nav">
+  <div class="brand">
+    🌐 Universal <b>AI Spatial Canvas</b> <span>全屏无限画布工作区</span>
   </div>
-</nav>
 
-<div class="seg-wrap">
-  <div class="seg">
-    <button data-tab="search" class="active">🌐 AI 搜索</button>
-    <button data-tab="chat">💬 渠道对话</button>
-    <button data-tab="channels">📡 渠道管理与中转路由</button>
+  <div class="global-search-box">
+    <input id="global-prompt-input" type="text" placeholder="输入任意问题，一键向画布中所有 AI 发起并发对比搜索…">
+    <button type="button" class="btn" onclick="triggerGlobalCanvasSearch()">🚀 组合全域搜索</button>
   </div>
+
+  <div class="top-actions">
+    <div class="endpoint-tag" onclick="copyEndpoint()" title="点击复制 API Base URL">📡 http://localhost:3000/v1</div>
+    <button type="button" class="btn btn-secondary" onclick="openHistoryModal()">📜 搜索历史</button>
+  </div>
+</header>
+
+<!-- 2. 左侧可折叠功能组件 Dock 抽屉 -->
+<aside class="left-dock" id="left-dock">
+  <div class="dock-toggle-btn" onclick="toggleDock()" title="展开/收起组件库">◀</div>
+  
+  <div class="dock-header">
+    <h3>🧩 功能组件库</h3>
+    <span style="font-size:12px;color:var(--text-muted);font-weight:600;">随意组合使用</span>
+  </div>
+
+  <div class="widget-library" id="widget-library">
+    <!-- 动态加载各大 AI 引擎 + 功能 Widget 卡片 -->
+  </div>
+</aside>
+
+<!-- 3. 全屏无限空间画布 Viewport -->
+<main id="canvas-viewport"
+      onwheel="handleCanvasWheel(event)"
+      onmousedown="handleCanvasMouseDown(event)"
+      ondragover="handleCanvasDragOver(event)"
+      ondrop="handleCanvasDrop(event)">
+  
+  <!-- 无限 2D 平移缩放变换层 -->
+  <div id="spatial-canvas">
+    <!-- 动态挂载用户随意放置与调大调小的功能 Card -->
+  </div>
+</main>
+
+<!-- 4. 浮动画布视图控制 Toolbar -->
+<div class="canvas-controls-toolbar">
+  <button type="button" id="hand-mode-btn" class="btn btn-secondary" style="padding:6px 14px;font-size:13px;" onclick="toggleHandMode()" title="切换抓手平移模式 (按住空格键同效)">🖐️ 抓手平移</button>
+  <span class="zoom-badge" id="zoom-badge">100%</span>
+  <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:15px;" onclick="zoomCanvas(0.1)" title="放大视角">➕</button>
+  <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:15px;" onclick="zoomCanvas(-0.1)" title="缩小视角">➖</button>
+  <button type="button" class="btn btn-secondary" style="padding:6px 14px;font-size:13px;" onclick="resetCanvasTransform()" title="重置视角 (0,0)">🎯 重置视角</button>
+  <button type="button" class="btn btn-secondary" style="padding:6px 14px;font-size:13px;" onclick="autoAlignWidgets()" title="整齐网格对齐">📐 自动整理</button>
+  <button type="button" class="btn btn-secondary" style="padding:6px 14px;font-size:13px;color:var(--red);" onclick="clearAllCanvasWidgets()" title="清空画布组件">🧹 清空画布</button>
 </div>
 
-<div class="wrap">
 
-  <!-- ============ 渠道对话 ============ -->
-  <section id="panel-chat" class="panel">
-    <div class="card">
-      <h2>多渠道 AI 对话中转</h2>
-      <p class="sub">通过本地中转站统一转发请求，当所选渠道失败或额度用尽时，自动无感回退到下一个可用免费渠道。</p>
-      <div class="row">
-        <select id="chat-channel"></select>
-        <select id="chat-model" class="model"></select>
-        <button type="button" class="btn-sm" id="refresh-ch">刷新渠道</button>
-      </div>
-      <label for="chat-prompt">提示词</label>
-      <textarea id="chat-prompt" placeholder="输入问题…">你好，用一句话介绍你自己</textarea>
-      <div style="margin-top:12px"><button type="button" class="btn" id="chat-send">发送</button></div>
-      <div id="chat-reply" class="reply placeholder">等待发送…</div>
+<!-- 5. 搜索历史 Modal 弹窗 -->
+<div id="history-modal" class="modal-overlay">
+  <div class="spatial-widget" style="width:82%;max-width:1100px;height:80vh;position:relative;resize:none;">
+    <div class="widget-head" style="cursor:default;">
+      <div class="widget-title">📜 AI 搜索历史沉淀记录</div>
+      <button type="button" class="icon-btn" onclick="closeHistoryModal()">✕</button>
     </div>
-  </section>
-
-  <!-- ============ AI 搜索自由画布空间 ============ -->
-  <section id="panel-search" class="panel active">
-    <!-- 顶部控制条 -->
-    <div class="search-bar" style="margin-bottom:14px;">
-      <input id="query-input" value="" placeholder="输入问题发起画布中已选择的 AI 组合检索…">
-      <button type="button" class="btn" id="search-go" onclick="startUnifiedSearch(event)">搜索</button>
-      <button type="button" class="btn" id="open-history-btn" onclick="openHistoryModal()" style="background:var(--fill);color:var(--text);border:1.5px solid var(--hairline);">📜 搜索历史</button>
-      <button type="button" class="btn" onclick="clearCanvas()" style="background:var(--fill);color:var(--text);border:1.5px solid var(--hairline);">🧹 清空画布</button>
-      <button type="button" class="btn" onclick="autoAlignCanvas()" style="background:var(--fill);color:var(--text);border:1.5px solid var(--hairline);">📐 自动整齐排列</button>
-    </div>
-
-    <!-- 画布工作区：左侧组件库 + 右侧自由放置画布区域 -->
-    <div style="display:flex;gap:18px;min-height:580px;align-items:stretch;">
-      <!-- 左侧组件池 -->
-      <div style="width:260px;background:var(--card-bg,#fff);border:1.5px solid var(--card-border,#e5e7eb);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 4px 16px rgba(0,0,0,0.03);">
-        <div>
-          <h3 style="font-size:15px;font-weight:800;margin:0;display:flex;align-items:center;gap:6px;color:#000;">
-            🧩 AI 搜索引擎组件库
-          </h3>
-          <p style="font-size:12px;color:var(--muted,#6b7280);margin:4px 0 0;">按住下方任意 AI 组件卡片拖拽入右侧画布，或点击【+ 拖入】即可使用。</p>
-        </div>
-        <div id="canvas-palette" style="display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;">
-          <!-- 动态加载 5 大 AI 引擎组件 -->
-        </div>
-      </div>
-
-      <!-- 右侧自由画布区域 -->
-      <div id="search-canvas" ondragover="handleCanvasDragOver(event)" ondrop="handleCanvasDrop(event)"
-           style="flex:1;background:var(--fill,#f9fafb);background-image:radial-gradient(var(--hairline,#e5e7eb) 1.5px, transparent 1.5px);background-size:24px 24px;border:1.5px dashed var(--card-border,#d1d5db);border-radius:16px;padding:18px;position:relative;display:grid;grid-template-columns:repeat(auto-fill, minmax(360px, 1fr));gap:18px;align-content:start;min-height:580px;box-shadow:inset 0 2px 8px rgba(0,0,0,0.02);">
-        <!-- 动态拖入放置的 AI 搜索卡片 -->
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ AI 搜索历史二级页面/弹窗 (Modal) ============ -->
-  <div id="history-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.45);z-index:1000;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);align-items:center;justify-content:center;">
-    <div class="card" style="width:82%;max-width:1100px;height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,0.18);">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:1.5px solid var(--card-border);">
-        <div>
-          <h2 style="font-size:22px;margin:0;">📜 AI 搜索历史记录</h2>
-          <p style="font-size:13px;color:var(--muted);margin:4px 0 0;">滚动保存近 6 小时内的检索记录，超时自动清理销毁。</p>
-        </div>
-        <div style="display:flex;gap:12px;align-items:center;">
-          <button type="button" class="btn-sm" id="clear-modal-history" onclick="clearAllModalHistory()" style="color:var(--red);font-size:14px;cursor:pointer;">🗑️ 清空所有历史</button>
-          <button type="button" class="btn" id="close-modal-btn" onclick="closeHistoryModal()" style="padding:8px 22px;font-size:15px;cursor:pointer;">✕ 关闭</button>
-        </div>
-
-      </div>
-
-      <!-- 历史记录内容体：左侧历史列表 + 右侧完整问题与回答详情 -->
-      <div style="display:flex;flex:1;min-height:0;margin-top:16px;gap:20px;">
-        <!-- 左侧列表 -->
-        <div id="modal-history-list" style="width:34%;border-right:1.5px solid var(--hairline);padding-right:14px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
-        </div>
-
-        <!-- 右侧详情 -->
-        <div id="modal-history-detail" style="flex:1;overflow-y:auto;background:var(--fill);border-radius:14px;padding:22px;display:flex;flex-direction:column;">
-          <div style="color:var(--muted);font-size:15px;text-align:center;margin:auto;">👈 请在左侧选择任意一条历史检索查看完整问题与回答</div>
-        </div>
+    <div class="widget-body" style="display:flex;gap:18px;padding:18px;">
+      <div id="modal-history-list" style="width:34%;border-right:1.5px solid var(--hairline);padding-right:14px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;"></div>
+      <div id="modal-history-detail" style="flex:1;overflow-y:auto;background:var(--bg-canvas);border-radius:12px;padding:20px;display:flex;flex-direction:column;">
+        <div style="color:var(--text-muted);font-size:14px;margin:auto;">👈 选择左侧记录查看详情</div>
       </div>
     </div>
   </div>
-
-  <!-- ============ 渠道管理与中转站 ============ -->
-  <section id="panel-channels" class="panel">
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <h2>📡 渠道管理与中转路由中心</h2>
-        <button class="btn-sm" onclick="copyEndpoint()" style="background:var(--blue);color:#fff;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600">📋 复制中转站 API 地址</button>
-      </div>
-      <p class="sub">中转站将各大平台的白嫖免费 API 及自用 Key 统一打包为标准 OpenAI 兼容接口，供你的 Chatbox、Pi Agent、VS Code 等全电脑软件统一调用。</p>
-      <div style="overflow-x:auto">
-        <table>
-          <thead><tr><th>渠道与来源域名</th><th>扣费风险与类型</th><th>状态 / 实时余额</th><th>可用模型</th><th>说明</th><th style="text-align:right">操作</th></tr></thead>
-          <tbody id="ch-tbody"></tbody>
-        </table>
-      </div>
-    </div>
-    
-    <!-- 统一中转站使用说明 -->
-    <div class="card" style="margin-top:18px">
-      <h2>🔌 电脑各软件接入中转站指引</h2>
-      <p class="sub" style="line-height:1.8">
-        在任何支持 OpenAI 格式的软件（如 Chatbox / LobeChat / Cursor / Python 脚本 / 网页插件）中填入以下通用中转配置：<br>
-        • <b>接口地址 (Base URL)</b>: <code style="background:var(--fill);padding:2px 8px;border-radius:6px;font-weight:600">http://localhost:3000/v1</code><br>
-        • <b>API Key</b>: <code style="background:var(--fill);padding:2px 8px;border-radius:6px;font-weight:600">sk-my-custom-hub</code> (任意填写即可)<br>
-        • <b>优先配额原则</b>: 中转站默认优先调配<b>免费白嫖 API</b>，当免费额度用完或响应超时时，自动无感 fallback 到下一个可用渠道。
-      </p>
-    </div>
-  </section>
-
 </div>
-
-<div class="footer">智能聚合网关 DS V4 CLI · 个人 API 中转网关 · 聚合白嫖 API · 数据不出本机</div>
 
 <script>
-/* ---------- 常量 ---------- */
-const ENGINES = [
-  {id:"yuanbao",name:"腾讯元宝 AI 搜索",icon:"🐧",badge:"微信公众号生态 + 腾讯全网实时检索"}
-];
-const HISTORY_TTL = 6 * 60 * 60 * 1000; // 6 小时过期时间 (ms)
-let channelCache = {};
+/* ==========================================================================
+   全屏无限 Spatial Canvas 引擎
+   ========================================================================== */
 
-/* ---------- Tab 切换（事件委托，无内联 onclick） ---------- */
-function openTab(id){
-  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-'+id));
-  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
-  if (id === 'search') { renderCanvasGrid(); }
-  if (id === 'channels') refreshChannels();
-}
-window.openTab = openTab;
-document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => openTab(b.dataset.tab)));
-
-function copyEndpoint(){ navigator.clipboard.writeText('http://' + location.host + '/v1'); }
-
-/* ---------- 渠道对话 ---------- */
-async function refreshChannels(){
-  try{
-    const d = await (await fetch('/api/channels')).json();
-    channelCache = d.channels || {};
-    const sel = document.getElementById('chat-channel');
-    sel.innerHTML = '';
-    Object.entries(channelCache).forEach(([id,ch]) => {
-      const ok = ch.key_set && ch.reachable;
-      const tag = ch.billing_type === 'paid' ? ' [付费按量]' : ' [免费]';
-      sel.innerHTML += '<option value="'+id+'">'+(ok?'✓ ':'')+ch.name+tag+(ok?'':'（待配置）')+'</option>';
-    });
-    loadChannelModels();
-    renderChannelTable();
-  }catch(e){}
-}
-/* ---------- 渠道管理表格渲染 ---------- */
-function renderChannelTable(){
-  const tbody = document.getElementById('ch-tbody');
-  if(!tbody) return;
-  tbody.innerHTML = '';
-  let rows = '';
-  Object.entries(channelCache || {}).forEach(([id, ch]) => {
-    const ok = ch.key_set && ch.reachable;
-    const dot = ok ? 'ok' : (ch.key_set ? 'err' : 'pending');
-    const status = ok ? '已连接' : (ch.key_set ? '异常' : '待配置');
-    const models = (ch.models && ch.models.length) ? ch.models.join(', ') : '—';
-    const note = ch.note || ch.error || '';
-    let actions = '';
-    if (ch.can_fill) {
-      actions += '<button class="btn-sm" onclick="fillKey(\''+id+'\')">🔑 填 Key</button>';
-    } else {
-      actions += '<span style="font-size:13px;color:var(--muted);font-weight:600">env 配置</span>';
-    }
-    rows += '<tr>'
-      + '<td><div class="ch-name">'+ch.icon+' '+ch.name+'</div><div class="ch-id">'+ch.id+'</div>'
-      + '<div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:2px">'+ (ch.provider||'') +'</div></td>'
-      + '<td style="font-size:13px">'+ (ch.billing_tag||'') +'</td>'
-      + '<td><span class="dot '+dot+'"></span><span style="font-weight:700">'+status+'</span>'
-      + '<div style="font-size:13px;color:var(--muted);font-weight:600;margin-top:4px">'+ (ch.balance||'') +'</div></td>'
-      + '<td class="ch-models">'+models+'</td>'
-      + '<td style="font-size:13px">'+note+'</td>'
-      + '<td style="text-align:right;white-space:nowrap">'+actions+'</td>'
-      + '</tr>';
-  });
-  tbody.innerHTML = rows;
-}
-/* ---------- 填入渠道 Key ---------- */
-async function fillKey(id){
-  const name = ((channelCache||{})[id]||{}).name || id;
-  const key = prompt('为「'+name+'」填入 API Key：');
-  if(!key) return;
-  try{
-    const r = await fetch('/api/channels/'+id+'/key', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({key: key.trim()})
-    });
-    const d = await r.json();
-    if(d && d.status === 'ok'){
-      alert('✅ '+name+' 已保存'+(d.reachable ? '，探测正常' : ('，但探测失败：'+(d.error||''))));
-      refreshChannels();
-    } else {
-      alert('保存失败：' + ((d&&d.error)||'未知错误'));
-    }
-  }catch(e){
-    alert('请求失败：' + e.message);
-  }
-}
-function loadChannelModels(){
-  const cid = document.getElementById('chat-channel').value;
-  const ch = channelCache[cid]; if(!ch) return;
-  const msel = document.getElementById('chat-model');
-  msel.innerHTML = '';
-  const models = (ch.models && ch.models.length) ? ch.models : [ch.default_model || '—'];
-  models.forEach(m => msel.innerHTML += '<option value="'+m+'">'+m+'</option>');
-}
-function chatSend(){
-  const model = document.getElementById('chat-model').value;
-  const prompt = document.getElementById('chat-prompt').value;
-  const out = document.getElementById('chat-reply');
-  out.classList.remove('placeholder');
-  out.innerText = '正在请求 ' + model + ' …';
-  const es = new EventSource('/v1/sse?model=' + encodeURIComponent(model) + '&prompt=' + encodeURIComponent(prompt));
-  let buf = '';
-  es.onmessage = ev => {
-    if (ev.data === '[DONE]'){ es.close(); return; }
-    try{
-      const o = JSON.parse(ev.data);
-      const c = o.choices[0].delta.content;
-      if (c){ buf += c; out.innerText = buf; }
-    }catch(e){}
-  };
-  es.onerror = () => { es.close(); if(!buf){ out.innerText = '请求失败：渠道未就绪或模型不可用'; } };
-}
-
-/* ---------- 6小时自动过期 AI 搜索历史 (二级页面/Modal 模式) ---------- */
-function getValidHistory(){
-  const now = Date.now();
-  let list = [];
-  try{ list = JSON.parse(localStorage.getItem('ai_search_history_v1') || '[]'); }catch(e){}
-  const valid = list.filter(item => item.timestamp && (now - item.timestamp < HISTORY_TTL));
-  if (valid.length !== list.length) {
-    localStorage.setItem('ai_search_history_v1', JSON.stringify(valid));
-  }
-  return valid;
-}
-
-function saveSearchHistory(query, resultsData){
-  if (!query || !query.trim()) return;
-  let list = getValidHistory();
-  list = list.filter(item => item.query !== query);
-  const now = new Date();
-  const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-  list.unshift({
-    id: String(Date.now()),
-    query: query.trim(),
-    timestamp: Date.now(),
-    time_str: timeStr,
-    results: resultsData
-  });
-  if (list.length > 20) list = list.slice(0, 20);
-  localStorage.setItem('ai_search_history_v1', JSON.stringify(list));
-}
-
-async function fetchServerHistory(){
-  try {
-    const res = await fetch('/api/history');
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.history && Array.isArray(data.history)) {
-        return data.history;
-      }
-    }
-  } catch(e){}
-  return null;
-}
-
-async function renderModalHistoryList(){
-  const container = document.getElementById('modal-history-list');
-  const detail = document.getElementById('modal-history-detail');
-  if (container) container.innerHTML = '<div style="color:var(--muted);font-size:14px;padding:16px;text-align:center;">加载搜索历史中…</div>';
-  
-  let list = getValidHistory();
-  const serverList = await fetchServerHistory();
-  if (serverList && serverList.length > 0) {
-    const mergedMap = new Map();
-    serverList.forEach(item => mergedMap.set(item.query || item.question, item));
-    list.forEach(item => {
-      const q = item.query || item.question;
-      if (q && !mergedMap.has(q)) mergedMap.set(q, item);
-    });
-    list = Array.from(mergedMap.values());
-  }
-
-  container.innerHTML = '';
-  
-  if (list.length === 0) {
-    container.innerHTML = '<div style="color:var(--muted);font-size:14px;padding:16px;text-align:center;">暂无搜索历史记录</div>';
-    detail.innerHTML = '<div style="color:var(--muted);font-size:15px;text-align:center;margin:auto;">暂无检索记录</div>';
-    return;
-  }
-
-  list.forEach((item, idx) => {
-    const card = document.createElement('div');
-    card.style.cssText = 'background:var(--fill);border:1px solid var(--hairline);border-radius:12px;padding:14px 16px;cursor:pointer;transition:all .15s;';
-    const queryText = item.query || item.question || '搜索记录';
-    const timeText = item.time_str || (item.created_at ? item.created_at.slice(11,16) : '历史');
-    card.innerHTML = '<div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;word-break:break-all;">🔍 ' + queryText + '</div>' +
-      '<div style="font-size:13px;color:var(--muted);display:flex;justify-content:space-between;"><span>时间: ' + timeText + '</span><span style="color:var(--blue);">查看完整回答 ➔</span></div>';
-    card.onclick = () => {
-      document.querySelectorAll('#modal-history-list > div').forEach(d => d.style.borderColor = 'var(--hairline)');
-      card.style.borderColor = 'var(--blue)';
-      showHistoryDetail(item);
-    };
-    container.appendChild(card);
-    if (idx === 0) {
-      card.style.borderColor = 'var(--blue)';
-      showHistoryDetail(item);
-    }
-  });
-}
-
-function openHistoryModal(){
-  document.getElementById('history-modal').style.display = 'flex';
-  renderModalHistoryList();
-}
-function closeHistoryModal(){
-  document.getElementById('history-modal').style.display = 'none';
-}
-function clearAllModalHistory(){
-  if (confirm('确定要清空所有 AI 搜索历史记录吗？')) {
-    localStorage.removeItem('ai_search_history_v1');
-    renderModalHistoryList();
-  }
-}
-window.openHistoryModal = openHistoryModal;
-window.closeHistoryModal = closeHistoryModal;
-window.clearAllModalHistory = clearAllModalHistory;
-
-
-/* ---------- AI 自由画布交互 ---------- */
-window.ENGINES_ALL = {
-  "yuanbao": { id: "yuanbao", name: "腾讯元宝", icon: "🐧", badge: "微信公众号生态 + 全网检索", site: "yuanbao.tencent.com" },
-  "doubao": { id: "doubao", name: "字节豆包", icon: "🧩", badge: "字节抖音全网实时检索", site: "doubao.com" },
-  "kimi": { id: "kimi", name: "月之暗面 Kimi", icon: "🌙", badge: "200万字长上下文 + 深度联网", site: "kimi.moonshot.cn" },
-  "qianwen": { id: "qianwen", name: "通义千问", icon: "🎈", badge: "阿里通义全网智搜", site: "tongyi.aliyun.com" },
-  "grok": { id: "grok", name: "Grok", icon: "🤖", badge: "xAI Grok 实时检索", site: "grok.com" },
-  "perplexity": { id: "perplexity", name: "Perplexity", icon: "🔍", badge: "Perplexity 实时全网检索", site: "perplexity.ai" }
+const AVAILABLE_WIDGET_TYPES = {
+  "yuanbao": { id: "yuanbao", type: "search", name: "腾讯元宝 AI 搜", icon: "🐧", badge: "微信公众号 + 腾讯全网" },
+  "doubao": { id: "doubao", type: "search", name: "字节豆包 AI 搜", icon: "🧩", badge: "字节抖音全网实时" },
+  "kimi": { id: "kimi", type: "search", name: "月之暗面 Kimi", icon: "🌙", badge: "200万字长上下文" },
+  "qianwen": { id: "qianwen", type: "search", name: "通义千问智搜", icon: "🎈", badge: "阿里通义全网检索" },
+  "grok": { id: "grok", type: "search", name: "xAI Grok", icon: "🤖", badge: "Grok 实时全网智搜" },
+  "perplexity": { id: "perplexity", type: "search", name: "Perplexity 搜", icon: "🔍", badge: "Perplexity 深度检索" },
+  "llm_chat": { id: "llm_chat", type: "tool", name: "多渠道对话 Box", icon: "💬", badge: "无感 Fallback 对话" },
+  "channel_status": { id: "channel_status", type: "tool", name: "中转站路由中心", icon: "📡", badge: "白嫖 API 路由监控" },
+  "memo_note": { id: "memo_note", type: "tool", name: "AI 灵感便签", icon: "📝", badge: " Markdown 随手记" }
 };
 
+let activeWidgets = JSON.parse(localStorage.getItem('spatial_widgets_state_v3') || '[]');
+let widgetPositions = JSON.parse(localStorage.getItem('spatial_widgets_pos_v3') || '{}');
 
-window.activeCanvasEngineIds = JSON.parse(localStorage.getItem('canvas_active_engines_v1') || '["yuanbao", "doubao", "kimi"]');
+let canvasPanX = 40, canvasPanY = 90, canvasZoomScale = 1.0;
+let isPanning = false, startPanX = 0, startPanY = 0;
+let channelCache = {};
 
-function saveCanvasState(){
-  localStorage.setItem('canvas_active_engines_v1', JSON.stringify(window.activeCanvasEngineIds));
+/* ---------- 拖拽 Dock 抽屉 ---------- */
+function toggleDock() {
+  const dock = document.getElementById('left-dock');
+  const btn = dock.querySelector('.dock-toggle-btn');
+  dock.classList.toggle('collapsed');
+  btn.innerText = dock.classList.contains('collapsed') ? '▶' : '◀';
 }
 
-function renderCanvasPalette(){
-  const palette = document.getElementById('canvas-palette');
-  if(!palette) return;
-  palette.innerHTML = '';
+/* ---------- 复制中转 API ---------- */
+function copyEndpoint() {
+  navigator.clipboard.writeText('http://' + location.host + '/v1');
+  alert('✅ 统一中转站 API 地址已复制到剪贴板:\nhttp://' + location.host + '/v1');
+}
 
-  Object.values(window.ENGINES_ALL).forEach(eng => {
-    const isAdded = window.activeCanvasEngineIds.includes(eng.id);
-    const item = document.createElement('div');
-    item.className = 'palette-item';
-    item.draggable = true;
-    item.ondragstart = (e) => handlePaletteDragStart(e, eng.id);
-    item.style.cssText = 'background:#fff;border:1.5px solid var(--hairline);border-radius:10px;padding:12px;cursor:grab;display:flex;flex-direction:column;gap:6px;transition:all 0.2s;user-select:none;box-shadow:0 2px 6px rgba(0,0,0,0.03);';
+/* ---------- Canvas 平移与缩放 (支持触控板轻扫、滚轮平移、按住拖拽、抓手模式、空格拖拽) ---------- */
+let isHandMode = false;
+let isSpacePressed = false;
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+    isSpacePressed = true;
+    const vp = document.getElementById('canvas-viewport');
+    if (vp) vp.style.cursor = 'grab';
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'Space') {
+    isSpacePressed = false;
+    const vp = document.getElementById('canvas-viewport');
+    if (vp) vp.style.cursor = isHandMode ? 'grab' : 'default';
+  }
+});
+
+function toggleHandMode() {
+  isHandMode = !isHandMode;
+  const btn = document.getElementById('hand-mode-btn');
+  const vp = document.getElementById('canvas-viewport');
+  if (btn) {
+    btn.style.background = isHandMode ? 'var(--primary)' : '#f1f5f9';
+    btn.style.color = isHandMode ? '#fff' : 'var(--text-main)';
+  }
+  if (vp) vp.style.cursor = isHandMode ? 'grab' : 'default';
+}
+
+function updateCanvasTransform() {
+  const canvas = document.getElementById('spatial-canvas');
+  const viewport = document.getElementById('canvas-viewport');
+  const badge = document.getElementById('zoom-badge');
+  if (canvas) {
+    canvas.style.transform = `translate(${canvasPanX}px, ${canvasPanY}px) scale(${canvasZoomScale})`;
+  }
+  if (viewport) {
+    const gridGradSize = 28 * canvasZoomScale;
+    viewport.style.backgroundSize = `${gridGradSize}px ${gridGradSize}px`;
+    viewport.style.backgroundPosition = `${canvasPanX}px ${canvasPanY}px`;
+  }
+  if (badge) badge.innerText = `${Math.round(canvasZoomScale * 100)}%`;
+}
+
+
+function zoomCanvas(delta) {
+  canvasZoomScale = Math.min(Math.max(0.2, canvasZoomScale + delta), 2.5);
+  updateCanvasTransform();
+}
+
+function resetCanvasTransform() {
+  canvasPanX = 40;
+  canvasPanY = 90;
+  canvasZoomScale = 1.0;
+  updateCanvasTransform();
+}
+
+function handleCanvasWheel(ev) {
+  ev.preventDefault();
+
+  // 若按住 Ctrl 键或 Pinch 缩放手势 -> 缩放视角
+  if (ev.ctrlKey || ev.metaKey) {
+    const zoomFactor = ev.deltaY < 0 ? 1.06 : 0.94;
+    const newScale = Math.min(Math.max(0.2, canvasZoomScale * zoomFactor), 2.5);
     
-    item.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;">' +
-        '<span style="font-weight:800;font-size:14px;color:#000;">' + eng.icon + ' ' + eng.name + '</span>' +
-        '<button type="button" class="btn-sm" onclick="addEngineToCanvas(\'' + eng.id + '\')" style="font-size:11px;padding:3px 8px;' + (isAdded ? 'background:#f3f4f6;color:#9ca3af;cursor:default;' : 'background:var(--blue);color:#fff;') + '" ' + (isAdded ? 'disabled' : '') + '>' + (isAdded ? '已在画布' : '+ 拖入') + '</button>' +
-      '</div>' +
-      '<span style="font-size:11px;color:var(--muted);">' + eng.badge + '</span>';
+    const viewport = document.getElementById('canvas-viewport');
+    const rect = viewport ? viewport.getBoundingClientRect() : { left: 0, top: 0 };
+    const mouseX = ev.clientX - rect.left;
+    const mouseY = ev.clientY - rect.top;
 
-    palette.appendChild(item);
+    canvasPanX = mouseX - (mouseX - canvasPanX) * (newScale / canvasZoomScale);
+    canvasPanY = mouseY - (mouseY - canvasPanY) * (newScale / canvasZoomScale);
+    canvasZoomScale = newScale;
+  } else {
+    // 正常滚轮 / 触控板轻扫 -> 顺滑 2D 平移 (上下左右 X/Y 双向)
+    canvasPanX -= ev.deltaX;
+    canvasPanY -= ev.deltaY;
+  }
+  
+  updateCanvasTransform();
+}
+
+function handleCanvasMouseDown(ev) {
+  // 点击空白背景、或者处于 Hand 抓手模式/按住 Space 键时触发平移
+  const isWidgetClick = ev.target.closest('.spatial-widget');
+  if (isWidgetClick && !isSpacePressed && !isHandMode) return;
+
+  isPanning = true;
+  startPanX = ev.clientX - canvasPanX;
+  startPanY = ev.clientY - canvasPanY;
+
+  const viewport = document.getElementById('canvas-viewport');
+  if (viewport) viewport.style.cursor = 'grabbing';
+
+  function onMouseMove(e) {
+    if (!isPanning) return;
+    canvasPanX = e.clientX - startPanX;
+    canvasPanY = e.clientY - startPanY;
+    updateCanvasTransform();
+  }
+
+  function onMouseUp() {
+    isPanning = false;
+    if (viewport) viewport.style.cursor = (isHandMode || isSpacePressed) ? 'grab' : 'default';
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  }
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+}
+
+
+/* ---------- 渲染组件库 ---------- */
+function renderWidgetLibrary() {
+  const library = document.getElementById('widget-library');
+  if (!library) return;
+  library.innerHTML = '';
+
+  Object.values(AVAILABLE_WIDGET_TYPES).forEach(item => {
+    const isAdded = activeWidgets.includes(item.id);
+    const card = document.createElement('div');
+    card.className = 'library-card';
+    card.draggable = true;
+    card.ondragstart = (e) => handleLibraryDragStart(e, item.id);
+    
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-weight:800;font-size:14px;color:#000;">${item.icon} ${item.name}</span>
+        <button type="button" class="btn" onclick="addWidgetToCanvas('${item.id}')" 
+                style="font-size:11px;padding:3px 10px;${isAdded ? 'background:#e2e8f0;color:#94a3b8;cursor:default;' : 'background:var(--primary);color:#fff;'}" 
+                ${isAdded ? 'disabled' : ''}>${isAdded ? '已在画布' : '+ 放置'}</button>
+      </div>
+      <span style="font-size:11px;color:var(--text-muted);">${item.badge}</span>
+    `;
+    library.appendChild(card);
   });
 }
 
-function renderCanvasGrid(){
-  const canvas = document.getElementById('search-canvas');
-  if(!canvas) return;
+/* ---------- 渲染 Spatial Canvas 上的所有 Widget 卡片 ---------- */
+function renderCanvasWidgets() {
+  const canvas = document.getElementById('spatial-canvas');
+  if (!canvas) return;
   canvas.innerHTML = '';
 
-  if (!window.activeCanvasEngineIds || window.activeCanvasEngineIds.length === 0) {
-    canvas.innerHTML = '<div style="grid-column:1/-1;margin:auto;padding:60px 20px;text-align:center;color:var(--muted);user-select:none;">' +
-        '<div style="font-size:42px;margin-bottom:12px;">🧩</div>' +
-        '<div style="font-size:16px;font-weight:700;color:#000;">自由画布空间目前为空</div>' +
-        '<div style="font-size:13px;margin-top:6px;">请从左侧【AI 搜索引擎组件库】按住拖拽任意 AI 引擎放入本画布中发起组合检索</div>' +
-      '</div>';
-    return;
+  if (activeWidgets.length === 0) {
+    activeWidgets = ["yuanbao", "doubao", "kimi", "channel_status"];
+    saveWidgetState();
   }
 
-  window.activeCanvasEngineIds.forEach(id => {
-    const eng = window.ENGINES_ALL[id] || { id, name: id, icon: '🤖', badge: 'AI 引擎' };
-    const card = document.createElement('div');
-    card.className = 'node-card canvas-card';
-    card.dataset.id = id;
-    card.style.cssText = 'background:#fff;border:1.5px solid var(--hairline);border-radius:14px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:12px;';
-    card.innerHTML = '<div class="node-head" style="display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1.5px solid var(--hairline);">' +
-        '<div style="display:flex;align-items:center;gap:8px;"><span class="node-name" style="font-weight:800;font-size:15px;color:#000;">' + eng.icon + ' ' + eng.name + '</span><span class="node-badge" style="font-size:11px;background:var(--fill);padding:2px 8px;border-radius:6px;color:var(--muted);">' + eng.badge + '</span></div>' +
-        '<button type="button" class="btn-sm" onclick="removeEngineFromCanvas(\'' + id + '\')" style="background:transparent;color:var(--muted);border:none;font-size:15px;cursor:pointer;padding:2px 6px;" title="从画布中移除">✕</button>' +
-      '</div>' +
-      '<div class="node-body" id="body-' + id + '" style="min-height:200px;max-height:480px;overflow-y:auto;font-size:15px;line-height:1.75;color:#000;">等待发起搜索…</div>' +
-      '<div class="node-foot" style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--hairline);">' +
-        '<span id="status-' + id + '" style="font-size:12px;color:var(--muted);font-weight:600;">就绪</span>' +
-      '</div>';
-    canvas.appendChild(card);
-  });
+  activeWidgets.forEach((id, idx) => {
+    const info = AVAILABLE_WIDGET_TYPES[id] || { id, name: id, icon: "🧩", badge: "组件" };
+    const pos = widgetPositions[id] || {
+      x: 30 + (idx % 3) * 440,
+      y: 30 + Math.floor(idx / 3) * 420,
+      w: id === 'channel_status' ? 840 : 410,
+      h: id === 'channel_status' ? 380 : 390
+    };
 
-  renderCanvasPalette();
-}
+    const widget = document.createElement('div');
+    widget.className = 'spatial-widget';
+    widget.dataset.id = id;
+    widget.style.cssText = `left:${pos.x}px;top:${pos.y}px;width:${pos.w}px;height:${pos.h}px;`;
 
-function handlePaletteDragStart(ev, engineId){
-  ev.dataTransfer.setData('text/plain', engineId);
-  ev.dataTransfer.effectAllowed = 'copy';
-}
-
-function handleCanvasDragOver(ev){
-  ev.preventDefault();
-  ev.dataTransfer.dropEffect = 'copy';
-}
-
-function handleCanvasDrop(ev){
-  ev.preventDefault();
-  const engineId = ev.dataTransfer.getData('text/plain');
-  if (engineId && window.ENGINES_ALL[engineId]) {
-    addEngineToCanvas(engineId);
-  }
-}
-
-function addEngineToCanvas(engineId){
-  if (!window.activeCanvasEngineIds.includes(engineId)) {
-    window.activeCanvasEngineIds.push(engineId);
-    saveCanvasState();
-    renderCanvasGrid();
-  }
-}
-
-function removeEngineFromCanvas(engineId){
-  window.activeCanvasEngineIds = window.activeCanvasEngineIds.filter(id => id !== engineId);
-  saveCanvasState();
-  renderCanvasGrid();
-}
-
-function clearCanvas(){
-  if (!window.activeCanvasEngineIds || window.activeCanvasEngineIds.length === 0) return;
-  window.activeCanvasEngineIds = [];
-  saveCanvasState();
-  renderCanvasGrid();
-}
-
-function autoAlignCanvas(){
-  renderCanvasGrid();
-}
-
-window.addEngineToCanvas = addEngineToCanvas;
-window.removeEngineFromCanvas = removeEngineFromCanvas;
-window.clearCanvas = clearCanvas;
-window.autoAlignCanvas = autoAlignCanvas;
-window.handlePaletteDragStart = handlePaletteDragStart;
-window.handleCanvasDragOver = handleCanvasDragOver;
-window.handleCanvasDrop = handleCanvasDrop;
-
-function restoreHistoryItem(item){
-  const input = document.getElementById('query-input');
-  if(input) input.value = item.query;
-  const resKeys = Object.keys(item.results || {});
-  if (resKeys.length > 0) {
-    window.activeCanvasEngineIds = resKeys;
-    saveCanvasState();
-  }
-  renderCanvasGrid();
-  window.activeCanvasEngineIds.forEach(id => {
-    const b = document.getElementById('body-' + id);
-    const s = document.getElementById('status-' + id);
-    const res = (item.results || {})[id];
-    if (b && res) {
-      b.innerHTML = res.html || renderResultHTML(res.thinking, res.answer || res.text, res.answer_html);
-      if (s) s.innerText = '历史记录 · 引用 ' + (res.refs || 0) + ' 条';
+    let bodyHTML = '';
+    if (info.type === 'search') {
+      bodyHTML = `<div class="node-body" id="body-${id}">等待发起搜索…</div>`;
+    } else if (id === 'llm_chat') {
+      bodyHTML = `
+        <div style="display:flex;flex-direction:column;gap:10px;height:100%;">
+          <div style="display:flex;gap:8px;">
+            <select id="chat-ch-sel" onchange="loadChannelModels()" style="flex:1;padding:8px;border:1.5px solid var(--hairline);border-radius:8px;font-size:13px;font-weight:600;"></select>
+            <select id="chat-md-sel" style="flex:1.2;padding:8px;border:1.5px solid var(--hairline);border-radius:8px;font-size:13px;font-weight:600;"></select>
+          </div>
+          <textarea id="chat-input" placeholder="输入提示词对话…" style="height:70px;padding:8px;border:1.5px solid var(--hairline);border-radius:8px;font-size:13px;font-weight:600;resize:none;">你好，用一句话介绍你自己</textarea>
+          <button type="button" class="btn" onclick="sendLlmChat()" style="padding:8px 16px;font-size:13px;">发送对话</button>
+          <div id="chat-reply" style="flex:1;background:var(--bg-canvas);border-radius:8px;padding:10px;font-size:13px;overflow-y:auto;white-space:pre-wrap;font-family:monospace;">等待发送…</div>
+        </div>
+      `;
+    } else if (id === 'channel_status') {
+      bodyHTML = `
+        <div style="display:flex;flex-direction:column;gap:10px;height:100%;overflow:hidden;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:13px;font-weight:700;">📡 聚合中转路由监控</span>
+            <button type="button" class="btn btn-secondary" onclick="refreshChannels()" style="padding:4px 10px;font-size:12px;">🔄 刷新状态</button>
+          </div>
+          <div style="flex:1;overflow-y:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead>
+                <tr style="background:var(--bg-canvas);border-bottom:1.5px solid var(--hairline);">
+                  <th style="padding:8px;text-align:left;">渠道与来源</th>
+                  <th style="padding:8px;text-align:left;">类型</th>
+                  <th style="padding:8px;text-align:left;">状态</th>
+                  <th style="padding:8px;text-align:left;">可用模型</th>
+                </tr>
+              </thead>
+              <tbody id="ch-tbody-canvas"></tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    } else if (id === 'memo_note') {
+      bodyHTML = `
+        <textarea style="width:100%;height:100%;border:none;outline:none;resize:none;font-size:14px;line-height:1.7;font-family:inherit;background:transparent;" 
+                  placeholder="✍️ 随意记录您的 AI 灵感便签与思考…"></textarea>
+      `;
     }
+
+    widget.innerHTML = `
+      <div class="widget-head" onmousedown="initWidgetDrag(event, '${id}')">
+        <div class="widget-title">${info.icon} ${info.name} <span class="widget-badge">${info.badge}</span></div>
+        <div class="widget-actions">
+          <button type="button" class="icon-btn" onclick="removeWidgetFromCanvas('${id}')" title="移除组件">✕</button>
+        </div>
+      </div>
+      <div class="widget-body">${bodyHTML}</div>
+      <div class="widget-foot">
+        <span id="status-${id}">就绪</span>
+        <span>↘ 拖拽右下角改变形状大小</span>
+      </div>
+    `;
+
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(entries => {
+        for (let entry of entries) {
+          const w = Math.round(entry.contentRect.width);
+          const h = Math.round(entry.contentRect.height);
+          if (widgetPositions[id]) {
+            widgetPositions[id].w = w;
+            widgetPositions[id].h = h;
+            saveWidgetPositions();
+          }
+        }
+      });
+      ro.observe(widget);
+    }
+
+    canvas.appendChild(widget);
   });
+
+  renderWidgetLibrary();
+  updateCanvasTransform();
+  refreshChannels();
 }
 
-function startUnifiedSearch(ev){
-  if (ev && ev.preventDefault) ev.preventDefault();
-  const inputEl = document.getElementById('query-input');
-  const prompt = inputEl ? inputEl.value.trim() : '';
+/* ---------- 拖拽组件 Card ---------- */
+function initWidgetDrag(ev, id) {
+  ev.stopPropagation();
+  const widget = document.querySelector(`.spatial-widget[data-id="${id}"]`);
+  if (!widget) return;
+
+  document.querySelectorAll('.spatial-widget').forEach(w => w.classList.remove('active-widget'));
+  widget.classList.add('active-widget');
+
+  const startX = ev.clientX;
+  const startY = ev.clientY;
+  const initialLeft = widget.offsetLeft;
+  const initialTop = widget.offsetTop;
+
+  function onMouseMove(e) {
+    const dx = (e.clientX - startX) / canvasZoomScale;
+    const dy = (e.clientY - startY) / canvasZoomScale;
+    const newLeft = initialLeft + dx;
+    const newTop = initialTop + dy;
+    widget.style.left = `${newLeft}px`;
+    widget.style.top = `${newTop}px`;
+    
+    if (!widgetPositions[id]) widgetPositions[id] = { w: 410, h: 390 };
+    widgetPositions[id].x = Math.round(newLeft);
+    widgetPositions[id].y = Math.round(newTop);
+  }
+
+
+  function onMouseUp() {
+    saveWidgetPositions();
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  }
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+}
+
+function handleLibraryDragStart(ev, widgetId) {
+  ev.dataTransfer.setData('text/plain', widgetId);
+}
+
+function handleCanvasDragOver(ev) {
+  ev.preventDefault();
+}
+
+function handleCanvasDrop(ev) {
+  ev.preventDefault();
+  const id = ev.dataTransfer.getData('text/plain');
+  if (id && AVAILABLE_WIDGET_TYPES[id]) {
+    addWidgetToCanvas(id);
+  }
+}
+
+function addWidgetToCanvas(id) {
+  if (!activeWidgets.includes(id)) {
+    activeWidgets.push(id);
+    saveWidgetState();
+    renderCanvasWidgets();
+  }
+}
+
+function removeWidgetFromCanvas(id) {
+  activeWidgets = activeWidgets.filter(item => item !== id);
+  saveWidgetState();
+  renderCanvasWidgets();
+}
+
+function clearAllCanvasWidgets() {
+  if (confirm('确定要清空画布上的所有组件吗？')) {
+    activeWidgets = [];
+    saveWidgetState();
+    renderCanvasWidgets();
+  }
+}
+
+function autoAlignWidgets() {
+  activeWidgets.forEach((id, idx) => {
+    widgetPositions[id] = {
+      x: 30 + (idx % 3) * 440,
+      y: 30 + Math.floor(idx / 3) * 420,
+      w: widgetPositions[id] ? widgetPositions[id].w : (id === 'channel_status' ? 840 : 410),
+      h: widgetPositions[id] ? widgetPositions[id].h : (id === 'channel_status' ? 380 : 390)
+    };
+  });
+  saveWidgetPositions();
+  resetCanvasTransform();
+  renderCanvasWidgets();
+}
+
+function saveWidgetState() {
+  localStorage.setItem('spatial_widgets_state_v3', JSON.stringify(activeWidgets));
+}
+
+function saveWidgetPositions() {
+  localStorage.setItem('spatial_widgets_pos_v3', JSON.stringify(widgetPositions));
+}
+
+/* ==========================================================================
+   搜索与渠道业务交互逻辑
+   ========================================================================== */
+
+function triggerGlobalCanvasSearch() {
+  const input = document.getElementById('global-prompt-input');
+  const prompt = input ? input.value.trim() : '';
   if (!prompt) {
-    alert('请输入搜索内容');
+    alert('请输入搜索问题');
     return;
   }
 
-  if (!window.activeCanvasEngineIds || window.activeCanvasEngineIds.length === 0) {
-    alert('画布中暂无 AI 组件！请先从左侧拖入至少一个 AI 搜索引擎。');
+  const searchEngineIds = activeWidgets.filter(id => AVAILABLE_WIDGET_TYPES[id] && AVAILABLE_WIDGET_TYPES[id].type === 'search');
+  if (searchEngineIds.length === 0) {
+    alert('画布中暂无 AI 搜索引擎组件！请先从左侧【功能组件库】放置至少一个 AI 搜索组件。');
     return;
   }
 
-  window.activeCanvasEngineIds.forEach(id => {
-    const eng = window.ENGINES_ALL[id];
+  searchEngineIds.forEach(id => {
+    const eng = AVAILABLE_WIDGET_TYPES[id];
     const body = document.getElementById('body-' + id);
     const status = document.getElementById('status-' + id);
-    if (body) body.innerHTML = '正在连接 ' + (eng ? eng.name : id) + '…<span class="cursor-blink"></span>';
+    if (body) body.innerHTML = `正在连接 ${eng.name}…<span class="cursor-blink"></span>`;
     if (status) status.innerText = '检索中…';
   });
 
   const currentResults = {};
-  const enginesParam = encodeURIComponent(window.activeCanvasEngineIds.join(','));
+  const enginesParam = encodeURIComponent(searchEngineIds.join(','));
   const es = new EventSource('/api/unified_stream?prompt=' + encodeURIComponent(prompt) + '&engines=' + enginesParam);
 
   es.onmessage = ev => {
-    if (ev.data === '[DONE]'){
+    if (ev.data === '[DONE]') {
       es.close();
-      window.activeCanvasEngineIds.forEach(id => {
+      searchEngineIds.forEach(id => {
         const b = document.getElementById('body-' + id);
         const c = b ? b.querySelector('.cursor-blink') : null;
-        if(c) c.remove();
-        if (!currentResults[id]) {
-          currentResults[id] = {
-            answer: b ? b.innerText.trim() : '',
-            html: b ? b.innerHTML : '',
-            refs: 0
-          };
-        }
+        if (c) c.remove();
       });
       saveSearchHistory(prompt, currentResults);
       return;
     }
     try {
       const d = JSON.parse(ev.data);
-      if (d.id && window.activeCanvasEngineIds.includes(d.id)) {
+      if (d.id && searchEngineIds.includes(d.id)) {
         const b = document.getElementById('body-' + d.id);
         const s = document.getElementById('status-' + d.id);
         if (d.status === 'progress' && b) {
           b.innerText = d.msg;
         } else if (d.status === 'done' && b) {
           const answerText = d.answer || d.text || '';
-          const answerHTML = d.answer_html || '';
-          b.innerHTML = renderResultHTML(d.thinking, answerText, answerHTML);
-          currentResults[d.id] = {
-            thinking: d.thinking || '',
-            answer: answerText,
-            answer_html: answerHTML,
-            html: b.innerHTML,
-            refs: d.refs || 0
-          };
-          if (s) s.innerText = d.refs ? '完成 · 引用 ' + d.refs + ' 条' : '完成';
+          b.innerHTML = renderResultHTML(d.thinking, answerText, d.answer_html || '');
+          currentResults[d.id] = { answer: answerText, html: b.innerHTML };
+          if (s) s.innerText = d.refs ? `完成 · 引用 ${d.refs} 条` : '完成';
         }
       }
     } catch(e){}
@@ -690,11 +886,142 @@ function startUnifiedSearch(ev){
   es.onerror = () => es.close();
 }
 
-window.startUnifiedSearch = startUnifiedSearch;
-window.renderCanvasGrid = renderCanvasGrid;
-window.renderCanvasPalette = renderCanvasPalette;
+function renderResultHTML(thinking, answer, answerHTML) {
+  let html = '';
+  if (thinking) {
+    html += `<details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-bottom:10px;">` +
+      `<summary style="font-size:12px;font-weight:700;color:var(--text-muted);cursor:pointer;">💡 展开思考过程</summary>` +
+      `<div style="font-size:13px;color:#475569;margin-top:6px;white-space:pre-wrap;">${thinking}</div></details>`;
+  }
+  if (answerHTML) {
+    html += answerHTML;
+  } else if (window.marked) {
+    html += marked.parse(answer || '');
+  } else {
+    html += answer || '';
+  }
+  return html;
+}
 
-window.onload = () => { openTab('search'); renderCanvasGrid(); refreshChannels(); };
+/* ---------- 渠道数据获取 ---------- */
+async function refreshChannels() {
+  try {
+    const d = await (await fetch('/api/channels')).json();
+    channelCache = d.channels || {};
+    
+    // 渲染 LLM 渠道下拉
+    const csel = document.getElementById('chat-ch-sel');
+    if (csel) {
+      csel.innerHTML = '';
+      Object.entries(channelCache).forEach(([id, ch]) => {
+        const ok = ch.key_set && ch.reachable;
+        csel.innerHTML += `<option value="${id}">${ok ? '✓ ' : ''}${ch.name}${ok ? '' : '（待配置）'}</option>`;
+      });
+      loadChannelModels();
+    }
+
+    // 渲染渠道监控表格
+    const tbody = document.getElementById('ch-tbody-canvas');
+    if (tbody) {
+      tbody.innerHTML = '';
+      Object.entries(channelCache).forEach(([id, ch]) => {
+        const ok = ch.key_set && ch.reachable;
+        const statusBadge = ok ? '<span style="color:var(--green);font-weight:700;">已连接</span>' : '<span style="color:var(--amber);font-weight:700;">待配置</span>';
+        const models = (ch.models && ch.models.length) ? ch.models.join(', ') : '—';
+        tbody.innerHTML += `
+          <tr style="border-bottom:1px solid var(--card-border);">
+            <td style="padding:8px;font-weight:700;">${ch.icon || '🔗'} ${ch.name}</td>
+            <td style="padding:8px;font-size:12px;">${ch.billing_tag || '免费'}</td>
+            <td style="padding:8px;">${statusBadge}</td>
+            <td style="padding:8px;font-size:12px;font-family:monospace;">${models}</td>
+          </tr>
+        `;
+      });
+    }
+  } catch(e){}
+}
+
+function loadChannelModels() {
+  const csel = document.getElementById('chat-ch-sel');
+  const msel = document.getElementById('chat-md-sel');
+  if (!csel || !msel) return;
+  const ch = channelCache[csel.value];
+  if (!ch) return;
+  msel.innerHTML = '';
+  const models = (ch.models && ch.models.length) ? ch.models : [ch.default_model || '—'];
+  models.forEach(m => msel.innerHTML += `<option value="${m}">${m}</option>`);
+}
+
+function sendLlmChat() {
+  const msel = document.getElementById('chat-md-sel');
+  const prompt = document.getElementById('chat-input').value;
+  const reply = document.getElementById('chat-reply');
+  if (!msel || !reply) return;
+
+  const model = msel.value;
+  reply.innerText = '请求 ' + model + ' 中…';
+  const es = new EventSource('/v1/sse?model=' + encodeURIComponent(model) + '&prompt=' + encodeURIComponent(prompt));
+  let buf = '';
+  es.onmessage = ev => {
+    if (ev.data === '[DONE]') { es.close(); return; }
+    try {
+      const o = JSON.parse(ev.data);
+      const c = o.choices[0].delta.content;
+      if (c) { buf += c; reply.innerText = buf; }
+    } catch(e){}
+  };
+  es.onerror = () => { es.close(); if(!buf) reply.innerText = '请求失败：渠道未就绪'; };
+}
+
+/* ---------- 历史记录 Modal ---------- */
+function openHistoryModal() {
+  document.getElementById('history-modal').style.display = 'flex';
+  renderModalHistoryList();
+}
+function closeHistoryModal() {
+  document.getElementById('history-modal').style.display = 'none';
+}
+function saveSearchHistory(query, resultsData) {
+  if (!query || !query.trim()) return;
+  let list = JSON.parse(localStorage.getItem('ai_search_history_v1') || '[]');
+  list.unshift({ query: query.trim(), time_str: new Date().toLocaleTimeString(), results: resultsData });
+  if (list.length > 20) list = list.slice(0, 20);
+  localStorage.setItem('ai_search_history_v1', JSON.stringify(list));
+}
+async function renderModalHistoryList() {
+  const listEl = document.getElementById('modal-history-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">加载中…</div>';
+  let list = JSON.parse(localStorage.getItem('ai_search_history_v1') || '[]');
+  try {
+    const res = await fetch('/api/history');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.history) list = data.history;
+    }
+  } catch(e){}
+
+  listEl.innerHTML = '';
+  if (list.length === 0) {
+    listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">暂无历史记录</div>';
+    return;
+  }
+  list.forEach(item => {
+    const div = document.createElement('div');
+    div.style.cssText = 'background:#fff;border:1px solid var(--card-border);border-radius:8px;padding:10px;cursor:pointer;';
+    div.innerHTML = `<div style="font-weight:700;font-size:14px;margin-bottom:4px;">🔍 ${item.query || item.question}</div><div style="font-size:11px;color:var(--text-muted);">时间: ${item.time_str || (item.created_at || '').slice(11,16)}</div>`;
+    div.onclick = () => {
+      document.getElementById('modal-history-detail').innerHTML = `<div style="font-weight:800;font-size:16px;margin-bottom:12px;">🔍 ${item.query || item.question}</div>` +
+        `<div style="font-size:14px;line-height:1.7;">${JSON.stringify(item.results || {}, null, 2)}</div>`;
+    };
+    listEl.appendChild(div);
+  });
+}
+
+window.onload = () => {
+  renderCanvasWidgets();
+  updateCanvasTransform();
+};
 </script>
 </body>
 </html>

@@ -222,6 +222,18 @@ async def github_create_repo(request: Request):
                                             body.get("private", True))
 
 
+@app.post("/api/github/repos/update_description")
+async def github_update_repo_description(request: Request):
+    """更新仓库描述。"""
+    body = await request.json()
+    name = body.get("name", "")
+    desc = body.get("description", "")
+    if not name:
+        raise HTTPException(400, "缺少仓库名称")
+    return await github_manager.update_repo_description(name, desc)
+
+
+
 # ---- task_004：仓库文件读取 ----
 
 @app.get("/api/github/repos/{owner}/{repo}/contents")

@@ -6,11 +6,23 @@ Supports single-turn and multi-turn conversations.
 """
 
 import json
+import os
 import re
 import subprocess
+import sys
 import threading
 import time
 import uuid
+
+GATEWAY_ID = os.environ.get("GATEWAY_ID", "ds_v4_cli")
+try:
+    _SHARED = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                            "..", "..", "03_共享组件"))
+    if _SHARED not in sys.path:
+        sys.path.insert(0, _SHARED)
+    from history import save_turn as _history_save_turn
+except Exception:  # noqa: BLE001 共享组件缺失时不影响主流程
+    _history_save_turn = None
 
 OPENCLI = "opencli"
 _NODE = "D:/Program Files/nodejs/node.exe"
@@ -77,71 +89,113 @@ GENERIC_EXTRACT_JS = """(function(){
   return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
 })()"""
 
+QIANWEN_EXTRACT_JS = """(function(){
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
+  var answers = Array.from(document.querySelectorAll('[class*=message-select-wrapper-answer], .markdown-body'));
+  var bestText = ''; var bestHTML = '';
+  for(var i=0; i<answers.length; i++){
+    var t = textOf(answers[i]); var h = htmlOf(answers[i]);
+    if(t.length > 0) { bestText = t; bestHTML = h; }
+  }
+  if(!bestText){
+    var lastRound = document.querySelector('[class*=last-message-item]');
+    if(lastRound){
+      var as = lastRound.querySelectorAll('[class*=message-select-wrapper-answer]');
+      if(as.length) { bestText = textOf(as[as.length-1]); bestHTML = htmlOf(as[as.length-1]); }
+    }
+  }
+  return JSON.stringify({found: bestText.length > 0, answer: bestText, answer_html: bestHTML, refs: 0});
+})()"""
+
 DOUBAO_EXTRACT_JS = """(function(){
-  function textOf(e){ return (e.innerText||'').trim(); }
-  var allMsgs = Array.from(document.querySelectorAll('[class*=message-content], [class*=bot-reply], [class*=answer-content], [class*=markdown]'));
-  var best = '';
-  var minLen = 10;
-  for(var i=0; i<allMsgs.length; i++){
-    var el = allMsgs[i];
-    var parent = el.parentElement;
-    var isUser = false;
-    while(parent && parent !== document.body){
-      if(parent.className && (String(parent.className).indexOf('human') > -1 || String(parent.className).indexOf('user') > -1)) { isUser=true; break; }
-      parent = parent.parentElement;
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
+
+  var bestText = ''; var bestHTML = '';
+
+  var mdEls = Array.from(document.querySelectorAll('[class*=markdown-body], [class*=markdown], [class*=message_content], [class*=v_list_row], [class*=answer], [class*=ai-message]'));
+  if (mdEls.length > 0) {
+    for (var i = mdEls.length - 1; i >= 0; i--) {
+      var t = textOf(mdEls[i]); var h = htmlOf(mdEls[i]);
+      if (t.length > 15 && t.indexOf('flow-chat') === -1) {
+        bestText = t; bestHTML = h;
+        break;
+      }
     }
-    if(isUser) continue;
-    var t = textOf(el);
-    if(t.length > minLen && t.length > best.length) best = t;
   }
-  if(!best){
+
+  if (!bestText) {
+    var li = document.querySelector('[class*=list_items]') || document.querySelector('[class*=message-list]');
+    if (li) {
+      var rows = Array.from(li.querySelectorAll(':scope > [class*=v_list_row], [class*=v_list_row]'));
+      for (var i = rows.length - 1; i >= 0; i--) {
+        var t = textOf(rows[i]); var h = htmlOf(rows[i]);
+        if (t.length >= 15) {
+          bestText = t; bestHTML = h;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!bestText) {
     var divs = Array.from(document.querySelectorAll('main [class*=content]'));
-    for(var i=0; i<divs.length; i++){
-      var t = textOf(divs[i]);
-      if(t.length > 40 && t.length > best.length && t.indexOf('flow-chat') === -1) best = t;
+    for (var i = 0; i < divs.length; i++) {
+      var t = textOf(divs[i]); var h = htmlOf(divs[i]);
+      if (t.length > 40 && t.length > bestText.length && t.indexOf('flow-chat') === -1) {
+        bestText = t; bestHTML = h;
+      }
     }
   }
-  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
+
+  if (!bestText) return JSON.stringify({found: false});
+  return JSON.stringify({found: true, answer: bestText, answer_html: bestHTML, refs: 0});
 })()"""
 
 KIMI_EXTRACT_JS = """(function(){
-  function textOf(e){ return (e.innerText||'').trim(); }
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
   var mds = Array.from(document.querySelectorAll('.segment-content .markdown, .markdown-body'));
   if(mds.length > 0){
-    var t = textOf(mds[mds.length - 1]);
-    if(t.length > 10) return JSON.stringify({found:true, answer:t, refs:0});
+    var target = mds[mds.length - 1];
+    var t = textOf(target); var h = htmlOf(target);
+    if(t.length > 10) return JSON.stringify({found:true, answer:t, answer_html:h, refs:0});
   }
   var segs = Array.from(document.querySelectorAll('.segment-content'));
   if(segs.length > 0){
     for(var i=segs.length-1; i>=0; i--){
-      var t = textOf(segs[i]);
-      if(t.length > 20) return JSON.stringify({found:true, answer:t, refs:0});
+      var t = textOf(segs[i]); var h = htmlOf(segs[i]);
+      if(t.length > 20) return JSON.stringify({found:true, answer:t, answer_html:h, refs:0});
     }
   }
   return JSON.stringify({found:false, answer:'', refs:0});
 })()"""
 
 PERPLEXITY_EXTRACT_JS = """(function(){
-  function textOf(e){ return (e.innerText||'').trim(); }
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
   var els = Array.from(document.querySelectorAll('[class*=prose], .markdown-body, [class*=answer]'));
-  var best = '';
+  var bestText = ''; var bestHTML = '';
   for(var i=0; i<els.length; i++){
-    var t = textOf(els[i]);
-    if(t.length > 20 && t.length > best.length) best = t;
+    var t = textOf(els[i]); var h = htmlOf(els[i]);
+    if(t.length > 20 && t.length > bestText.length) { bestText = t; bestHTML = h; }
   }
-  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
+  return JSON.stringify({found: bestText.length > 0, answer: bestText, answer_html: bestHTML, refs: 0});
 })()"""
 
 GROK_EXTRACT_JS = """(function(){
-  function textOf(e){ return (e.innerText||'').trim(); }
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
   var els = Array.from(document.querySelectorAll('.markdown-body, [class*=message-content], [class*=prose]'));
-  var best = '';
+  var bestText = ''; var bestHTML = '';
   for(var i=0; i<els.length; i++){
-    var t = textOf(els[i]);
-    if(t.length > 20 && t.length > best.length) best = t;
+    var t = textOf(els[i]); var h = htmlOf(els[i]);
+    if(t.length > 20 && t.length > bestText.length) { bestText = t; bestHTML = h; }
   }
-  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
+  return JSON.stringify({found: bestText.length > 0, answer: bestText, answer_html: bestHTML, refs: 0});
 })()"""
+
 
 # ---------------------------------------------------------------- Engine registry
 
@@ -198,10 +252,11 @@ ENGINES = {
         "session": "qianwen",
         "site_url": "https://tongyi.aliyun.com/qianwen/",
         "site_host": "qianwen",
-        "fill_selector": "textarea, [contenteditable=true]",
+        "fill_selector": "[contenteditable=true]",
+        "input_method": "clipboard",
         "submit": {"enter": True},
-        "probe_js": "!!document.querySelector('textarea, [contenteditable=true]')",
-        "extract_js": GENERIC_EXTRACT_JS,
+        "probe_js": "!!document.querySelector('[contenteditable=true]')",
+        "extract_js": QIANWEN_EXTRACT_JS,
         "new_chat_js": "(function(){ var btn = document.querySelector('[class*=new-chat]'); if(btn) btn.click(); })()",
     },
     "grok": {
@@ -375,7 +430,23 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
         progress(f"连接 {eng['name']}…")
 
     input_method = eng.get("input_method", "fill")
-    if input_method == "react_input":
+    if input_method == "clipboard":
+        paste_js = ("(function(){"
+                    "  var el = document.querySelector('%s');"
+                    "  if(!el) return false;"
+                    "  el.focus();"
+                    "  var dt=new DataTransfer();"
+                    "  dt.setData('text/plain', %s);"
+                    "  var ev=new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true});"
+                    "  el.dispatchEvent(ev);"
+                    "  return true;"
+                    "})()") % (eng["fill_selector"], json.dumps(prompt))
+        pasted = run_cli(["browser", sess, "eval", paste_js], timeout=30)
+        if not pasted["ok"] or pasted["stdout"].strip() != "true":
+            return {"status": "error", "answer": "", "refs": 0,
+                    "error": f"输入失败: {(pasted['stderr'] or pasted['stdout'])[:160]}",
+                    "elapsed": time.time() - t0}
+    elif input_method == "react_input":
         react_fill_js = ("(function(){"
                          "  var el = document.querySelector('%s');"
                          "  if(!el) return false;"
@@ -403,10 +474,11 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
         if eng.get("fill_nth") is not None:
             type_args += ["--nth", str(eng["fill_nth"])]
         type_args += [eng["fill_selector"], prompt]
-        typed = run_cli(["browser", sess, "fill", eng["fill_selector"], prompt], timeout=60)
+        typed = run_cli(type_args, timeout=60)
         if not typed["ok"]:
-            type_args = ["browser", sess, "type", eng["fill_selector"], prompt]
-            run_cli(type_args, timeout=60)
+            return {"status": "error", "answer": "", "refs": 0,
+                    "error": f"输入失败: {(typed['stderr'] or typed['stdout'])[:160]}",
+                    "elapsed": time.time() - t0}
     else:
         clear_js = ("(function(){var el=document.querySelector('%s');"
                     "if(el){el.focus();document.execCommand('selectAll',false,null);"
@@ -433,6 +505,8 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
         run_cli(["browser", sess, "click", sub["click"]], timeout=30)
     if sub.get("keys"):
         run_cli(["browser", sess, "keys", sub["keys"]], timeout=30)
+    if sub.get("enter"):
+        run_cli(["browser", sess, "keys", "Enter"], timeout=30)
 
     last = {"found": False, "thinking": "", "answer": "", "answer_html": "", "refs": 0}
     prev_len = 0
@@ -528,6 +602,16 @@ def ask_conversation(engine_id, conversation_id, prompt):
             "time": time.strftime("%H:%M:%S")
         })
     res["conversation_id"] = conversation_id
+
+    # task_010：持久化到本地 history.json（共享组件），失败不影响返回
+    if _history_save_turn is not None:
+        try:
+            _history_save_turn(GATEWAY_ID, engine_id, conversation_id, "user", prompt)
+            if res["status"] == "ok" and res.get("answer"):
+                _history_save_turn(GATEWAY_ID, engine_id, conversation_id,
+                                   "assistant", res["answer"])
+        except Exception:  # noqa: BLE001
+            pass
     return res
 
 

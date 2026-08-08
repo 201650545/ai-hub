@@ -90,84 +90,112 @@ GENERIC_EXTRACT_JS = """(function(){
 })()"""
 
 QIANWEN_EXTRACT_JS = """(function(){
-  function textOf(e){ return (e.innerText||'').trim(); }
-  var answers = Array.from(document.querySelectorAll('[class*=message-select-wrapper-answer]'));
-  var best = '';
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
+  var answers = Array.from(document.querySelectorAll('[class*=message-select-wrapper-answer], .markdown-body'));
+  var bestText = ''; var bestHTML = '';
   for(var i=0; i<answers.length; i++){
-    var t = textOf(answers[i]);
-    if(t.length > 0) best = t;
+    var t = textOf(answers[i]); var h = htmlOf(answers[i]);
+    if(t.length > 0) { bestText = t; bestHTML = h; }
   }
-  if(!best){
+  if(!bestText){
     var lastRound = document.querySelector('[class*=last-message-item]');
     if(lastRound){
       var as = lastRound.querySelectorAll('[class*=message-select-wrapper-answer]');
-      if(as.length) best = textOf(as[as.length-1]);
+      if(as.length) { bestText = textOf(as[as.length-1]); bestHTML = htmlOf(as[as.length-1]); }
     }
   }
-  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
+  return JSON.stringify({found: bestText.length > 0, answer: bestText, answer_html: bestHTML, refs: 0});
 })()"""
 
 DOUBAO_EXTRACT_JS = """(function(){
-  function textOf(e){ return (e.innerText||'').trim(); }
-  var li = document.querySelector('[class*=list_items]') || document.querySelector('[class*=message-list]');
-  var best = '';
-  if(li){
-    var rows = Array.from(li.querySelectorAll(':scope > [class*=v_list_row], [class*=v_list_row]'));
-    var lastAnswer = '';
-    for(var i=0; i<rows.length; i++){
-      var t = textOf(rows[i]);
-      if(t.length >= 15) lastAnswer = t;
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
+
+  var bestText = ''; var bestHTML = '';
+
+  var mdEls = Array.from(document.querySelectorAll('[class*=markdown-body], [class*=markdown], [class*=message_content], [class*=v_list_row], [class*=answer], [class*=ai-message]'));
+  if (mdEls.length > 0) {
+    for (var i = mdEls.length - 1; i >= 0; i--) {
+      var t = textOf(mdEls[i]); var h = htmlOf(mdEls[i]);
+      if (t.length > 15 && t.indexOf('flow-chat') === -1) {
+        bestText = t; bestHTML = h;
+        break;
+      }
     }
-    if(lastAnswer) best = lastAnswer;
   }
-  if(!best){
+
+  if (!bestText) {
+    var li = document.querySelector('[class*=list_items]') || document.querySelector('[class*=message-list]');
+    if (li) {
+      var rows = Array.from(li.querySelectorAll(':scope > [class*=v_list_row], [class*=v_list_row]'));
+      for (var i = rows.length - 1; i >= 0; i--) {
+        var t = textOf(rows[i]); var h = htmlOf(rows[i]);
+        if (t.length >= 15) {
+          bestText = t; bestHTML = h;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!bestText) {
     var divs = Array.from(document.querySelectorAll('main [class*=content]'));
-    for(var i=0; i<divs.length; i++){
-      var t = textOf(divs[i]);
-      if(t.length > 40 && t.length > best.length && t.indexOf('flow-chat') === -1) best = t;
+    for (var i = 0; i < divs.length; i++) {
+      var t = textOf(divs[i]); var h = htmlOf(divs[i]);
+      if (t.length > 40 && t.length > bestText.length && t.indexOf('flow-chat') === -1) {
+        bestText = t; bestHTML = h;
+      }
     }
   }
-  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
+
+  if (!bestText) return JSON.stringify({found: false});
+  return JSON.stringify({found: true, answer: bestText, answer_html: bestHTML, refs: 0});
 })()"""
 
 KIMI_EXTRACT_JS = """(function(){
-  function textOf(e){ return (e.innerText||'').trim(); }
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
   var mds = Array.from(document.querySelectorAll('.segment-content .markdown, .markdown-body'));
   if(mds.length > 0){
-    var t = textOf(mds[mds.length - 1]);
-    if(t.length > 10) return JSON.stringify({found:true, answer:t, refs:0});
+    var target = mds[mds.length - 1];
+    var t = textOf(target); var h = htmlOf(target);
+    if(t.length > 10) return JSON.stringify({found:true, answer:t, answer_html:h, refs:0});
   }
   var segs = Array.from(document.querySelectorAll('.segment-content'));
   if(segs.length > 0){
     for(var i=segs.length-1; i>=0; i--){
-      var t = textOf(segs[i]);
-      if(t.length > 20) return JSON.stringify({found:true, answer:t, refs:0});
+      var t = textOf(segs[i]); var h = htmlOf(segs[i]);
+      if(t.length > 20) return JSON.stringify({found:true, answer:t, answer_html:h, refs:0});
     }
   }
   return JSON.stringify({found:false, answer:'', refs:0});
 })()"""
 
 PERPLEXITY_EXTRACT_JS = """(function(){
-  function textOf(e){ return (e.innerText||'').trim(); }
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
   var els = Array.from(document.querySelectorAll('[class*=prose], .markdown-body, [class*=answer]'));
-  var best = '';
+  var bestText = ''; var bestHTML = '';
   for(var i=0; i<els.length; i++){
-    var t = textOf(els[i]);
-    if(t.length > 20 && t.length > best.length) best = t;
+    var t = textOf(els[i]); var h = htmlOf(els[i]);
+    if(t.length > 20 && t.length > bestText.length) { bestText = t; bestHTML = h; }
   }
-  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
+  return JSON.stringify({found: bestText.length > 0, answer: bestText, answer_html: bestHTML, refs: 0});
 })()"""
 
 GROK_EXTRACT_JS = """(function(){
-  function textOf(e){ return (e.innerText||'').trim(); }
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
   var els = Array.from(document.querySelectorAll('.markdown-body, [class*=message-content], [class*=prose]'));
-  var best = '';
+  var bestText = ''; var bestHTML = '';
   for(var i=0; i<els.length; i++){
-    var t = textOf(els[i]);
-    if(t.length > 20 && t.length > best.length) best = t;
+    var t = textOf(els[i]); var h = htmlOf(els[i]);
+    if(t.length > 20 && t.length > bestText.length) { bestText = t; bestHTML = h; }
   }
-  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
+  return JSON.stringify({found: bestText.length > 0, answer: bestText, answer_html: bestHTML, refs: 0});
 })()"""
+
 
 # ---------------------------------------------------------------- Engine registry
 

@@ -1,0 +1,21 @@
+component: image_gen
+site: ChatGPT镜像版
+session: chatgpt_mirror
+url: ""                     # 待用户提供镜像站 URL
+style_lock: "flat cartoon, children's textbook illustration, bright warm colors"
+inject:
+  fill_selector: "[contenteditable=true], textarea"
+  submit: "keys:Enter"
+wait:
+  timeout_s: 120            # GPT Image 生成较慢
+  poll_js: "!!document.querySelector('img[alt*=generated], img[src^=blob], img[src*=oaidalleapiprodscus]')"
+extract:
+  method: blob_canvas       # ChatGPT 生图常见 blob: 地址，需 canvas 转 dataURL
+  selector: "img[alt*=generated], img[src^=blob], img[src*=oaidalleapiprodscus]"
+  prefer_last: true
+fallback:
+  - 换提示词重试
+  - 换备用站点（doubao / qianwen）
+budget:
+  max_retry: 2
+notes: 镜像站结构未知，选择器为 ChatGPT 官方站经验值，绑定会话后需实测校准。
