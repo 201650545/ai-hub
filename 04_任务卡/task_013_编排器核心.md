@@ -62,4 +62,12 @@ class Orchestrator:
 - `python -m py_compile orchestrator.py` 通过
 
 ## 完成记录
-（执行后填写）
+- 2026-08-07 完成（OpenCode）
+- 交付 `06_组件编排器\orchestrator.py`：`Orchestrator(lesson_dir, autonomy, component_registry)` 含 scan_slots / fill_slot / run / verify
+- 槽位正则严格按协议 §3（field 间单空格、直引号、source 仅 video），格式错误给出具体行号
+- 组件调用约定：`component.run(slot, rule_card_path) -> {ok, asset, error}`；规则卡 PyYAML 读取（budget.max_retry 控制重试），失败兜底 status=failed 回写注释
+- 事件流完全符合 §8：{ts, phase, slot, event, detail}，phase∈六阶段，event∈白名单；deliver 事件校验通过
+- L2 档位在槽位清单确认节点阻塞等 `confirm_slots()` 恢复；L3 每槽位确认（本任务保留 L1/L2 完整验证，L3 在每个槽位前确认）
+- verify：无残留槽位／引用文件存在／Pillow 图片解码／BV 号格式校验
+- 测试 `tests\test_orchestrator.py` 7 用例：槽位解析、格式报错行号、mock 全流程(3图1视频)、L2 暂停恢复、失败槽位事件+标记、verify 校验、规则卡加载；全套 34/34 通过
+- 遗留：组件具体逻辑由 task_014/015 提供；L3 的逐槽确认事件在画布联调时补充推进
