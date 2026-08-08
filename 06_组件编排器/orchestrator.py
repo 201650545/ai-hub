@@ -207,7 +207,8 @@ class Orchestrator:
         for attempt in range(max_retry + 1):
             attempts = attempt + 1
             try:
-                r = comp.run(slot, rule_card)
+                call = getattr(comp, "run", None) or comp
+                r = call(slot, rule_card)
             except Exception as exc:  # noqa: BLE001
                 r = {"ok": False, "asset": None, "error": f"{type(exc).__name__}: {exc}"}
             if r.get("ok") and r.get("asset"):

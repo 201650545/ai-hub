@@ -47,6 +47,7 @@ def main() -> None:
     import test_history
     import test_quota
     import test_orchestrator
+    import test_video_embed
 
     all_results = []
     for suite, fn in (
@@ -56,6 +57,7 @@ def main() -> None:
         ("历史管理", test_history.run_all),
         ("额度统计", test_quota.run_all),
         ("编排器", test_orchestrator.run_all),
+        ("视频组件", test_video_embed.run_all),
     ):
         res = fn()
         print()
