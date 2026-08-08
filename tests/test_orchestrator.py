@@ -225,6 +225,66 @@ def test_verify_residue_and_image():
     return Result("verify 资产校验", Result.PASS, "文件存在+PNG 解码通过")
 
 
+def test_lesson_dir_injection():
+    """编排器在调组件前会把 lesson_dir 注入槽位（image_gen 契约依赖它）。"""
+    ldir = tempfile.mkdtemp()
+    html = _write_html(ldir, [
+        '<!-- MEDIA:img id=p12 topic="图" prompt="x" mode=download status=pending -->',
+    ])
+    seen = {}
+
+    class CapturingComponent:
+        def run(self, slot, rule_card_path):
+            seen["slot"] = slot
+            seen["card"] = rule_card_path
+            return {"ok": True, "asset": "p12.png", "error": ""}
+
+    from orchestrator import Orchestrator
+    reg = {"image_gen": {"component": CapturingComponent(),
+                         "rule_card": "image_gen_doubao.yaml"}}
+    orch = Orchestrator(ldir, autonomy="L1", component_registry=reg)
+    r = orch.run(html)
+    if r["done"] != 1:
+        return Result("lesson_dir 注入", Result.FAIL, f"done={r['done']}")
+    if seen.get("slot", {}).get("lesson_dir") != ldir:
+        return Result("lesson_dir 注入", Result.FAIL,
+                      f"slot['lesson_dir']={seen.get('slot',{}).get('lesson_dir')}")
+    return Result("lesson_dir 注入", Result.PASS, "slot 已携带课时目录")
+
+
+def test_real_image_gen_two_arg_contract():
+    """真实 image_gen.run 兼容两参数调用（编排器契约），且按 slot lesson_dir 存盘。"""
+    ldir = tempfile.mkdtemp()
+    from components import image_gen
+
+    saved = {}
+
+    def fake_inject(session, url, prompt, card):
+        saved["prompt"] = prompt
+        return True
+
+    def fake_extract(session, card, save_path):
+        from PIL import Image
+        Image.new("RGB", (64, 64), (200, 30, 30)).save(save_path)
+        return True
+
+    image_gen.inject_and_generate = fake_inject
+    image_gen.extract_image = fake_extract
+
+    slot = {"id": "p12", "topic": "测试", "prompt": "a red apple",
+            "mode": "download", "lesson_dir": ldir}
+    card = os.path.join(ORCH_DIR, "组件规则卡", "image_gen_doubao.yaml")
+    r = image_gen.run(slot, card)
+    if not r.get("ok"):
+        return Result("image_gen 两参数", Result.FAIL, f"run 返回 {r}")
+    if not saved.get("prompt"):
+        return Result("image_gen 两参数", Result.FAIL, "未注入提示词")
+    if not os.path.exists(os.path.join(ldir, "p12.png")):
+        return Result("image_gen 两参数", Result.FAIL, "资产未写入 lesson_dir")
+    return Result("image_gen 两参数", Result.PASS,
+                  f"run(slot,card) ok, asset={r['asset']}, 提示词已注入")
+
+
 def test_rule_card_load():
     card = Path(ORCH_DIR, "组件规则卡", "video_embed_bilibili.yaml")
     from orchestrator import load_rule_card
@@ -246,6 +306,8 @@ def run_all():
         test_l2_pause_resume,
         test_failed_slot_reports,
         test_verify_residue_and_image,
+        test_lesson_dir_injection,
+        test_real_image_gen_two_arg_contract,
         test_rule_card_load,
     ]
     for t in tests:

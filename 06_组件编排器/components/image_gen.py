@@ -1,0 +1,272 @@
+# -*- coding: utf-8 -*-
+"""
+图片生成组件 (image_gen) —— 组件编排器核心适配器
+通过 opencli 自动控制浏览器生图站点、注入提示词、轮询等待、提取下载图片到指定课时文件夹。
+遵守规范：
+1. opencli 直调 (_NODE + _OPENCLI_SCRIPT)
+2. JS 注入只用单引号，替换换行为空格
+3. React 受控输入采用 type 方式
+4. 会话隔离命名 (*_image)
+5. 支持 fallback 重试与备用站点切换
+"""
+
+import base64
+import glob
+import json
+import os
+import subprocess
+import time
+import urllib.request
+import yaml
+
+_NODE = "D:/Program Files/nodejs/node.exe"
+_OPENCLI_SCRIPT = "C:/Users/郭永涛/AppData/Roaming/npm/node_modules/@jackwener/opencli/dist/src/main.js"
+RULE_CARD_DIR = r"d:\项目\06_组件编排器\组件规则卡"
+
+def run_cli(args, timeout=90):
+    """底层 opencli 执行器"""
+    safe_args = [a.replace("\r", " ").replace("\n", " ") if isinstance(a, str) else a for a in args]
+    cmdline = subprocess.list2cmdline([_NODE, _OPENCLI_SCRIPT] + safe_args)
+    try:
+        proc = subprocess.run(
+            cmdline, shell=True, capture_output=True,
+            timeout=timeout, encoding="utf-8", errors="replace",
+        )
+        return {"ok": proc.returncode == 0, "code": proc.returncode,
+                "stdout": proc.stdout.strip(), "stderr": (proc.stderr or "").strip()}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "code": -1, "stdout": "", "stderr": "opencli 超时"}
+    except Exception as e:
+        return {"ok": False, "code": -2, "stdout": "", "stderr": str(e)}
+
+def load_card(rule_card_path: str) -> dict:
+    """加载 yaml 规则卡"""
+    if not os.path.exists(rule_card_path):
+        card_name = os.path.basename(rule_card_path)
+        rule_card_path = os.path.join(RULE_CARD_DIR, card_name)
+    with open(rule_card_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+def list_sites() -> list:
+    """扫描规则卡目录，返回可用站点列表（供 fallback 排序）"""
+    cards = []
+    pattern = os.path.join(RULE_CARD_DIR, "image_gen_*.yaml")
+    for file_path in glob.glob(pattern):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                c = yaml.safe_load(f)
+                if c and c.get("component") == "image_gen":
+                    cards.append({
+                        "path": file_path,
+                        "site": c.get("site", "未知"),
+                        "session": c.get("session", "image_session"),
+                        "url": c.get("url", "")
+                    })
+        except Exception:
+            pass
+    return cards
+
+def inject_and_generate(session: str, url: str, prompt: str, card: dict) -> bool:
+    """打开站点 → 注入提示词 → 提交 → 轮询 poll_js 至超时"""
+    inj = card.get("inject", {})
+    wait_cfg = card.get("wait", {})
+    fill_selector = inj.get("fill_selector", "textarea")
+    input_method = inj.get("input_method", "type")
+    submit = inj.get("submit", "keys:Enter")
+    timeout_s = wait_cfg.get("timeout_s", 90)
+    poll_js = wait_cfg.get("poll_js", "!!document.querySelector('img')")
+
+    # 1. 确保打开页面
+    if url:
+        open_res = run_cli(["browser", session, "open", url], timeout=40)
+        time.sleep(2)
+        if "chatgpt_mirror" in session or "vip" in url:
+            run_cli(["browser", session, "bind"], timeout=20)
+            time.sleep(1)
+
+    # 2. 注入提示词
+    if input_method == "type":
+        focus_js = ("(function(){ var el = document.querySelector('%s');"
+                    " if(el){ el.focus(); document.execCommand('selectAll',false,null);"
+                    " document.execCommand('insertText',false,''); } return !!el; })()") % fill_selector
+        run_cli(["browser", session, "eval", focus_js], timeout=15)
+        type_res = run_cli(["browser", session, "type", fill_selector, prompt], timeout=40)
+        if not type_res["ok"]:
+            # fallback js insertText
+            insert_js = ("(function(){ var el = document.querySelector('%s');"
+                         " if(!el) return false; el.focus();"
+                         " document.execCommand('insertText',false,'%s');"
+                         " return true; })()") % (fill_selector, prompt.replace("'", "\\'"))
+            run_cli(["browser", session, "eval", insert_js], timeout=15)
+    elif input_method == "react_input":
+        react_js = ("(function(){ var el = document.querySelector('%s');"
+                    " if(!el) return false; el.focus();"
+                    " var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;"
+                    " nativeSetter.call(el, '%s');"
+                    " el.dispatchEvent(new Event('input', { bubbles: true }));"
+                    " el.dispatchEvent(new Event('change', { bubbles: true }));"
+                    " return true; })()") % (fill_selector, prompt.replace("'", "\\'"))
+        run_cli(["browser", session, "eval", react_js], timeout=20)
+    else:
+        run_cli(["browser", session, "fill", fill_selector, prompt], timeout=30)
+
+    time.sleep(1)
+
+    # 3. 提交生成
+    if submit == "keys:Enter":
+        run_cli(["browser", session, "keys", "Enter"], timeout=15)
+    elif isinstance(submit, str) and submit.startswith("js_click:"):
+        js_click = submit.split("js_click:", 1)[1]
+        run_cli(["browser", session, "eval", js_click], timeout=15)
+    else:
+        run_cli(["browser", session, "keys", "Enter"], timeout=15)
+
+    # 4. 轮询等待生成完成
+    poll_start = time.time()
+    while time.time() - poll_start < timeout_s:
+        time.sleep(2.5)
+        res = run_cli(["browser", session, "eval", poll_js], timeout=15)
+        if res["ok"] and res["stdout"].strip() == "true":
+            return True
+
+    return False
+
+def extract_image(session: str, card: dict, save_path: str) -> bool:
+    """提取图片：支持 img_src 直链下载与 blob_canvas 转 dataURL 保存"""
+    ext_cfg = card.get("extract", {})
+    method = ext_cfg.get("method", "img_src")
+    selector = ext_cfg.get("selector", "img")
+    prefer_last = ext_cfg.get("prefer_last", True)
+
+    if method == "blob_canvas":
+        canvas_js = ("(function(){"
+                     " var imgs = Array.from(document.querySelectorAll('%s'));"
+                     " if (!imgs.length) return '';"
+                     " var img = %s;"
+                     " var canvas = document.createElement('canvas');"
+                     " canvas.width = img.naturalWidth || img.width || 512;"
+                     " canvas.height = img.naturalHeight || img.height || 512;"
+                     " var ctx = canvas.getContext('2d');"
+                     " ctx.drawImage(img, 0, 0);"
+                     " return canvas.toDataURL('image/png');"
+                     "})()") % (selector, "imgs[imgs.length - 1]" if prefer_last else "imgs[0]")
+        res = run_cli(["browser", session, "eval", canvas_js], timeout=20)
+        data_url = res["stdout"].strip().strip('"')
+        if data_url.startswith("data:image"):
+            header, encoded = data_url.split(",", 1)
+            data = base64.b64decode(encoded)
+            with open(save_path, "wb") as f:
+                f.write(data)
+            return True
+
+    # 默认 img_src 直链提取
+    ext_js = ("(function(){"
+              " var imgs = Array.from(document.querySelectorAll('%s'));"
+              " if (!imgs.length) return '';"
+              " var img = %s;"
+              " return img.src || '';"
+              "})()") % (selector, "imgs[imgs.length - 1]" if prefer_last else "imgs[0]")
+
+    res = run_cli(["browser", session, "eval", ext_js], timeout=15)
+    img_url = res["stdout"].strip().strip('"').strip("'")
+
+    if img_url:
+        if img_url.startswith("data:image"):
+            header, encoded = img_url.split(",", 1)
+            data = base64.b64decode(encoded)
+            with open(save_path, "wb") as f:
+                f.write(data)
+            return True
+        elif img_url.startswith("http"):
+            req = urllib.request.Request(img_url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=30) as resp, open(save_path, "wb") as f:
+                f.write(resp.read())
+            return True
+
+    return False
+
+def run(slot: dict, rule_card_path: str, lesson_dir: str | None = None) -> dict:
+    """
+    槽位填充入口函数（兼容组件编排器两参数契约）：
+    slot: {id, topic, prompt, mode=download, lesson_dir?}
+    rule_card_path: 规则卡路径
+    lesson_dir: 资产保存的课时目录（可选；编排器会注入 slot["lesson_dir"]）
+    """
+    slot_id = slot.get("id", f"img_{int(time.time())}")
+    base_prompt = slot.get("prompt", slot.get("topic", "picture"))
+    lesson_dir = lesson_dir or slot.get("lesson_dir") \
+        or os.path.dirname(RULE_CARD_DIR)
+    os.makedirs(lesson_dir, exist_ok=True)
+    save_path = os.path.join(lesson_dir, f"{slot_id}.png")
+
+    card = load_card(rule_card_path)
+    site_name = card.get("site", "AI生图")
+    session = card.get("session", f"{slot_id}_image")
+    url = card.get("url", "")
+    style_lock = card.get("style_lock", "")
+    full_prompt = f"{base_prompt}, {style_lock}" if style_lock else base_prompt
+
+    max_retry = card.get("budget", {}).get("max_retry", 2)
+
+    # 1. 尝试主站点生成
+    for attempt in range(max_retry + 1):
+        clean_prompt = full_prompt if attempt == 0 else f"{base_prompt}, simple cartoon style"
+        print(f"[{site_name}] 正在生成槽位 {slot_id} (尝试 {attempt+1}/{max_retry+1})...")
+        gen_ok = inject_and_generate(session, url, clean_prompt, card)
+        if gen_ok:
+            ext_ok = extract_image(session, card, save_path)
+            if ext_ok and os.path.exists(save_path) and os.path.getsize(save_path) > 100:
+                return {
+                    "ok": True,
+                    "asset": f"{slot_id}.png",
+                    "site": site_name,
+                    "path": save_path,
+                    "error": None
+                }
+
+    # 2. 触发 Fallback 备用站点
+    print(f"[{site_name}] 主站点生成失败，尝试 Fallback 备用站点...")
+    available_sites = list_sites()
+    for fallback_card_info in available_sites:
+        if fallback_card_info["site"] == site_name:
+            continue
+        try:
+            fb_card = load_card(fallback_card_info["path"])
+            fb_site = fb_card.get("site", "备用生图")
+            fb_session = fb_card.get("session", "fallback_image")
+            fb_url = fb_card.get("url", "")
+            print(f"[Fallback 切换] -> {fb_site}...")
+            fb_gen = inject_and_generate(fb_session, fb_url, full_prompt, fb_card)
+            if fb_gen:
+                fb_ext = extract_image(fb_session, fb_card, save_path)
+                if fb_ext and os.path.exists(save_path) and os.path.getsize(save_path) > 100:
+                    return {
+                        "ok": True,
+                        "asset": f"{slot_id}.png",
+                        "site": fb_site,
+                        "path": save_path,
+                        "error": None
+                    }
+        except Exception as e:
+            print(f"Fallback 站点 {fallback_card_info['site']} 出错: {e}")
+
+    return {
+        "ok": False,
+        "asset": None,
+        "site": site_name,
+        "path": None,
+        "error": "所有生图站点生成/提取均超时或失败"
+    }
+
+if __name__ == "__main__":
+    test_slot = {
+        "id": "p12_market_test",
+        "topic": "超市场景对话",
+        "prompt": "A bright supermarket aisle with colorful apples, flat cartoon style",
+        "mode": "download"
+    }
+    card_p = os.path.join(RULE_CARD_DIR, "image_gen_zhipu.yaml")
+    target_dir = r"d:\项目\06_组件编排器\components\test_output"
+    print("Testing image_gen.py adapter...")
+    res = run(test_slot, card_p, target_dir)
+    print("Run Result:", json.dumps(res, ensure_ascii=False, indent=2))

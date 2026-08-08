@@ -208,7 +208,8 @@ class Orchestrator:
             attempts = attempt + 1
             try:
                 call = getattr(comp, "run", None) or comp
-                r = call(slot, rule_card)
+                call_slot = {**slot, "lesson_dir": str(self.lesson_dir)}
+                r = call(call_slot, rule_card)
             except Exception as exc:  # noqa: BLE001
                 r = {"ok": False, "asset": None, "error": f"{type(exc).__name__}: {exc}"}
             if r.get("ok") and r.get("asset"):
