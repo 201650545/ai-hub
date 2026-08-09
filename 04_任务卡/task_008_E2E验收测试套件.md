@@ -74,3 +74,8 @@
 - 渠道测试：deepseek/gemini/openrouter reachable=True 且真实对话 OK；fallback 链正确
 - 敏感扫描：仅示例占位（channels.example.json:your-...-here）已过滤，无真实 key 入库
 - 遗留：groq/siliconflow/dashscope/zhipu 4 渠道未填 key，测试标注待填；e2e 注册的测试网关为运行时临时数据（不提交 config）
+
+## 2026-08-09 回归（OpenCode）
+- 随引擎修复扩展至 51 用例（历史/额度/编排器/视频/骨架一并纳入 run_all.py）
+- 修复 test_engines.py 过期断言：千问 `clipboard`→`type`（c56a9e0 已实测 527 字提取正确）、submit 单断言→含发送按钮；新增豆包 type+gentle_submit 断言
+- `python tests/run_all.py` 实测 51/51 通过

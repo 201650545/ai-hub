@@ -39,7 +39,7 @@ def _pick_connected(engines):
 
 
 def test_engine_config_wiring(engines):
-    """静态配置校验：豆包/通义走专用提取器，通义使用 clipboard+enter 输入提交。"""
+    """静态配置校验：豆包/通义走专用提取器，通义用 type 原生键入 + 发送按钮提交。"""
     try:
         checks = []
         checks.append((
@@ -47,18 +47,23 @@ def test_engine_config_wiring(engines):
             engines.ENGINES["doubao"]["extract_js"] is engines.DOUBAO_EXTRACT_JS,
             f"extract={engines.ENGINES['doubao']['extract_js'] is engines.DOUBAO_EXTRACT_JS}",
         ))
+        db = engines.ENGINES["doubao"]
+        checks.append(("豆包 type 原生键入", db.get("input_method") == "type",
+                       f"method={db.get('input_method')}"))
+        checks.append(("豆包温和提交", db.get("gentle_submit") is True,
+                       f"gentle={db.get('gentle_submit')}"))
         qw = engines.ENGINES["qianwen"]
         checks.append(("通义专用提取器", qw["extract_js"] is engines.QIANWEN_EXTRACT_JS,
                        f"extract={qw['extract_js'] is engines.QIANWEN_EXTRACT_JS}"))
-        checks.append(("通义 clipboard 输入", qw.get("input_method") == "clipboard",
+        checks.append(("通义 type 原生键入", qw.get("input_method") == "type",
                        f"method={qw.get('input_method')}"))
-        checks.append(("通义 enter 提交", qw.get("submit") == {"enter": True},
-                       f"submit={qw.get('submit')}"))
+        checks.append(("通义 enter+发送按钮提交", bool(qw.get("submit", {}).get("enter")) and bool(qw.get("submit", {}).get("click")),
+                       f"submit={qw.get('submit', {}).get('click')}"))
 
         for name, ok, info in checks:
             if not ok:
-                return Result("引擎输入/提取配置", Result.FAIL, f"{name}:{info}")
-        return Result("引擎输入/提取配置", Result.PASS,
+                return Result("引擎输入/配置套", Result.FAIL, f"{name}:{info}")
+        return Result("引擎输入/配置套", Result.PASS,
                       f"{len(checks)} 项配置正确(doubao+qianwen)")
     except Exception as e:  # noqa: BLE001
         return Result("引擎输入/提取配置", Result.FAIL, f"{type(e).__name__}: {e}")
