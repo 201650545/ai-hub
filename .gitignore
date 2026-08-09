@@ -39,3 +39,6 @@ gateway_err.log
 _tmp/
 *.tmp
 config/github.json
+
+# 调试脚本隔离区（不入库）
+06_组件编排器/_debug_quarantine/
