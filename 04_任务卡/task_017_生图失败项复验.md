@@ -89,3 +89,14 @@
 - **产出真实样例**：`勘探样例/doubao_pro.png`（435×580 WEBP 123KB，浅色卡通背景 4966 色，符合提示词主题）。
 - **补充实测**：`doubao_image` 会话现有 30 张历史生图（580×580 imagex 直链），此前误提取的 160×160 缩略图问题在豆包链路不存在。
 - **结论**：字节豆包 = ✅ 全自动出图实锤，作为生图主力站定案；Gemini/ChatGPT 镜像保持 ⚠️ 待人工复验。
+
+## ✅ 智谱清言全链路补强实测（2026-08-09 OpenCode，方案 C 落地）
+
+- **入口确认**：智谱 `https://chatglm.cn/` 登录后重定向到 `alltoolsdetail` 工具列表页；需点击侧栏「AI画图」（`.aside-subjects .aside-subject` 索引 1，用 MouseEvent 完整序列模拟真实点击）进入 `gdetail/...` 工具页。
+- **修正规则卡 `image_gen_zhipu.yaml`**：原 `selector: img` + `poll_js: imgs.length>3` 会误取侧栏图标/推荐卡片。修正为：
+  - `extract.selector: ".answer-content-wrap img[src*=testpath]"`（生成结果在回答内容区，testpath 直链）
+  - `wait.poll_js: !!document.querySelector('.answer-content-wrap img[src*=testpath]')`
+  - 输入区 `textarea`（`.scroll-display-none`，实际可见 714×48），Enter 提交
+- **实测生成**：注入"橘色小狐狸在秋叶堆" → Enter → 新对话出现 → 结果区 testpath 图新增 → 提取 1024×1024 真实图。
+- **产出真实样例**：`勘探样例/zhipu_pro.png`（1024×1024 WEBP 31KB，6496 色，暖橙主色符合提示词主题）。
+- **结论**：智谱清言 = ✅ 全自动出图实锤，作为第二主力站；现全自动站池 = **豆包 + 智谱清言**，Gemini/ChatGPT 镜像保持 ⚠️ 待人工复验。
