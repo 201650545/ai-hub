@@ -282,9 +282,10 @@ ENGINES = {
         "session": "doubao",
         "site_url": "https://www.doubao.com/chat",
         "site_host": "doubao.com",
-        "fill_selector": "textarea",
+        "fill_selector": ".semi-input-textarea",
         "fill_nth": 0,
-        "input_method": "react_input",
+        "input_method": "type",
+        "gentle_submit": True,
         "submit": {
             "js_click": "(function(){ var b = document.querySelector('button[class*=\"send-msg-btn\"]') || document.querySelector('#flow-end-msg-send'); if(b) b.click(); })()",
             "click": "button[class*=\"send-msg-btn\"]",
@@ -586,22 +587,33 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
     run_cli(["browser", sess, "eval", focus_js], timeout=10)
     time.sleep(0.3)
 
-    # 2. 优先通过 CDP 发送绝对真实的原生 Enter 回车按键 (isTrusted=true)
-    res_keys = run_cli(["browser", sess, "keys", "Enter"], timeout=10)
-
-    # 3. 补发按钮点击作为二重保障
-    time.sleep(0.6)
     sub = eng["submit"]
-    if sub.get("js_click"):
-        run_cli(["browser", sess, "eval", sub["js_click"]], timeout=10)
-    if sub.get("click"):
-        run_cli(["browser", sess, "click", sub["click"]], timeout=8)
+    if eng.get("gentle_submit"):
+        # 温和单次提交：对风控敏感的站点(豆包)只用一次原生 Enter + 按住按钮点击，
+        # 避免频谱轰炸式交互触发风控。点击后等待 settle。
+        if progress:
+            progress(f"提交至 {eng['name']}…")
+        run_cli(["browser", sess, "keys", "Enter"], timeout=10)
+        time.sleep(SUBMIT_SETTLE_DELAY)
+        if sub.get("click"):
+            run_cli(["browser", sess, "click", sub["click"]], timeout=8)
+        time.sleep(SUBMIT_SETTLE_DELAY)
+    else:
+        # 2. 优先通过 CDP 发送绝对真实的原生 Enter 回车按键 (isTrusted=true)
+        res_keys = run_cli(["browser", sess, "keys", "Enter"], timeout=10)
 
-    # 多引擎并发提交双重校验与强制补偿补发回车
-    time.sleep(1.0)
-    focus_and_enter_js = "(function(){ var el = document.querySelector('" + eng["fill_selector"] + "'); if(el){ el.focus(); var ev=new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,bubbles:true}); el.dispatchEvent(ev); } })()"
-    run_cli(["browser", sess, "eval", focus_and_enter_js], timeout=15)
-    run_cli(["browser", sess, "keys", "Enter"], timeout=15)
+        # 3. 补发按钮点击作为二重保障
+        time.sleep(0.6)
+        if sub.get("js_click"):
+            run_cli(["browser", sess, "eval", sub["js_click"]], timeout=10)
+        if sub.get("click"):
+            run_cli(["browser", sess, "click", sub["click"]], timeout=8)
+
+        # 多引擎协同提交双重校验触发与强制补偿补发回车
+        time.sleep(1.0)
+        focus_and_enter_js = "(function(){ var el = document.querySelector('" + eng["fill_selector"] + "'); if(el){ el.focus(); var ev=new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,bubbles:true}); el.dispatchEvent(ev); } })()"
+        run_cli(["browser", sess, "eval", focus_and_enter_js], timeout=15)
+        run_cli(["browser", sess, "keys", "Enter"], timeout=15)
 
     last = {"found": False, "thinking": "", "answer": "", "answer_html": "", "refs": 0}
     prev_len = 0
