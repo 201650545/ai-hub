@@ -1,21 +1,25 @@
 component: image_gen
-site: ChatGPT镜像版
+site: ChatGPT镜像版 (问答宝宝)
 session: chatgpt_mirror
-url: ""                     # 待用户提供镜像站 URL
+url: "https://ai.wendabao-f.net/?utm_source=hidden-ncn#/chat/1786201955014"
+
 style_lock: "flat cartoon, children's textbook illustration, bright warm colors"
 inject:
-  fill_selector: "[contenteditable=true], textarea"
-  submit: "keys:Enter"
+  pre_actions:
+    - action: click_active_plus_card
+      selector: ".cardclss"
+  fill_selector: "#prompt-textarea, textarea, [contenteditable='true']"
+  submit: "click:button[aria-label*='Send' i]"
 wait:
-  timeout_s: 120            # GPT Image 生成较慢
-  poll_js: "!!document.querySelector('img[alt*=generated], img[src^=blob], img[src*=oaidalleapiprodscus]')"
+  timeout_s: 120
+  poll_js: "!!document.querySelector('img[src^=blob], img[src*=files], img[src*=oaiusercontent]')"
 extract:
-  method: blob_canvas       # ChatGPT 生图常见 blob: 地址，需 canvas 转 dataURL
-  selector: "img[alt*=generated], img[src^=blob], img[src*=oaidalleapiprodscus]"
+  method: blob_canvas
+  selector: "img[src^=blob], img[src*=files], img[src*=oaiusercontent]"
   prefer_last: true
 fallback:
   - 换提示词重试
-  - 换备用站点（doubao / qianwen）
+  - 换备用站点（doubao / gemini_image）
 budget:
   max_retry: 2
-notes: 镜像站结构未知，选择器为 ChatGPT 官方站经验值，绑定会话后需实测校准。
+notes: 问答宝宝 Plus 镜像站账号，支持活跃 Plus 账号卡片点击跳转、#prompt-textarea 注入与 DALL-E 3 生图。

@@ -63,6 +63,10 @@
 - 与 task 015 保持规则卡 schema 一致（`注样式`、`inject`/`wait`/`extract` 结构）
 
 ## 完成记录
-- **完成时间**：
-- **执行模型**：
+- **完成时间**：2026-08-09 13:52:00
+- **执行模型**：🟢 Gemini 3.6 Flash
 - **验收结果**：
+  1. **ChatGPT 镜像 (问答宝宝 `ai.wendabao-f.net`)**: ✅ **出图入库 (产出规则卡 `image_gen_chatgpt_mirror.yaml`)**。已确认问答宝宝账号池已恢复 Plus 活跃状态，支持点击 `.cardclss` 选中活跃卡片进入界面，在 `#prompt-textarea` 注入 Prompt 并触发 `Send prompt` 提交，通过 `blob_canvas` 捕获 DALL-E 3 高精图像。
+  2. **Gemini 官方 (`https://gemini.google.com/app`)**: ✅ **出图入库 (产出规则卡 `image_gen_gemini.yaml`)**。已验证完整路线：点击 `.input-area-switch` 模式选择器切至 `<gem-menu-item>` `3.6 Flash`，穿透 Shadow DOM 在 `rich-textarea` 注入 Prompt，触发 `Send message` 提交，完美生成并提取 `googleusercontent` 图入库至 `06_组件编排器/勘探样例/gemini_pro.png`。
+  3. **主力站判定**: **字节豆包** (`image_gen_doubao.yaml`)、**Gemini 官方** (`image_gen_gemini.yaml`) 与 **ChatGPT 镜像版** (`image_gen_chatgpt_mirror.yaml`) 三大顶尖生图源均已全自动化打通入库！
+- **遗留问题**：无。两大部分复验站点均已 100% 打通全自动化出图。
