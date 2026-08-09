@@ -3,6 +3,7 @@ site: Gemini 官方生图
 session: gemini_image
 url: https://gemini.google.com/app
 style_lock: "flat cartoon, 线条手绘插画风, 干净简约"
+status: "⚠️ 证据不足 — 2026-08-09 OpenCode 复核：Images 工具当前无法激活（href=/images 为侧栏导航），gemini_pro.png 为 160x160 疑似 Logo 误提取，待人工半自动复验"
 inject:
   pre_actions:
     - action: click_model_picker
@@ -24,4 +25,4 @@ fallback:
   - 换备用站点（doubao / zhipu）
 budget:
   max_retry: 2
-notes: 支持 3.6 Flash 模型下自动化，穿透 Shadow DOM 在 rich-textarea 注入提示词并点击 Send 提交，提取 googleusercontent 图片。
+notes: 支持 3.6 Flash 模型下自动化，穿透 Shadow DOM 在 rich-textarea 注入提示词并点击 Send 提交，提取 googleusercontent 图片。⚠️ 出图环节需人工复验（Images 工具激活不可复现）。

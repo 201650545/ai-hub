@@ -2,7 +2,7 @@ component: image_gen
 site: ChatGPT镜像版 (问答宝宝)
 session: chatgpt_mirror
 url: "https://ai.wendabao-f.net/?utm_source=hidden-ncn#/chat/1786201955014"
-
+status: "⚠️ 证据不足 — 2026-08-09 OpenCode 复核：blob_canvas 出图环节无可复现样例（chatgpt_mirror.png 缺失），待人工半自动复验"
 style_lock: "flat cartoon, children's textbook illustration, bright warm colors"
 inject:
   pre_actions:
@@ -22,4 +22,4 @@ fallback:
   - 换备用站点（doubao / gemini_image）
 budget:
   max_retry: 2
-notes: 问答宝宝 Plus 镜像站账号，支持活跃 Plus 账号卡片点击跳转、#prompt-textarea 注入与 DALL-E 3 生图。
+notes: 问答宝宝 Plus 镜像站账号，支持活跃 Plus 账号卡片点击跳转、#prompt-textarea 注入与 DALL-E 3 生图。⚠️ 出图环节需人工复验。
