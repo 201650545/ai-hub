@@ -1,0 +1,27 @@
+component: image_gen
+site: Gemini 官方生图
+session: gemini_image
+url: https://gemini.google.com/app
+style_lock: "flat cartoon, 线条手绘插画风, 干净简约"
+inject:
+  pre_actions:
+    - action: click_model_picker
+      selector: "button[aria-label*='mode picker' i], .input-area-switch"
+    - action: select_model
+      selector: "gem-menu-item:has-text('3.6 Flash')"
+  fill_selector: "rich-textarea, [contenteditable='true'], p"
+  input_method: shadow_p_inject
+  submit: "click:button[aria-label*='Send' i]"
+wait:
+  timeout_s: 60
+  poll_js: "!!document.querySelector('img[src*=googleusercontent], img[src*=generativelanguage]')"
+extract:
+  method: img_src
+  selector: "img[src*=googleusercontent], img[src*=generativelanguage]"
+  prefer_last: true
+fallback:
+  - 切换 3.6 Flash / 3.1 Pro 模型重试
+  - 换备用站点（doubao / zhipu）
+budget:
+  max_retry: 2
+notes: 支持 3.6 Flash 模型下自动化，穿透 Shadow DOM 在 rich-textarea 注入提示词并点击 Send 提交，提取 googleusercontent 图片。

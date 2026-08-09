@@ -1,0 +1,23 @@
+component: image_gen
+site: 智谱清言 AI
+session: zhipu_image
+url: https://chatglm.cn/
+style_lock: "flat cartoon, 儿童教材插画风, 明亮色调"
+inject:
+  fill_selector: "textarea, [contenteditable=true]"
+  fill_nth: 0
+  input_method: type
+  submit: "keys:Enter"
+wait:
+  timeout_s: 60
+  poll_js: "(function(){ var imgs=Array.from(document.querySelectorAll('img')); return imgs.length > 3; })()"
+extract:
+  method: img_src
+  selector: "img"
+  prefer_last: true
+fallback:
+  - 换提示词重试（去敏感词）
+  - 换备用站点（doubao / chatgpt_mirror / liblib）
+budget:
+  max_retry: 2
+notes: 响应速度极快，图片直链提取方便。
