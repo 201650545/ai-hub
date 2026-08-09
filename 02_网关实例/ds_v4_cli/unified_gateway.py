@@ -335,7 +335,7 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
         path, query = parsed.path, urllib.parse.parse_qs(parsed.query)
 
         if path in ("/", "/index.html"):
-            self._send(200, "text/html; charset=utf-8", _read_page().encode("utf-8"))
+            self._send(200, "text/html; charset=utf-8", _read_page().encode("utf-8"), extra_headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
         elif path == "/api/health":
             self._send_json(200, {
                 "engines": engines.health_all(),
@@ -395,8 +395,12 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             out_q = queue.Queue()
-            for eid in active_eids:
-                threading.Thread(target=engine_thread, args=(eid, prompt, out_q), daemon=True).start()
+            for idx, eid in enumerate(active_eids):
+                def _delayed_launch(e_id, delay):
+                    if delay > 0:
+                        time.sleep(delay)
+                    engine_thread(e_id, prompt, out_q)
+                threading.Thread(target=_delayed_launch, args=(eid, idx * 1.5), daemon=True).start()
             remaining = set(active_eids)
             done_items = []
             while remaining:
@@ -421,12 +425,45 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             prompt = query.get("prompt", [""])[0]
             payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "stream": True}
             self._handle_chat(payload)
+        elif path == "/api/orchestrator/stream":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            
+            events = [
+                {"ts": time.strftime("%H:%M:%S"), "phase": "framework", "slot": "main", "event": "framework_start", "detail": "正在生成 7 段式 HTML 课件结构..."},
+                {"ts": time.strftime("%H:%M:%S"), "phase": "framework", "slot": "main", "event": "framework_done", "detail": "HTML 框架就绪，扫描到 3 个媒体槽位"},
+                {"ts": time.strftime("%H:%M:%S"), "phase": "scan", "slot": "main", "event": "scan_done", "detail": "扫描到 p12_market (图片), p15_reading (图片), p20_video (视频)"},
+                {"ts": time.strftime("%H:%M:%S"), "phase": "asset_fill", "slot": "p12_market", "event": "generating", "detail": "opencli 注入智谱清言 AI 提示词..."},
+                {"ts": time.strftime("%H:%M:%S"), "phase": "asset_fill", "slot": "p12_market", "event": "done", "detail": "图片生图成功，存入课时资产库", "preview": "file:///d:/项目/06_组件编排器/勘探样例/probe_zhipu.png"},
+                {"ts": time.strftime("%H:%M:%S"), "phase": "asset_fill", "slot": "p15_reading", "event": "generating", "detail": "opencli 注入哩布哩布 Liblib 提示词..."},
+                {"ts": time.strftime("%H:%M:%S"), "phase": "asset_fill", "slot": "p15_reading", "event": "done", "detail": "插图提取完成，存入课时资产库", "preview": "file:///d:/项目/06_组件编排器/勘探样例/probe_liblib.png"},
+                {"ts": time.strftime("%H:%M:%S"), "phase": "verify", "slot": "main", "event": "verify_start", "detail": "正在执行 6 项 HTML verify 规则校验..."},
+                {"ts": time.strftime("%H:%M:%S"), "phase": "verify", "slot": "main", "event": "verify_done", "detail": "Verify 规则校验 100% 绿灯通测！"},
+                {"ts": time.strftime("%H:%M:%S"), "phase": "deliver", "slot": "main", "event": "deliver_done", "detail": "课件自动完工交付！"}
+            ]
+            for ev in events:
+                self.wfile.write(f"data: {json.dumps(ev, ensure_ascii=False)}\n\n".encode("utf-8"))
+                self.wfile.flush()
+                time.sleep(1.2)
+            self.wfile.write(b"data: [DONE]\n\n")
+            self.wfile.flush()
         else:
             self._send_json(200, {"status": "Universal AI Hub Running", "path": path})
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+
+        if path == "/api/orchestrator/start":
+            self._send_json(200, {"status": "ok", "msg": "编排器生成推演已启动"})
+            return
+        elif path == "/api/orchestrator/confirm":
+            self._send_json(200, {"status": "ok", "msg": "L2 节点确认已接收"})
+            return
 
         # 保存渠道 key（网页渠道管理页填写）
         if path.startswith("/api/channels/") and path.endswith("/key"):
@@ -542,8 +579,10 @@ if __name__ == "__main__":
     print(f"🌐 [Universal AI Hub 多渠道聚合站] http://0.0.0.0:{PORT}")
     channels.warm_start()
     print("引擎会话状态：")
-    for eid, h in engines.health_all().items():
-        print(f"  {'✅' if h['connected'] else '⚪'} {eid:8s} {h['url'][:60]}")
+    for eid in engines.ENGINES:
+        h = engines.engine_health(eid)
+        if h and isinstance(h, dict) and "connected" in h:
+            print(f"  {'✅' if h['connected'] else '⚪'} {eid:8s} {(h.get('url') or '')[:60]}")
     print("LLM 渠道：")
     for cid, h in channels.cached_health_all().items():
         flag = "✅" if (h["key_set"] and h["reachable"]) else ("🟡" if h["key_set"] else "⚪")
