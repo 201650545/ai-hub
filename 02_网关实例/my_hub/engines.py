@@ -45,37 +45,23 @@ CONVERSATIONS = {}
 YUANBAO_EXTRACT_JS = """(function(){
   function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
   function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
-  var cc = document.getElementById('chat-content') || document.body;
+  var cc = document.getElementById('chat-content') || document.querySelector('.agent-dialogue') || document.body;
 
-  var cotEls = Array.from(cc.querySelectorAll('.hyc-component-deepsearch-cot__think__content, [class*=deepsearch-cot__think]'));
-  var thinking = '';
-  for (var i=0; i<cotEls.length; i++){
-    var ct = textOf(cotEls[i]);
-    if (ct.length > 5 && thinking.indexOf(ct.slice(0,30)) === -1)
-      thinking += (thinking ? '\\n' : '') + ct;
-  }
-
-  var els = Array.from(cc.querySelectorAll('.hyc-common-markdown-style'));
+  var items = Array.from(cc.querySelectorAll('.agent-chat__list__item--ai, [class*="agent-chat__list__item"][class*="--ai"]'));
   var answersText = []; var answersHTML = [];
-  for (var i=0; i<els.length; i++){
-    var cls = String(els[i].className);
-    if (cls.indexOf('-cot') > -1) continue;
-    var t = textOf(els[i]);
-    if (t.length > 15 && answersText.indexOf(t) === -1) {
+  for (var i = items.length - 1; i >= 0; i--) {
+    var t = textOf(items[i]); var h = htmlOf(items[i]);
+    if (t.length > 10) {
       answersText.push(t);
-      
-      var clone = els[i].cloneNode(true);
+      var clone = items[i].cloneNode(true);
       var icons = Array.from(clone.querySelectorAll('svg, img, [class*="icon"], [class*="ref"], a'));
       icons.forEach(function(ic){
         var url = ic.getAttribute('href') || ic.getAttribute('data-url') || ic.getAttribute('data-href');
         var parentA = ic.closest('a');
         if (!url && parentA) url = parentA.getAttribute('href');
-        
         if (url && url.startsWith('http')) {
           var a = document.createElement('a');
-          a.href = url;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
+          a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
           a.className = 'ref-link';
           a.style.cssText = 'font-size:12px;color:#0052cc;background:rgba(0,82,204,0.08);padding:2px 8px;border-radius:6px;text-decoration:none;margin:0 4px;display:inline-flex;align-items:center;gap:4px;vertical-align:middle;';
           a.innerHTML = '🔗 查看原网页 ↗';
@@ -84,25 +70,43 @@ YUANBAO_EXTRACT_JS = """(function(){
           ic.remove();
         }
       });
-
       answersHTML.push(clone.innerHTML.trim());
+      break;
     }
   }
 
   if (!answersText.length) {
-    var bubbles = Array.from(cc.querySelectorAll('.agent-chat__bubble--ai .agent-chat__bubble__content'));
-    if (bubbles.length) {
-      var lb = bubbles[bubbles.length - 1];
-      var t = textOf(lb); var h = htmlOf(lb);
-      if (t.length > 15) { answersText.push(t); answersHTML.push(h); }
+    var cotEls = Array.from(cc.querySelectorAll('.hyc-component-deepsearch-cot__think__content, [class*=deepsearch-cot__think]'));
+    var thinking = '';
+    for (var k=0; k<cotEls.length; k++){
+      var ct = textOf(cotEls[k]);
+      if (ct.length > 5 && thinking.indexOf(ct.slice(0,30)) === -1)
+        thinking += (thinking ? '\\n' : '') + ct;
     }
+    var mdEls = Array.from(cc.querySelectorAll('.hyc-common-markdown-style'));
+    for (var m=0; m<mdEls.length; m++){
+      var cls = String(mdEls[m].className);
+      if (cls.indexOf('-cot') > -1) continue;
+      var tm = textOf(mdEls[m]);
+      if (tm.length > 15) { answersText.push(tm); answersHTML.push(htmlOf(mdEls[m])); break; }
+    }
+    if (answersText.length) {
+      var answer = answersText[answersText.length - 1];
+      var answer_html = answersHTML[answersHTML.length - 1];
+      var m2 = (cc.innerText||'').match(/Found\\s*(\\d+)\\s*references/i);
+      return JSON.stringify({found:true, thinking:thinking, answer:answer, answer_html:answer_html, refs:m2?parseInt(m2[1],10):0});
+    }
+    return JSON.stringify({found: false});
   }
 
-  var answer = answersText.length > 0 ? answersText[answersText.length - 1] : '';
-  var answer_html = answersHTML.length > 0 ? answersHTML[answersHTML.length - 1] : '';
-  if (!answer && !thinking) return JSON.stringify({found: false});
-  var m = (cc.innerText||'').match(/Found\\s*(\\d+)\\s*references/i);
-  return JSON.stringify({found:true,thinking:thinking,answer:answer,answer_html:answer_html,refs:m?parseInt(m[1],10):0});
+  var thinkTxt = '';
+  var cot2 = Array.from(cc.querySelectorAll('[class*=deepsearch-cot__think]'));
+  for (var c=0; c<cot2.length; c++){
+    var ct2 = textOf(cot2[c]);
+    if (ct2.length > 5 && thinkTxt.indexOf(ct2.slice(0,30)) === -1)
+      thinkTxt += (thinkTxt ? '\\n' : '') + ct2;
+  }
+  return JSON.stringify({found:true, thinking: thinkTxt, answer: answersText[0], answer_html: answersHTML[0], refs: 0});
 })()"""
 
 
@@ -120,94 +124,104 @@ GENERIC_EXTRACT_JS = """(function(){
 QIANWEN_EXTRACT_JS = """(function(){
   function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
   function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
-  var answers = Array.from(document.querySelectorAll('[class*=message-select-wrapper-answer], .markdown-body'));
-  var bestText = ''; var bestHTML = '';
-  for(var i=0; i<answers.length; i++){
-    var t = textOf(answers[i]); var h = htmlOf(answers[i]);
-    if(t.length > 0) { bestText = t; bestHTML = h; }
-  }
-  if(!bestText){
-    var lastRound = document.querySelector('[class*=last-message-item]');
-    if(lastRound){
-      var as = lastRound.querySelectorAll('[class*=message-select-wrapper-answer]');
-      if(as.length) { bestText = textOf(as[as.length-1]); bestHTML = htmlOf(as[as.length-1]); }
-    }
-  }
-  return JSON.stringify({found: bestText.length > 0, answer: bestText, answer_html: bestHTML, refs: 0});
-})()"""
+  var main = document.querySelector('#qianwen-main-area') || document.querySelector('main') || document.body;
 
-DOUBAO_EXTRACT_JS = """(function(){
-  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
-  function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
-
-  var bestText = ''; var bestHTML = '';
-
-  var mdEls = Array.from(document.querySelectorAll('[class*=markdown-body], [class*=markdown], [class*=message_content], [class*=v_list_row], [class*=answer], [class*=ai-message]'));
-  if (mdEls.length > 0) {
-    for (var i = mdEls.length - 1; i >= 0; i--) {
-      var t = textOf(mdEls[i]); var h = htmlOf(mdEls[i]);
-      if (t.length > 15 && t.indexOf('flow-chat') === -1) {
-        bestText = t; bestHTML = h;
-        break;
-      }
-    }
-  }
-
-  if (!bestText) {
-    var li = document.querySelector('[class*=list_items]') || document.querySelector('[class*=message-list]');
-    if (li) {
-      var rows = Array.from(li.querySelectorAll(':scope > [class*=v_list_row], [class*=v_list_row]'));
-      for (var i = rows.length - 1; i >= 0; i--) {
-        var t = textOf(rows[i]); var h = htmlOf(rows[i]);
-        if (t.length >= 15) {
-          bestText = t; bestHTML = h;
-          break;
+  var roots = Array.from(main.querySelectorAll('[class*="pageContentWrap"], [class*="mainContent"], [class*="guideComp"]'));
+  if (roots.length > 0) {
+    for (var k = roots.length - 1; k >= 0; k--) {
+      var md = roots[k].querySelectorAll('.markdown-body, [class*="markdown"], [class*="answer-common-card"], [class*="chat-answers-card"]');
+      for (var m = md.length - 1; m >= 0; m--) {
+        var t = textOf(md[m]);
+        if (t.length > 20 && t.indexOf('你好，我是千问') === -1) {
+          return JSON.stringify({found: true, answer: t, answer_html: htmlOf(md[m]), refs: 0});
         }
       }
     }
   }
 
-  if (!bestText) {
-    var divs = Array.from(document.querySelectorAll('main [class*=content]'));
-    for (var i = 0; i < divs.length; i++) {
-      var t = textOf(divs[i]); var h = htmlOf(divs[i]);
-      if (t.length > 40 && t.length > bestText.length && t.indexOf('flow-chat') === -1) {
-        bestText = t; bestHTML = h;
-      }
+  var mdEls = Array.from(main.querySelectorAll('.markdown-body'));
+  for (var i = mdEls.length - 1; i >= 0; i--) {
+    var t2 = textOf(mdEls[i]);
+    if (t2.length > 20 && t2.indexOf('你好，我是千问') === -1) {
+      return JSON.stringify({found: true, answer: t2, answer_html: htmlOf(mdEls[i]), refs: 0});
     }
   }
+  return JSON.stringify({found: false, answer: '', answer_html: '', refs: 0});
+})()"""
 
-  if (!bestText) return JSON.stringify({found: false});
-  return JSON.stringify({found: true, answer: bestText, answer_html: bestHTML, refs: 0});
+DOUBAO_EXTRACT_JS = """(function(){
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
+  var main = document.querySelector('main') || document.body;
+
+  var rows = Array.from(main.querySelectorAll('[class*="list_items"] [class*="inner-item"], [class*="list_items"] [class*="v_list_row"], [class*="message-list"] [class*="inner-item"]'));
+  var bestText = ''; var bestHTML = '';
+  for (var i = rows.length - 1; i >= 0; i--) {
+    var t = textOf(rows[i]); var h = htmlOf(rows[i]);
+    var cls = String(rows[i].className || '');
+    if (cls.indexOf('bg-g-send-msg-bubble-bg') > -1) continue;
+    if (t.length <= 20) continue;
+    if (t.indexOf('发送消息') > -1 || t.indexOf('历史对话') > -1 || t.indexOf('新对话') > -1 || t.indexOf('深入研究') > -1 || t.indexOf('图像生成') > -1) continue;
+    if (t.length > bestText.length) { bestText = t; bestHTML = h; }
+  }
+
+  if (!bestText) {
+    var lastRow = Array.from(main.querySelectorAll('[class*="list_items"] [class*="v_list_row"]'));
+    for (var j = lastRow.length - 1; j >= 0; j--) {
+      var t2 = textOf(lastRow[j]);
+      if (t2.length > 40) { bestText = t2; bestHTML = htmlOf(lastRow[j]); break; }
+    }
+  }
+  return JSON.stringify({found: bestText.length > 0, answer: bestText, answer_html: bestHTML, refs: 0});
 })()"""
 
 KIMI_EXTRACT_JS = """(function(){
   function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
   function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
-  var mds = Array.from(document.querySelectorAll('.segment-content .markdown, .markdown-body'));
-  if(mds.length > 0){
-    var target = mds[mds.length - 1];
-    var t = textOf(target); var h = htmlOf(target);
-    if(t.length > 10) return JSON.stringify({found:true, answer:t, answer_html:h, refs:0});
-  }
-  var segs = Array.from(document.querySelectorAll('.segment-content'));
-  if(segs.length > 0){
-    for(var i=segs.length-1; i>=0; i--){
-      var t = textOf(segs[i]); var h = htmlOf(segs[i]);
-      if(t.length > 20) return JSON.stringify({found:true, answer:t, answer_html:h, refs:0});
+  var items = Array.from(document.querySelectorAll('.chat-content-item.chat-content-item-assistant, [class*="chat-content-item"][class*="assistant"]'));
+  var bestText = ''; var bestHTML = '';
+  for (var i = items.length - 1; i >= 0; i--) {
+    var t = textOf(items[i]); var h = htmlOf(items[i]);
+    if (t.length > 20 && t.indexOf('稍后再说') === -1 && t.indexOf('新建会话') === -1 && t.indexOf('查看全部') === -1) {
+      bestText = t; bestHTML = h;
+      break;
     }
   }
-  return JSON.stringify({found:false, answer:'', refs:0});
+  if (!bestText) {
+    var blocks = Array.from(document.querySelectorAll('.chat-content-list [class*="chat-content-item"], .chat-content-list > div'));
+    for (var j = blocks.length - 1; j >= 0; j--) {
+      var cls2 = String(blocks[j].className || '');
+      var t2 = textOf(blocks[j]);
+      if (cls2.indexOf('user') > -1) continue;
+      if (t2.length > 30) { bestText = t2; bestHTML = htmlOf(blocks[j]); break; }
+    }
+  }
+  return JSON.stringify({found: bestText.length > 0, answer: bestText, answer_html: bestHTML, refs: 0});
 })()"""
 
 PERPLEXITY_EXTRACT_JS = """(function(){
   function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
   function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
   var els = Array.from(document.querySelectorAll('[class*=prose], .markdown-body, [class*=answer]'));
+  if (els.length > 0) {
+    var last = els[els.length - 1];
+    var t = textOf(last); var h = htmlOf(last);
+    if (t.length > 10) return JSON.stringify({found: true, answer: t, answer_html: h, refs: 0});
+  }
+  return JSON.stringify({found: false, answer: '', answer_html: '', refs: 0});
+})()"""
+
+ZAI_EXTRACT_JS = """(function(){
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
+  var els = Array.from(document.querySelectorAll('.markdown-body, [class*="prose"], [class*="message"], article'));
   var bestText = ''; var bestHTML = '';
-  for(var i=0; i<els.length; i++){
+  for (var i = els.length - 1; i >= 0; i--) {
     var t = textOf(els[i]); var h = htmlOf(els[i]);
-    if(t.length > 20 && t.length > bestText.length) { bestText = t; bestHTML = h; }
+    if (t.length > 15 && t.indexOf('发送消息') === -1) {
+      bestText = t; bestHTML = h;
+      break;
+    }
   }
   return JSON.stringify({found: bestText.length > 0, answer: bestText, answer_html: bestHTML, refs: 0});
 })()"""
@@ -215,11 +229,28 @@ PERPLEXITY_EXTRACT_JS = """(function(){
 GROK_EXTRACT_JS = """(function(){
   function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
   function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
-  var els = Array.from(document.querySelectorAll('.markdown-body, [class*=message-content], [class*=prose]'));
+
+  function isGarbage(t){
+    var low = t.toLowerCase();
+    if (low.indexOf('limit is gone') > -1) return true;
+    if (low.indexOf('upgrade to supergrok') > -1) return true;
+    if (low.indexOf('upgrade now') > -1) return true;
+    if (low.indexOf('ask grok') > -1) return true;
+    if (low.indexOf('toggle sidebar') > -1) return true;
+    if (low.indexOf('before limit') > -1) return true;
+    return false;
+  }
+
+  var items = Array.from(document.querySelectorAll('[class*="items-start"]'));
   var bestText = ''; var bestHTML = '';
-  for(var i=0; i<els.length; i++){
-    var t = textOf(els[i]); var h = htmlOf(els[i]);
-    if(t.length > 20 && t.length > bestText.length) { bestText = t; bestHTML = h; }
+  for (var i = items.length - 1; i >= 0; i--) {
+    var cls = String(items[i].className || '');
+    var el = items[i].querySelector('.message-bubble') || items[i].querySelector('[class*="prose"]') || items[i];
+    var t = textOf(el); var h = htmlOf(el);
+    if (t.length > 20 && !isGarbage(t)) {
+      bestText = t; bestHTML = h;
+      break;
+    }
   }
   return JSON.stringify({found: bestText.length > 0, answer: bestText, answer_html: bestHTML, refs: 0});
 })()"""
@@ -236,7 +267,10 @@ ENGINES = {
         "site_url": "https://yuanbao.tencent.com/chat",
         "site_host": "yuanbao.tencent.com",
         "fill_selector": "[contenteditable=true]",
-        "submit": {"js_click": "document.querySelector('#yuanbao-send-btn') && document.querySelector('#yuanbao-send-btn').click()"},
+        "submit": {
+            "click": "#yuanbao-send-btn",
+            "enter": True
+        },
         "probe_js": "!!document.querySelector('[contenteditable=true]')",
         "extract_js": YUANBAO_EXTRACT_JS,
         "new_chat_js": "(function(){ var btn = document.querySelector('[class*=new-chat], [class*=new_chat]'); if(btn) btn.click(); })()",
@@ -248,12 +282,14 @@ ENGINES = {
         "session": "doubao",
         "site_url": "https://www.doubao.com/chat",
         "site_host": "doubao.com",
-        "fill_selector": "textarea",
+        "fill_selector": ".semi-input-textarea",
         "fill_nth": 0,
-        "input_method": "react_input",
+        "input_method": "type",
+        "gentle_submit": True,
         "submit": {
-            "js_click": "document.getElementById('flow-end-msg-send') && document.getElementById('flow-end-msg-send').click()",
-            "keys": "Enter",
+            "js_click": "(function(){ var b = document.querySelector('button[class*=\"send-msg-btn\"]') || document.querySelector('#flow-end-msg-send'); if(b) b.click(); })()",
+            "click": "button[class*=\"send-msg-btn\"]",
+            "enter": True
         },
         "probe_js": "!!document.querySelector('textarea')",
         "extract_js": DOUBAO_EXTRACT_JS,
@@ -267,63 +303,90 @@ ENGINES = {
         "site_url": "https://www.kimi.com/",
         "site_host": "kimi",
         "fill_selector": "[contenteditable=true]",
-        "submit": {"js_click": "(function(){ var s=document.querySelector('svg[name=Send]'); var btn=s?s.closest('button,div[role=button]'):null; if(btn)btn.click(); })()"},
+        "submit": {
+            "click": "button[class*=\"send\" i], div.send-button-container",
+            "enter": True
+        },
         "probe_js": "!!document.querySelector('[contenteditable=true]')",
         "extract_js": KIMI_EXTRACT_JS,
         "dismiss_popup_js": "(function(){ var btns=Array.from(document.querySelectorAll('button, div[role=button]')); for(var i=0;i<btns.length;i++){ if((btns[i].innerText||'').indexOf('稍后再说')>-1){ btns[i].click(); return true; } } return false; })()",
-        "new_chat_js": "(function(){ var btn = document.querySelector('svg[name=NewChat]') ? document.querySelector('svg[name=NewChat]').closest('button, div[role=button]') : null; if(btn) btn.click(); })()",
+        "new_chat_js": "(function(){ var btn = document.querySelector('svg[name=NewChat]') ? document.querySelector('svg[name=NewChat]').closest('button, div[role=button], div') : null; if(btn) btn.click(); })()",
     },
     "qianwen": {
-        "name": "通义千问",
+        "name": "通义千问智搜",
         "icon": "🎈",
         "badge": "阿里通义全网智搜",
         "session": "qianwen",
-        "site_url": "https://tongyi.aliyun.com/qianwen/",
+        "site_url": "https://www.qianwen.com/",
         "site_host": "qianwen",
-        "fill_selector": "[contenteditable=true]",
-        "input_method": "clipboard",
-        "submit": {"enter": True},
-        "probe_js": "!!document.querySelector('[contenteditable=true]')",
+        "fill_selector": "[role=textbox][contenteditable=true], [contenteditable=true]",
+        "fill_nth": 0,
+        "input_method": "type",
+        "submit": {
+            "js_click": "(function(){ var closeBtn=document.querySelector('button[aria-label=关闭]'); if(closeBtn) closeBtn.click(); var btn=document.querySelector('button[aria-label=\"发送消息\"]') || document.querySelector('[aria-label=\"发送消息\"]') || document.querySelector('button[aria-label*=\"发送\"]'); if(btn) btn.click(); })()",
+            "click": "button[aria-label=\"发送消息\"]",
+            "enter": True
+        },
+        "probe_js": "!!(document.querySelector('[role=textbox][contenteditable=true]') || document.querySelector('[contenteditable=true]'))",
         "extract_js": QIANWEN_EXTRACT_JS,
-        "new_chat_js": "(function(){ var btn = document.querySelector('[class*=new-chat]'); if(btn) btn.click(); })()",
+        "dismiss_popup_js": "(function(){ var b=document.querySelector('button[aria-label=关闭]') || document.querySelector('[data-testid=home-guide-carousel] button'); if(b) b.click(); })()",
+        "new_chat_js": "(function(){ var btn = document.querySelector('button[aria-label*=\"新建对话\"]'); if(btn) btn.click(); })()",
     },
     "grok": {
         "name": "Grok",
         "icon": "🤖",
-        "badge": "xAI Grok real-time search",
+        "badge": "Grok 实时全网智搜",
         "session": "grok",
         "site_url": "https://grok.com/",
         "site_host": "grok.com",
-        "fill_selector": "textarea, [contenteditable=true]",
-        "input_method": "type",
+        "fill_selector": ".tiptap.ProseMirror, [contenteditable=true]",
+        "fill_nth": 0,
         "submit": {
-            "keys": "Enter",
-            "js_click": "(function(){ var el=document.querySelector('button[type=submit], button[aria-label*=send i], [data-testid*=Send]'); if(el) el.click(); })()"
+            "click": "button[data-testid=\"chat-submit\"]",
+            "enter": True
         },
-        "probe_js": "!!document.querySelector('textarea, [contenteditable=true]')",
+        "probe_js": "!!document.querySelector('[contenteditable=true]')",
         "extract_js": GROK_EXTRACT_JS,
-        "new_chat_js": "(function(){ var btn = document.querySelector('a[href=\"/\"], button[aria-label*=\"New\"]'); if(btn) btn.click(); })()",
+        "dismiss_popup_js": "(function(){ var b=document.querySelector('#accept-recommended-btn-handler, #onetrust-accept-btn-handler'); if(b){ b.click(); return true; } return false; })()",
+        "new_chat_js": "(function(){ var a = document.querySelector('a[href=\"/\"]'); if(a) a.click(); })()",
     },
     "perplexity": {
-        "name": "Perplexity",
+        "name": "Perplexity 搜",
         "icon": "🔍",
-        "badge": "Perplexity real-time search",
+        "badge": "Perplexity 深度检索",
         "session": "perplexity",
         "site_url": "https://www.perplexity.ai/",
         "site_host": "perplexity.ai",
-        "fill_selector": "textarea, [contenteditable=true]",
-        "input_method": "type",
+        "fill_selector": "textarea",
+        "fill_nth": 0,
         "submit": {
-            "js_click": "(function(){ var el=document.querySelector('button[type=submit], button[aria-label*=Submit], button[aria-label*=send]'); if(el) el.click(); })()",
-            "keys": "Enter"
+            "click": "button[aria-label*=\"Submit\" i], button[aria-label*=\"Send\" i]",
+            "enter": True
         },
-        "probe_js": "!!document.querySelector('textarea, [contenteditable=true]')",
+        "probe_js": "!!document.querySelector('textarea')",
         "extract_js": PERPLEXITY_EXTRACT_JS,
-        "new_chat_js": "(function(){ var btn = document.querySelector('a[href=\"/\"], button[aria-label*=\"New\"]'); if(btn) btn.click(); })()",
+        "new_chat_js": "(function(){ var btn = document.querySelector('[aria-label*=\"New thread\"]'); if(btn) btn.click(); })()",
+    },
+    "zai": {
+        "name": "Z.ai 智搜",
+        "icon": "⚡",
+        "badge": "Z.ai 智能全网检索",
+        "session": "zai",
+        "site_url": "https://z.ai/",
+        "site_host": "z.ai",
+        "fill_selector": "textarea, [contenteditable=\"true\"]",
+        "fill_nth": 0,
+        "submit": {
+            "click": "button[type=\"submit\"], button[aria-label*=\"Send\" i]",
+            "enter": True
+        },
+        "probe_js": "!!document.querySelector('textarea, [contenteditable=\"true\"]')",
+        "extract_js": ZAI_EXTRACT_JS,
+        "new_chat_js": "(function(){ var a = document.querySelector('a[href=\"/\"]'); if(a) a.click(); })()",
     },
 }
 
-ENGINE_ORDER = ["yuanbao", "doubao", "kimi", "qianwen", "grok", "perplexity"]
+ENGINE_ORDER = ["yuanbao", "doubao", "kimi", "qianwen", "grok", "perplexity", "zai"]
 
 
 # ---------------------------------------------------------------- 工具函数
@@ -440,8 +503,27 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
                 "error": f"{eng['name']} 会话未绑定，请运行 setup_engines.py 打开页面完成登录",
                 "elapsed": time.time() - t0}
 
+    # 检查当前 Session 页面 URL。若已在聊天页面中，禁止重置跳转！
+    st = run_cli(["browser", sess, "state"], timeout=10)
+    current_url = st.get("stdout", "")
+    if ("about:blank" in current_url or not current_url.strip()) or (eng["site_host"] not in current_url):
+        run_cli(["browser", sess, "open", eng["site_url"]], timeout=25)
+        time.sleep(2.0)
+    else:
+        if eng.get("new_chat_js"):
+            run_cli(["browser", sess, "eval", eng["new_chat_js"]], timeout=10)
+            time.sleep(0.5)
+
+    # 动态等待输入框 DOM 元素真正挂载就绪，解决 React/Vue 渲染延迟
+    fill_sel = eng["fill_selector"]
+    for _ in range(6):
+        chk = run_cli(["browser", sess, "eval", f"!!document.querySelector('{fill_sel}')"], timeout=10)
+        if chk["ok"] and chk["stdout"].strip() == "true":
+            break
+        time.sleep(0.8)
+
     if eng.get("dismiss_popup_js"):
-        run_cli(["browser", sess, "eval", eng["dismiss_popup_js"]], timeout=15)
+        run_cli(["browser", sess, "eval", eng["dismiss_popup_js"]], timeout=10)
 
     baseline_ans = ""
     baseline_think = ""
@@ -457,114 +539,106 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
     if progress:
         progress(f"连接 {eng['name']}…")
 
-    input_method = eng.get("input_method", "fill")
-    if input_method == "clipboard":
-        paste_js = ("(function(){"
-                    "  var el = document.querySelector('%s');"
-                    "  if(!el) return false;"
-                    "  el.focus();"
-                    "  var dt=new DataTransfer();"
-                    "  dt.setData('text/plain', %s);"
-                    "  var ev=new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true});"
-                    "  el.dispatchEvent(ev);"
-                    "  return true;"
-                    "})()") % (eng["fill_selector"], json.dumps(prompt))
-        pasted = run_cli(["browser", sess, "eval", paste_js], timeout=30)
-        if not pasted["ok"] or pasted["stdout"].strip() != "true":
-            return {"status": "error", "answer": "", "refs": 0,
-                    "error": f"输入失败: {(pasted['stderr'] or pasted['stdout'])[:160]}",
-                    "elapsed": time.time() - t0}
-    elif input_method == "react_input":
-        react_fill_js = ("(function(){"
-                         "  var el = document.querySelector('%s');"
-                         "  if(!el) return false;"
-                         "  el.focus();"
-                         "  var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;"
-                         "  nativeSetter.call(el, %s);"
-                         "  el.dispatchEvent(new Event('input', { bubbles: true }));"
-                         "  el.dispatchEvent(new Event('change', { bubbles: true }));"
-                         "  return true;"
-                         "})()") % (eng["fill_selector"], json.dumps(prompt))
-        typed = run_cli(["browser", sess, "eval", react_fill_js], timeout=30)
-        if not typed["ok"] or typed["stdout"].strip() != "true":
-            type_args = ["browser", sess, "type"]
-            if eng.get("fill_nth") is not None:
-                type_args += ["--nth", str(eng["fill_nth"])]
-            type_args += [eng["fill_selector"], prompt]
-            run_cli(type_args, timeout=60)
-    elif input_method == "type":
-        focus_js = ("(function(){var el=document.querySelector('%s');"
-                    "if(el){el.focus();document.execCommand('selectAll',false,null);"
-                    "document.execCommand('insertText',false,'');}return true;})()"
-                    % eng["fill_selector"])
-        run_cli(["browser", sess, "eval", focus_js], timeout=30)
-        type_args = ["browser", sess, "type"]
-        if eng.get("fill_nth") is not None:
-            type_args += ["--nth", str(eng["fill_nth"])]
-        type_args += [eng["fill_selector"], prompt]
-        typed = run_cli(type_args, timeout=60)
-        if not typed["ok"]:
-            return {"status": "error", "answer": "", "refs": 0,
-                    "error": f"输入失败: {(typed['stderr'] or typed['stdout'])[:160]}",
-                    "elapsed": time.time() - t0}
-    else:
-        clear_js = ("(function(){var el=document.querySelector('%s');"
-                    "if(el){el.focus();document.execCommand('selectAll',false,null);"
-                    "document.execCommand('insertText',false,'');}return true;})()"
-                    % eng["fill_selector"])
-        run_cli(["browser", sess, "eval", clear_js], timeout=30)
-        fill_args = ["browser", sess, "fill"]
-        if eng.get("fill_nth") is not None:
-            fill_args += ["--nth", str(eng["fill_nth"])]
-        fill_args += [eng["fill_selector"], prompt]
-        fill = run_cli(fill_args, timeout=60)
-        if not fill["ok"]:
-            return {"status": "error", "answer": "", "refs": 0,
-                    "error": f"输入失败: {(fill['stderr'] or fill['stdout'])[:160]}",
-                    "elapsed": time.time() - t0}
+    injected = {"ok": False, "stdout": ""}
+    if eng.get("input_method") == "type":
+        # 原生键入注入：对 JS 注入感知不友好的 React 富文本编辑器，用 CDP 原生 type
+        focus_try = run_cli(["browser", sess, "eval", "(function(){ var el=document.querySelector(%s); if(el) el.focus(); return !!el; })()" % json.dumps(eng["fill_selector"].split(",")[0].strip())], timeout=10)
+        time.sleep(0.2)
+        t_res = run_cli(["browser", sess, "type", eng["fill_selector"].split(",")[0].strip(), prompt], timeout=30)
+        if t_res["ok"]:
+            injected = {"ok": True, "stdout": "true"}
+    if not injected["ok"] or injected.get("stdout", "").strip() != "true":
+        universal_input_js = ("(function(){"
+                              "  var el = document.querySelector(%s);"
+                              "  if(!el) return false;"
+                              "  el.focus();"
+                              "  if(el.tagName === 'TEXTAREA' || el.tagName === 'INPUT'){"
+                              "    var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value') ? "
+                              "      Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set : null;"
+                              "    if(nativeSetter){ nativeSetter.call(el, %s); } else { el.value = %s; }"
+                              "    el.dispatchEvent(new Event('input', { bubbles: true }));"
+                              "    el.dispatchEvent(new Event('change', { bubbles: true }));"
+                              "  } else {"
+                              "    el.innerHTML = '<p>' + %s + '</p>';"
+                              "    document.execCommand('selectAll', false, null);"
+                              "    document.execCommand('insertText', false, %s);"
+                              "    el.dispatchEvent(new Event('input', { bubbles: true }));"
+                              "    el.dispatchEvent(new Event('change', { bubbles: true }));"
+                              "  }"
+                              "  return true;"
+                              "})()") % (json.dumps(eng["fill_selector"]), json.dumps(prompt), json.dumps(prompt), json.dumps(prompt), json.dumps(prompt))
 
-    time.sleep(SUBMIT_SETTLE_DELAY)
+        injected = run_cli(["browser", sess, "eval", universal_input_js], timeout=30)
+        if not injected["ok"] or injected.get("stdout", "").strip() != "true":
+            paste_js = ("(function(){"
+                        "  var el = document.querySelector(%s);"
+                        "  if(!el) return false;"
+                        "  el.focus();"
+                        "  var dt=new DataTransfer();"
+                        "  dt.setData('text/plain', %s);"
+                        "  var ev=new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true});"
+                        "  el.dispatchEvent(ev);"
+                        "  return true;"
+                        "})()") % (json.dumps(eng["fill_selector"]), json.dumps(prompt))
+            run_cli(["browser", sess, "eval", paste_js], timeout=30)
+
+    # 1. 强制聚焦输入框
+    focus_js = "(function(){ var el = document.querySelector('" + eng["fill_selector"] + "'); if(el){ el.focus(); return true; } return false; })()"
+    run_cli(["browser", sess, "eval", focus_js], timeout=10)
+    time.sleep(0.3)
+
     sub = eng["submit"]
-    if progress:
-        progress("已提交，正在检索与思考...")
-    if sub.get("js_click"):
-        run_cli(["browser", sess, "eval", sub["js_click"]], timeout=30)
-    if sub.get("click"):
-        run_cli(["browser", sess, "click", sub["click"]], timeout=30)
-    if sub.get("keys"):
-        run_cli(["browser", sess, "keys", sub["keys"]], timeout=30)
-    if sub.get("enter"):
-        run_cli(["browser", sess, "keys", "Enter"], timeout=30)
+    if eng.get("gentle_submit"):
+        # 温和单次提交：对风控敏感的站点(豆包)只用一次原生 Enter + 按住按钮点击，
+        # 避免频谱轰炸式交互触发风控。点击后等待 settle。
+        if progress:
+            progress(f"提交至 {eng['name']}…")
+        run_cli(["browser", sess, "keys", "Enter"], timeout=10)
+        time.sleep(SUBMIT_SETTLE_DELAY)
+        if sub.get("click"):
+            run_cli(["browser", sess, "click", sub["click"]], timeout=8)
+        time.sleep(SUBMIT_SETTLE_DELAY)
+    else:
+        # 2. 优先通过 CDP 发送绝对真实的原生 Enter 回车按键 (isTrusted=true)
+        res_keys = run_cli(["browser", sess, "keys", "Enter"], timeout=10)
+
+        # 3. 补发按钮点击作为二重保障
+        time.sleep(0.6)
+        if sub.get("js_click"):
+            run_cli(["browser", sess, "eval", sub["js_click"]], timeout=10)
+        if sub.get("click"):
+            run_cli(["browser", sess, "click", sub["click"]], timeout=8)
+
+        # 多引擎协同提交双重校验触发与强制补偿补发回车
+        time.sleep(1.0)
+        focus_and_enter_js = "(function(){ var el = document.querySelector('" + eng["fill_selector"] + "'); if(el){ el.focus(); var ev=new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,bubbles:true}); el.dispatchEvent(ev); } })()"
+        run_cli(["browser", sess, "eval", focus_and_enter_js], timeout=15)
+        run_cli(["browser", sess, "keys", "Enter"], timeout=15)
 
     last = {"found": False, "thinking": "", "answer": "", "answer_html": "", "refs": 0}
     prev_len = 0
     stable_count = 0
 
-    for _ in range(EXTRACT_POLL_MAX):
+    for i in range(EXTRACT_POLL_MAX):
         time.sleep(EXTRACT_POLL_INTERVAL)
         current = extract_answer(sess, eng)
         if current["found"] and (current["answer"] or current["thinking"]):
-            if current.get("answer") == baseline_ans and current.get("thinking") == baseline_think:
+            # 关键校验：若抓取到的回答与提问前的旧回答完全相同，说明页面尚未更新新回答，必须跳过！
+            if baseline_ans and current.get("answer") == baseline_ans and current.get("thinking") == baseline_think:
                 continue
+
             curr_len = len(current.get("answer", "")) + len(current.get("thinking", ""))
             if curr_len > prev_len:
                 last = current
                 prev_len = curr_len
                 stable_count = 0
                 if progress:
-                    progress(f"正在思考与生成回答({curr_len}字)…")
+                    progress(f"正在生成回答({curr_len}字)…")
             else:
                 stable_count += 1
-                if stable_count >= 2:
-                    return {
-                        "status": "ok",
-                        "thinking": last.get("thinking", ""),
-                        "answer": last["answer"],
-                        "answer_html": last.get("answer_html", ""),
-                        "refs": last["refs"],
-                        "error": "",
-                        "elapsed": time.time() - t0
-                    }
+                if stable_count >= 3 and curr_len > 10:
+                    last = current
+                    break
 
     if last["found"] and (last["answer"] or last["thinking"]):
         return {
