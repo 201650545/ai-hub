@@ -133,12 +133,25 @@ CHANNELS = {
         "models": ["glm-4-flash", "glm-4.5-flash", "glm-4-air"],
         "note": "GLM-4-Flash 永久免费，0 欠费风险。",
     },
+    "cherrystudio": {
+        "name": "Cherry Studio 网关",
+        "provider": "Cherry Studio 本地 API 网关 (127.0.0.1:23333)",
+        "billing_type": "free",
+        "billing_tag": "🟢 本机聚合（70+ provider 全打通）",
+        "icon": "🍒",
+        "base_url": "http://127.0.0.1:23333/v1",
+        "env_key": "CHERRYSTUDIO_API_KEY",
+        "free": True,
+        "default_model": "deepseek:deepseek-v4-flash",
+        "models": [],  # 健康检查时动态拉取 Cherry 内已启用模型
+        "note": "Cherry Studio 内置网关，统一暴露其绑定的所有 provider。模型名用 providerId:apiModelId 格式。",
+    },
 }
 
-CHANNEL_ORDER = ["deepseek", "gemini", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
+CHANNEL_ORDER = ["deepseek", "gemini", "openrouter", "groq", "siliconflow", "dashscope", "zhipu", "cherrystudio"]
 
-# fallback 链（前端模型未匹配时按此顺序路由）
-DEFAULT_CHAIN = ["deepseek", "openrouter", "gemini", "groq", "siliconflow", "dashscope", "zhipu"]
+# fallback 链（前端模型未匹配时按此顺序路由）；cherrystudio 兜底所有未识别模型
+DEFAULT_CHAIN = ["deepseek", "openrouter", "gemini", "groq", "siliconflow", "dashscope", "zhipu", "cherrystudio"]
 
 _config_cache = None
 
@@ -273,6 +286,13 @@ def channel_health(channel_id):
     balance = get_balance(channel_id, key)
     base = ch["base_url"].rstrip("/")
     try:
+        if channel_id == "cherrystudio":
+            # Cherry 网关：动态拉取全部已启用模型（providerId:apiModelId），不截断
+            data = _get_json(base + "/models", key, timeout=8)
+            models = [m.get("id") for m in (data.get("data") or []) if m.get("id")]
+            return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": True, "models": models,
+                    "error": "", "can_fill": can_fill, "provider": provider,
+                    "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
         if channel_id == "openrouter":
             data = _get_json(base + "/models", key, timeout=8)
             models = [m["id"] for m in data.get("data", [])
@@ -417,6 +437,9 @@ def chat_completion(channel_id, payload):
     if not key:
         raise RuntimeError(f"{ch['name']} 未配置 key")
     req_payload = dict(payload)
+    if channel_id == "cherrystudio":
+        # Cherry 网关要求 providerId:apiModelId 格式；裸模型名按后缀解析补全
+        req_payload["model"] = resolve_cherry_model(req_payload.get("model", ""))
     # developer 角色 → system（部分渠道不认 developer）
     for m in req_payload.get("messages", []):
         if m.get("role") == "developer":
@@ -511,6 +534,8 @@ class _QuotaResponse:
 
 def model_to_chain(model):
     """模型名 → 渠道候选链（第一个命中优先）。"""
+    if ":" in model and not model.startswith("deepseek-"):  # Cherry 风格 providerId:apiModelId
+        return ["cherrystudio"]
     if model.startswith("deepseek-"):
         return ["deepseek"]
     if model.startswith("gemini-"):
@@ -522,3 +547,24 @@ def model_to_chain(model):
         if m in [x.lower() for x in CHANNELS[cid].get("models", [])]:
             return [cid]
     return DEFAULT_CHAIN
+
+
+def resolve_cherry_model(model):
+    """把请求的模型名解析成 Cherry 网关要求的 providerId:apiModelId 格式。
+
+    优先返回能动态从 Cherry /v1/models 匹配到的完整 id；匹配不到则原样透传
+    （仍会让 Cherry 网关按默认路由尝试，失败再由上层 fallback 链兜底）。
+    """
+    if not model or ":" in model:
+        return model  # 已是 Cherry 格式或空，直接透传
+    try:
+        data = _get_json(CHANNELS["cherrystudio"]["base_url"].rstrip("/") + "/models",
+                         get_key("cherrystudio"), timeout=6)
+        for m in (data.get("data") or []):
+            mid = m.get("id") or ""
+            # 裸名命中：model == 完整 id，或 == id 冒号后的部分（含大小写忽略）
+            if mid.lower() == model.lower() or mid.lower().split(":", 1)[-1] == model.lower():
+                return mid
+    except Exception:  # noqa: BLE001
+        pass
+    return model

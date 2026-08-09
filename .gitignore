@@ -38,6 +38,7 @@ gateway_err.log
 # 临时文件
 _tmp/
 *.tmp
+_tmp_feishu_rows.json
 config/github.json
 
 # 调试脚本隔离区（不入库）
