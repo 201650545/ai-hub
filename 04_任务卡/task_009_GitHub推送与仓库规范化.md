@@ -49,3 +49,9 @@ git push -u origin main
 - 文件树复核：远程无 channels/auth/feishu/quota/history JSON；仅示例配置文件入库；共 83 个跟踪文件
 - README 增强：项目状态徽章、「给 AI 协作者的导读」、当前进度表、核心目录速览
 - 遗留：无（全部验收项达成）
+
+## 2026-08-09 增量推送（OpenCode）
+- 引擎修复（c56a9e0/7d0ad43/bdaf8f7）+ E2E 回归（8cb0cf8）+ 任务卡状态（075ad73/de02f96）+ 管理面板升级（a3e4ada）+ 勘探报告/规则卡（5caea9d）+ 画布观察窗/生图规则卡/样例（8b6bfc6）共 9 提交推送
+- `git push origin main` 成功：远程 HEAD=8b6bfc6 与本地同步；`git ls-remote` 复核一致
+- 敏感复核：追踪文件中无 channels/auth/feishu/quota/history JSON，仅示例占位 key
+- 未追踪调试探针（06_组件编排器 下 151 个 test_/probe_/check_/inspect_ 脚本）不入库，保留本地
