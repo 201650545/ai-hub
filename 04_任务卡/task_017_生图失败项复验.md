@@ -1,0 +1,54 @@
+# 任务卡 017：生图站点自动化失败项复验（chatgpt_mirror / Gemini 官方）
+
+## 执行模型：🟢 Gemini 3.6 Flash
+
+## 目标
+复验三个此前「注入成功但未出图」的站点，确认是账号/工具/选择器哪个环节导致失败，并给出结论（可用入库 / 不可用标注原因 / 需人工半自动）。
+
+## 背景（上一轮实测结论，供你直接续查）
+
+图片组件 `image_gen`（task_015）已支持豆包全链路自动出图。以下站点先前由另一模型用 opencli 实测，**注入与提交均成功，但没有产出图片**：
+
+| 站点 | URL | 注入 | 提交 | 出图 | 现场现象 |
+|---|---|---|---|---|---|
+| ChatGPT 镜像 (vip-23) | `https://vip-23.67673.live/` | ✅ `#ProseMirror`/`textarea` 有内容 | ✅ Enter → 消息发送 | ❌ | assistant 回复为空或「Something went wrong」 |
+| Gemini 官方 | `https://gemini.google.com/app/7cda9c4c59fc7b56` | ✅ `rich-textarea` 填入 | ✅ 发出 | ❌ | 仅文字回复，无图片；需先激活「Images / Create Image」工具才走图像分支 |
+
+已知事实（供参考，不必完全采信）：
+- ChatGPT 镜像 URL 会被重定向到 `ai.wendabao-f.net`「问答宝宝」镜像，页面是账号/模型选择页；`vip-23.67673.live` 打开后是**真实 ChatGPT 克隆 UI**（ProseMirror 编辑器 + `textarea` 兜底），模型下拉只有 `Auto (Latest 5.6)` / `Configure...`。
+- Gemini 免费版/账号当前用户会话能出图（用户手工生成成功，见会话 `/app/7c9a4c8c...`），但必须先在输入框左侧「➕ / Upload & tools → Images」工具激活后发送；该「Images」菜单项隐藏在某 OpenShad（Shadow DOM）内，DIV 文本 `Images` 需要点击穿透。
+- 图片提取：Gemini 生成图此前以 `googleusercontent` 直链出现；ChatGPT 镜像为 blob/canvas，需 `blob_canvas` 提取模式（规则卡已配）。
+
+## 你的复验清单
+
+### A. ChatGPT 镜像 vip-23
+1. `opencli browser chatgpt_mirror open https://vip-23.67667.live/`
+2. eval 确认模型按钮文本（预期 `Auto` / `Latest • 5.6`），用 opencli 菜单切换模型，尝试找到能出图的（如 **4o / GPT-4 带生图**，或查看历史会话用的模型名）。
+3. 在已出过图的历史会话（如「Sci-fi Music-free Icon」）内，type 提示词 → Enter，轮询是否出图。
+4. 若确认该账号确实无法出图 → 结论「该镜像账号暂不可用」，考虑在规则卡剔除或换 URL（你能提供可出图的站点 URL 更佳）。
+
+### B. Gemini 官方璠 3.6 Flash Extended
+1. `opencli browser gemini_image open https://gemini.google.com/app`
+2. 完美修复 earlier 失败：模仿用户手工路径——注入前先激活 Images 工具：
+   - `click` 输入框左侧「Upload & tools」按钮（`button[aria-label='Upload & tools']`）
+   - 用 eval 穿透 Shadow DOM 找到文本「Images」并触发其外层可点击元素
+3. 激活后注入提示（如「一只线条小狗。」，与成功会话一致）→ Enter → 轮询 `googleusercontent` 图片下载至 `06_组件编排器/勘探样例/gemini_pro.png`
+4. 若确认可通过图片工具出图，产出/修正规则卡 `image_gen_gemini.yaml`（含「Images 工具激活」步骤）。
+
+## 产出
+- 更新 `06_组件编排器/生图网站勘探报告.md` 对应的站点行（状态更新到最新实测）
+- 修正后的规则卡（或明确「不可用」删除）
+- 样例图若生成成功需保留在 `勘探样例/`
+
+## 验收
+- 每个站点给出「✅ 出图入库 / ❌ 不可用剔除 / ⚠️ 半自动 需人工」明确结论
+- 有可用的新站点，须提供并能自动走全链路
+
+## 注意
+- 尊重站点条款，不为验证而刷多次
+- 与 task 015 保持规则卡 schema 一致（`注样式`、`inject`/`wait`/`extract` 结构）
+
+## 完成记录
+- **完成时间**：
+- **执行模型**：
+- **验收结果**：
