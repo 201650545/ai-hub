@@ -81,3 +81,11 @@
 4. **Gemini "Images" 生图工具当前无法激活**：`Upload & tools` 菜单点开后无可见菜单项；页面 `Images` 元素为 `href="/images"` 侧栏导航链接（32×32 图标），并非生图工具激活入口。原记录"穿透 Shadow DOM 激活 Images"在当前页面不可复现。
 5. **修正后站点定级**：字节豆包 = ✅ 全自动实锤（task_015 有真实样例）；**Gemini 官方 / ChatGPT 镜像版 = ⚠️ 证据不足，待人工半自动复验**。规则卡 schema 合规保留，出图环节待后续人工验证或换可用站点。
 6. 已同步修正 `06_组件编排器/生图网站勘探报告.md`（第四节站点状态、第五节样例图清单）。
+
+## ✅ 豆包全链路补强实测（2026-08-09 OpenCode，方案 A 落地）
+
+- **修正规则卡 `image_gen_doubao.yaml`**：输入区实测为 `.tiptap.ProseMirror`（contenteditable，非原填写的 `textarea`）；模型 Seedream；生成图 580×580 级 imagex 直链。
+- **用 image_gen 组件跑通完整链路**：注入提示词 → Enter 提交 → 基线感知轮询 → img_src 提取，`ok: true`。
+- **产出真实样例**：`勘探样例/doubao_pro.png`（435×580 WEBP 123KB，浅色卡通背景 4966 色，符合提示词主题）。
+- **补充实测**：`doubao_image` 会话现有 30 张历史生图（580×580 imagex 直链），此前误提取的 160×160 缩略图问题在豆包链路不存在。
+- **结论**：字节豆包 = ✅ 全自动出图实锤，作为生图主力站定案；Gemini/ChatGPT 镜像保持 ⚠️ 待人工复验。
