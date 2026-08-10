@@ -3,7 +3,7 @@ site: Gemini 官方生图
 session: gemini_image
 url: https://gemini.google.com/app
 style_lock: "flat cartoon, 线条手绘插画风, 干净简约"
-status: "⚠️ 证据不足 — 2026-08-09 OpenCode 复核：Images 工具当前无法激活（href=/images 为侧栏导航），gemini_pro.png 为 160x160 疑似 Logo 误提取，待人工半自动复验"
+status: "✅ 实锤入库 — 2026-08-09 OpenCode 复核修正：3.6 Flash 直接输入绘图提示词即可自动调起 Imagen 生图，无需额外激活 Images 工具。产出样例 gemini_official_pro.png"
 inject:
   pre_actions:
     - action: click_model_picker
@@ -14,15 +14,15 @@ inject:
   input_method: shadow_p_inject
   submit: "click:button[aria-label*='Send' i]"
 wait:
-  timeout_s: 60
-  poll_js: "!!document.querySelector('img[src*=googleusercontent], img[src*=generativelanguage]')"
+  timeout_s: 90
+  poll_js: "!!document.querySelector('generated-image img[alt*=\"AI generated\"], img[src^=\"blob:\"][alt*=\"AI generated\"]')"
 extract:
-  method: img_src
-  selector: "img[src*=googleusercontent], img[src*=generativelanguage]"
+  method: blob_screenshot
+  selector: "generated-image img[alt*='AI generated'], single-image img[alt*='AI generated']"
   prefer_last: true
 fallback:
   - 切换 3.6 Flash / 3.1 Pro 模型重试
   - 换备用站点（doubao / zhipu）
 budget:
   max_retry: 2
-notes: 支持 3.6 Flash 模型下自动化，穿透 Shadow DOM 在 rich-textarea 注入提示词并点击 Send 提交，提取 googleusercontent 图片。⚠️ 出图环节需人工复验（Images 工具激活不可复现）。
+notes: 支持 3.6 Flash 模型下自动化，穿透 Shadow DOM 在 rich-textarea 注入提示词并点击 Send 提交。Flash 模型接收绘图提示词后自动调起 Imagen 生图，DOM 中产生 `<generated-image>` 元素含 blob: 图片。提取方法需处理 blob URL（截图或 canvas 提取）。
