@@ -1,6 +1,0 @@
-{
-  "logic": "and",
-  "conditions": [
-    ["实用性评估(筛选规则)", "contains", "标记为无用"]
-  ]
-}

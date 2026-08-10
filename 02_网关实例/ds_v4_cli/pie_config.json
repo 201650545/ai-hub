@@ -1,7 +1,0 @@
-{
-  "table_name": "实用性精选与黑名单",
-  "count_all": true,
-  "group_by": [
-    { "field_name": "实用性评估(筛选规则)", "mode": "integrated" }
-  ]
-}
