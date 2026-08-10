@@ -39,6 +39,10 @@ def run_cli(args, timeout=90):
     except Exception as e:
         return {"ok": False, "code": -2, "stdout": "", "stderr": str(e)}
 
+def _js_quote(s: str) -> str:
+    """用 json.dumps 安全生成 JS 字符串字面量（处理单引号/双引号/换行/反斜杠）。"""
+    return json.dumps(s, ensure_ascii=True)
+
 def load_card(rule_card_path: str) -> dict:
     """加载 yaml 规则卡"""
     if not os.path.exists(rule_card_path):
@@ -99,61 +103,58 @@ def inject_and_generate(session: str, url: str, prompt: str, card: dict) -> bool
         if not pa_sel:
             continue
         if pa_act == "click_model_picker":
-            # 用 eval 点击模型选择器按钮（兼容 CSS 选择器与 Playwright 定位器）
-            js = ("(function(){"
-                  " var el = document.querySelector('%s');"
-                  " if(el){ el.click(); return 'clicked'; }"
-                  " return 'not found';"
-                  "})()") % pa_sel.replace("'", "\\'")
+            js = ('(function(){'
+                  ' var el = document.querySelector(%s);'
+                  ' if(el){ el.click(); return "clicked"; }'
+                  ' return "not found";'
+                  '})()') % _js_quote(pa_sel)
             run_cli(["browser", session, "eval", js], timeout=15)
             time.sleep(1.5)
         elif pa_act == "select_model":
-            # 根据文本内容找菜单项点击
             model_text = pa.get("text", "3.6 Flash")
-            js = ("(function(){"
-                  " var items = document.querySelectorAll('%s');"
-                  " for(var i=0;i<items.length;i++){"
-                  "   if(items[i].innerText.includes('%s')){ items[i].click(); return 'clicked'; }"
-                  " }"
-                  " return 'not found';"
-                  "})()") % (pa_sel.replace("'", "\\'"), model_text.replace("'", "\\'"))
+            js = ('(function(){'
+                  ' var items = document.querySelectorAll(%s);'
+                  ' for(var i=0;i<items.length;i++){'
+                  '   if(items[i].innerText.includes(%s)){ items[i].click(); return "clicked"; }'
+                  ' }'
+                  ' return "not found";'
+                  '})()') % (_js_quote(pa_sel), _js_quote(model_text))
             run_cli(["browser", session, "eval", js], timeout=15)
             time.sleep(1)
         else:
-            # 通用：直接用 selector click
-            js = ("(function(){"
-                  " var el = document.querySelector('%s');"
-                  " if(el){ el.click(); return 'clicked'; }"
-                  " return 'not found';"
-                  "})()") % pa_sel.replace("'", "\\'")
+            js = ('(function(){'
+                  ' var el = document.querySelector(%s);'
+                  ' if(el){ el.click(); return "clicked"; }'
+                  ' return "not found";'
+                  '})()') % _js_quote(pa_sel)
             run_cli(["browser", session, "eval", js], timeout=15)
             time.sleep(1)
 
     # 2. 注入提示词
     if input_method == "type":
-        focus_js = ("(function(){ var el = document.querySelector('%s');"
+        focus_js = ("(function(){ var el = document.querySelector(%s);"
                     " if(el){ el.focus(); document.execCommand('selectAll',false,null);"
-                    " document.execCommand('insertText',false,''); } return !!el; })()") % fill_selector
+                    " document.execCommand('insertText',false,''); } return !!el; })()") % _js_quote(fill_selector)
         run_cli(["browser", session, "eval", focus_js], timeout=15)
         type_res = run_cli(["browser", session, "type", fill_selector, prompt], timeout=40)
         if not type_res["ok"]:
-            # fallback js insertText
-            insert_js = ("(function(){ var el = document.querySelector('%s');"
+            insert_js = ("(function(){ var el = document.querySelector(%s);"
                          " if(!el) return false; el.focus();"
-                         " document.execCommand('insertText',false,'%s');"
-                         " return true; })()") % (fill_selector, prompt.replace("'", "\\'"))
+                         " document.execCommand('insertText',false,%s);"
+                         " return true; })()") % (_js_quote(fill_selector), _js_quote(prompt))
             run_cli(["browser", session, "eval", insert_js], timeout=15)
     elif input_method == "react_input":
-        react_js = ("(function(){ var el = document.querySelector('%s');"
+        react_js = ("(function(){ var el = document.querySelector(%s);"
                     " if(!el) return false; el.focus();"
                     " var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;"
-                    " nativeSetter.call(el, '%s');"
+                    " nativeSetter.call(el, %s);"
                     " el.dispatchEvent(new Event('input', { bubbles: true }));"
                     " el.dispatchEvent(new Event('change', { bubbles: true }));"
-                    " return true; })()") % (fill_selector, prompt.replace("'", "\\'"))
+                    " return true; })()") % (_js_quote(fill_selector), _js_quote(prompt))
         run_cli(["browser", session, "eval", react_js], timeout=20)
     elif input_method == "shadow_p_inject":
         # 穿透 Shadow DOM 找到 contenteditable 输入框，execCommand 注入
+        # 注意：execCommand('insertText') 不触发 React 合成事件，须补发 input/change
         shadow_js = (
             "(function(){"
             " function deepCE(root){"
@@ -169,20 +170,34 @@ def inject_and_generate(session: str, url: str, prompt: str, card: dict) -> bool
             " if(!ta) return false;"
             " ta.focus();"
             " document.execCommand('selectAll',false,null);"
-            " document.execCommand('insertText',false,'%s');"
+            " document.execCommand('insertText',false,%s);"
+            " ta.dispatchEvent(new Event('input',{bubbles:true}));"
+            " ta.dispatchEvent(new Event('change',{bubbles:true}));"
             " return true;"
             "})()"
-        ) % (fill_nth, prompt.replace("'", "\\'").replace("\\n", " "))
+        ) % (fill_nth, _js_quote(prompt))
         run_cli(["browser", session, "eval", shadow_js], timeout=20)
     else:
         run_cli(["browser", session, "fill", fill_selector, prompt], timeout=30)
 
     time.sleep(1)
 
-    # 基线：提交前结果区图片数量与末张 src
-    base_js = ("(function(){var imgs=Array.from(document.querySelectorAll('%s'));"
+    # 基线：提交前结果区图片数量与末张 src（穿透 Shadow DOM）
+    _DEEP_Q_JS = (
+        "function deepQSA(root,sel){"
+        " var out=Array.from(root.querySelectorAll(sel));"
+        " for(var i=0;i<root.children.length;i++){"
+        "   var c=root.children[i];"
+        "   if(c.shadowRoot){ Array.prototype.push.apply(out,deepQSA(c.shadowRoot,sel)); }"
+        " }"
+        " return out;"
+        "}"
+    )
+    safe_sel = _js_quote(selector)
+    base_js = ("(function(){%s"
+               "var imgs=deepQSA(document,%s);"
                "var last=imgs.length?imgs[imgs.length-1].src||'':'';"
-               "return JSON.stringify({n:imgs.length,s:last});})()") % selector
+               "return JSON.stringify({n:imgs.length,s:last});})()") % (_DEEP_Q_JS, safe_sel)
     base_res = run_cli(["browser", session, "eval", base_js], timeout=15)
     base_n, base_src = 0, ""
     if base_res["ok"]:
@@ -200,17 +215,21 @@ def inject_and_generate(session: str, url: str, prompt: str, card: dict) -> bool
         run_cli(["browser", session, "eval", js_click], timeout=15)
     elif isinstance(submit, str) and submit.startswith("click:"):
         sel = submit.split("click:", 1)[1]
-        js_click = ("(function(){ var el=document.querySelector('%s');"
-                    " if(el){ el.click(); return 'clicked'; } return 'not found'; })()") % sel
+        js_click = ('(function(){ var el=document.querySelector(%s);'
+                    ' if(el){ el.click(); return "clicked"; } return "not found"; })()') % _js_quote(sel)
         run_cli(["browser", session, "eval", js_click], timeout=15)
     else:
         run_cli(["browser", session, "keys", "Enter"], timeout=15)
 
-    # 4. 轮询等待「新图」出现（数量增加或末张 src 变化）
+    # 4. 轮询等待「新图」出现（数量增加或末张 src 变化，穿透 Shadow DOM）
+    poll_js_deep = ("(function(){%s"
+                    "var imgs=deepQSA(document,%s);"
+                    "return JSON.stringify({n:imgs.length,s:imgs.length?imgs[imgs.length-1].src||'':''});})()"
+                    ) % (_DEEP_Q_JS, safe_sel)
     poll_start = time.time()
     while time.time() - poll_start < timeout_s:
         time.sleep(2.5)
-        cur_res = run_cli(["browser", session, "eval", base_js], timeout=15)
+        cur_res = run_cli(["browser", session, "eval", poll_js_deep], timeout=15)
         if not cur_res["ok"]:
             continue
         cur_n, cur_src = 0, ""
@@ -249,7 +268,7 @@ def extract_image(session: str, card: dict, save_path: str) -> bool:
             "   }"
             "   return out;"
             " }"
-            " var imgs = deepQSA(document, '%s');"
+            " var imgs = deepQSA(document, %s);"
             " if (!imgs.length) return '';"
             " var img = %s;"
             " var canvas = document.createElement('canvas');"
@@ -259,7 +278,7 @@ def extract_image(session: str, card: dict, save_path: str) -> bool:
             " ctx.drawImage(img, 0, 0);"
             " return canvas.toDataURL('image/png');"
             "})()"
-        ) % (selector, "imgs[imgs.length - 1]" if prefer_last else "imgs[0]")
+        ) % (_js_quote(selector), "imgs[imgs.length - 1]" if prefer_last else "imgs[0]")
         res = run_cli(["browser", session, "eval", canvas_js], timeout=20)
         data_url = res["stdout"].strip().strip('"')
         if data_url.startswith("data:image"):
@@ -271,11 +290,11 @@ def extract_image(session: str, card: dict, save_path: str) -> bool:
 
     # 默认 img_src 直链提取
     ext_js = ("(function(){"
-              " var imgs = Array.from(document.querySelectorAll('%s'));"
+              " var imgs = Array.from(document.querySelectorAll(%s));"
               " if (!imgs.length) return '';"
               " var img = %s;"
               " return img.src || '';"
-              "})()") % (selector, "imgs[imgs.length - 1]" if prefer_last else "imgs[0]")
+              "})()") % (_js_quote(selector), "imgs[imgs.length - 1]" if prefer_last else "imgs[0]")
 
     res = run_cli(["browser", session, "eval", ext_js], timeout=15)
     img_url = res["stdout"].strip().strip('"').strip("'")

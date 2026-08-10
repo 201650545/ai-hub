@@ -1,0 +1,22 @@
+{
+  "session": "msdaily",
+  "urls": {
+    "primary": "https://www.modelscope.cn/",
+    "fallback": "https://www.modelscope.cn/aigc/models"
+  },
+  "api": {
+    "balance": "/openapi/v1/magic_cube/balance",
+    "transactions": "/openapi/v1/magic_cube/transactions?page=1&page_size=60"
+  },
+  "expectDailyRules": [
+    { "rule_key": "daily_active", "label": "每日登录", "expect": 200 },
+    { "rule_key": "aliyun_bindlogin", "label": "阿里云绑定日奖", "expect": 50 }
+  ],
+  "modelTierCost": { "lite": 0.5, "standard": 1, "ultra": 2 },
+  "waitSecondsAfterOpen": 6,
+  "retry": 2,
+  "closeTabAfterRun": true,
+  "timeZone": "Asia/Shanghai",
+  "opencliBin": "opencli",
+  "opencliEntry": ""
+}

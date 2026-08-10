@@ -1,0 +1,46 @@
+{
+  "date_cn": "2026-08-10",
+  "ran_at": "2026/08/10 08:35:42",
+  "bridge_ok": true,
+  "granted": {
+    "daily_active": {
+      "label": "每日登录",
+      "expect": 200,
+      "got": 200,
+      "ok": true,
+      "expire_at": "2026-08-11 00:05:48"
+    },
+    "aliyun_bindlogin": {
+      "label": "阿里云绑定日奖",
+      "expect": 50,
+      "got": 50,
+      "ok": true,
+      "expire_at": "2026-08-11 00:05:48"
+    }
+  },
+  "all_granted": true,
+  "balance": {
+    "user_id": "GuoYongtao",
+    "total_balance": 612,
+    "available_balance": 612,
+    "frozen_amount": 0,
+    "user_level": "basic",
+    "nearest_expiry_at": "2026-08-10 17:04:36",
+    "nearest_expiry_amount": 174
+  },
+  "recent_spend": [
+    {
+      "date": "2026-08-10",
+      "amount": 8,
+      "count": 4,
+      "tier": "ultra"
+    },
+    {
+      "date": "2026-08-09",
+      "amount": 18,
+      "count": 9,
+      "tier": "ultra"
+    }
+  ],
+  "notes": []
+}
