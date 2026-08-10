@@ -78,6 +78,8 @@ def inject_and_generate(session: str, url: str, prompt: str, card: dict) -> bool
     fill_selector = inj.get("fill_selector", "textarea")
     input_method = inj.get("input_method", "type")
     submit = inj.get("submit", "keys:Enter")
+    pre_actions = inj.get("pre_actions", []) or []
+    fill_nth = int(inj.get("fill_nth", 0) or 0)
     timeout_s = wait_cfg.get("timeout_s", 90)
     poll_js = wait_cfg.get("poll_js", "!!document.querySelector('img')")
     selector = ext_cfg.get("selector", "img")
@@ -88,6 +90,43 @@ def inject_and_generate(session: str, url: str, prompt: str, card: dict) -> bool
         time.sleep(2)
         if "chatgpt_mirror" in session or "vip" in url:
             run_cli(["browser", session, "bind"], timeout=20)
+            time.sleep(1)
+
+    # 1.5 执行 pre_actions（如 Gemini 点模型选择器 + 选模型）
+    for pa in pre_actions:
+        pa_act = pa.get("action", "")
+        pa_sel = pa.get("selector", "")
+        if not pa_sel:
+            continue
+        if pa_act == "click_model_picker":
+            # 用 eval 点击模型选择器按钮（兼容 CSS 选择器与 Playwright 定位器）
+            js = ("(function(){"
+                  " var el = document.querySelector('%s');"
+                  " if(el){ el.click(); return 'clicked'; }"
+                  " return 'not found';"
+                  "})()") % pa_sel.replace("'", "\\'")
+            run_cli(["browser", session, "eval", js], timeout=15)
+            time.sleep(1.5)
+        elif pa_act == "select_model":
+            # 根据文本内容找菜单项点击
+            model_text = pa.get("text", "3.6 Flash")
+            js = ("(function(){"
+                  " var items = document.querySelectorAll('%s');"
+                  " for(var i=0;i<items.length;i++){"
+                  "   if(items[i].innerText.includes('%s')){ items[i].click(); return 'clicked'; }"
+                  " }"
+                  " return 'not found';"
+                  "})()") % (pa_sel.replace("'", "\\'"), model_text.replace("'", "\\'"))
+            run_cli(["browser", session, "eval", js], timeout=15)
+            time.sleep(1)
+        else:
+            # 通用：直接用 selector click
+            js = ("(function(){"
+                  " var el = document.querySelector('%s');"
+                  " if(el){ el.click(); return 'clicked'; }"
+                  " return 'not found';"
+                  "})()") % pa_sel.replace("'", "\\'")
+            run_cli(["browser", session, "eval", js], timeout=15)
             time.sleep(1)
 
     # 2. 注入提示词
@@ -113,6 +152,28 @@ def inject_and_generate(session: str, url: str, prompt: str, card: dict) -> bool
                     " el.dispatchEvent(new Event('change', { bubbles: true }));"
                     " return true; })()") % (fill_selector, prompt.replace("'", "\\'"))
         run_cli(["browser", session, "eval", react_js], timeout=20)
+    elif input_method == "shadow_p_inject":
+        # 穿透 Shadow DOM 找到 contenteditable 输入框，execCommand 注入
+        shadow_js = (
+            "(function(){"
+            " function deepCE(root){"
+            "   var els = Array.from(root.querySelectorAll('[contenteditable=true]'));"
+            "   if(els.length) return els[%d];"
+            "   for(var i=0;i<root.children.length;i++){"
+            "     var c=root.children[i];"
+            "     if(c.shadowRoot){ var f=deepCE(c.shadowRoot); if(f) return f; }"
+            "   }"
+            "   return null;"
+            " }"
+            " var ta=deepCE(document);"
+            " if(!ta) return false;"
+            " ta.focus();"
+            " document.execCommand('selectAll',false,null);"
+            " document.execCommand('insertText',false,'%s');"
+            " return true;"
+            "})()"
+        ) % (fill_nth, prompt.replace("'", "\\'").replace("\\n", " "))
+        run_cli(["browser", session, "eval", shadow_js], timeout=20)
     else:
         run_cli(["browser", session, "fill", fill_selector, prompt], timeout=30)
 
@@ -136,6 +197,11 @@ def inject_and_generate(session: str, url: str, prompt: str, card: dict) -> bool
         run_cli(["browser", session, "keys", "Enter"], timeout=15)
     elif isinstance(submit, str) and submit.startswith("js_click:"):
         js_click = submit.split("js_click:", 1)[1]
+        run_cli(["browser", session, "eval", js_click], timeout=15)
+    elif isinstance(submit, str) and submit.startswith("click:"):
+        sel = submit.split("click:", 1)[1]
+        js_click = ("(function(){ var el=document.querySelector('%s');"
+                    " if(el){ el.click(); return 'clicked'; } return 'not found'; })()") % sel
         run_cli(["browser", session, "eval", js_click], timeout=15)
     else:
         run_cli(["browser", session, "keys", "Enter"], timeout=15)
@@ -172,17 +238,28 @@ def extract_image(session: str, card: dict, save_path: str) -> bool:
     prefer_last = ext_cfg.get("prefer_last", True)
 
     if method == "blob_canvas":
-        canvas_js = ("(function(){"
-                     " var imgs = Array.from(document.querySelectorAll('%s'));"
-                     " if (!imgs.length) return '';"
-                     " var img = %s;"
-                     " var canvas = document.createElement('canvas');"
-                     " canvas.width = img.naturalWidth || img.width || 512;"
-                     " canvas.height = img.naturalHeight || img.height || 512;"
-                     " var ctx = canvas.getContext('2d');"
-                     " ctx.drawImage(img, 0, 0);"
-                     " return canvas.toDataURL('image/png');"
-                     "})()") % (selector, "imgs[imgs.length - 1]" if prefer_last else "imgs[0]")
+        # 递归穿透 Shadow DOM 找图，canvas 转 dataURL（兼容 Gemini 的 <generated-image> shadow DOM）
+        canvas_js = (
+            "(function(){"
+            " function deepQSA(root, sel){"
+            "   var out = Array.from(root.querySelectorAll(sel));"
+            "   for(var i=0;i<root.children.length;i++){"
+            "     var c=root.children[i];"
+            "     if(c.shadowRoot){ Array.prototype.push.apply(out, deepQSA(c.shadowRoot, sel)); }"
+            "   }"
+            "   return out;"
+            " }"
+            " var imgs = deepQSA(document, '%s');"
+            " if (!imgs.length) return '';"
+            " var img = %s;"
+            " var canvas = document.createElement('canvas');"
+            " canvas.width = img.naturalWidth || img.width || 512;"
+            " canvas.height = img.naturalHeight || img.height || 512;"
+            " var ctx = canvas.getContext('2d');"
+            " ctx.drawImage(img, 0, 0);"
+            " return canvas.toDataURL('image/png');"
+            "})()"
+        ) % (selector, "imgs[imgs.length - 1]" if prefer_last else "imgs[0]")
         res = run_cli(["browser", session, "eval", canvas_js], timeout=20)
         data_url = res["stdout"].strip().strip('"')
         if data_url.startswith("data:image"):

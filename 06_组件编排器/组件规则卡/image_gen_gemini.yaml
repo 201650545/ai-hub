@@ -7,9 +7,10 @@ status: "✅ 实锤入库 — 2026-08-09 OpenCode 复核修正：3.6 Flash 直�
 inject:
   pre_actions:
     - action: click_model_picker
-      selector: "button[aria-label*='mode picker' i], .input-area-switch"
+      selector: "button[aria-label*='mode picker'], .input-area-switch"
     - action: select_model
-      selector: "gem-menu-item:has-text('3.6 Flash')"
+      selector: "[role=menuitemradio], [data-test-id^=bard-mode-option]"
+      text: "3.6 Flash"
   fill_selector: "rich-textarea, [contenteditable='true'], p"
   input_method: shadow_p_inject
   submit: "click:button[aria-label*='Send' i]"
@@ -17,7 +18,7 @@ wait:
   timeout_s: 90
   poll_js: "!!document.querySelector('generated-image img[alt*=\"AI generated\"], img[src^=\"blob:\"][alt*=\"AI generated\"]')"
 extract:
-  method: blob_screenshot
+  method: blob_canvas
   selector: "generated-image img[alt*='AI generated'], single-image img[alt*='AI generated']"
   prefer_last: true
 fallback:
@@ -25,4 +26,4 @@ fallback:
   - 换备用站点（doubao / zhipu）
 budget:
   max_retry: 2
-notes: 支持 3.6 Flash 模型下自动化，穿透 Shadow DOM 在 rich-textarea 注入提示词并点击 Send 提交。Flash 模型接收绘图提示词后自动调起 Imagen 生图，DOM 中产生 `<generated-image>` 元素含 blob: 图片。提取方法需处理 blob URL（截图或 canvas 提取）。
+notes: "支持 3.6 Flash 模型下自动化，穿透 Shadow DOM 在 rich-textarea 注入提示词并点击 Send 提交。Flash 模型接收绘图提示词后自动调起 Imagen 生图，DOM 中产生 `<generated-image>` 元素含 blob: 图片。提取方法需处理 blob URL（截图或 canvas 提取）。"
