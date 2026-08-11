@@ -13,6 +13,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: 安装依赖
-        run: pip install fastapi uvicorn httpx
+        run: pip install fastapi uvicorn httpx pyyaml Pillow
       - name: 全量回归（tests/run_all.py）
         run: python tests/run_all.py
