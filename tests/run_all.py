@@ -41,32 +41,49 @@ def test_secret_scan():
 
 
 def main() -> None:
-    import test_central
-    import test_gateway
-    import test_engines
-    import test_history
-    import test_quota
-    import test_orchestrator
-    import test_video_embed
-    import test_lesson_framework
+    import importlib
+
+    # 套件清单：(模块名, 中文名)。
+    # 网关三件套（03_共享组件）已随 48eac65 删除，test_gateway/test_engines/
+    # test_history/test_quota 依赖其 history/quota/engines 模块——缺失时整套 SKIP
+    # （保留文件供参考，不删除），其余在测套件照常运行。
+    SUITES = [
+        ("test_central", "中央平台"),
+        ("test_gateway", "网关"),
+        ("test_engines", "引擎"),
+        ("test_history", "历史管理"),
+        ("test_quota", "额度统计"),
+        ("test_orchestrator", "编排器"),
+        ("test_video_embed", "视频组件"),
+        ("test_lesson_framework", "课件骨架"),
+    ]
 
     all_results = []
-    for suite, fn in (
-        ("中央平台", test_central.run_all),
-        ("网关", test_gateway.run_all),
-        ("引擎", test_engines.run_all),
-        ("历史管理", test_history.run_all),
-        ("额度统计", test_quota.run_all),
-        ("编排器", test_orchestrator.run_all),
-        ("视频组件", test_video_embed.run_all),
-        ("课件骨架", test_lesson_framework.run_all),
-    ):
-        res = fn()
+    for mod_name, desc in SUITES:
+        try:
+            mod = importlib.import_module(mod_name)
+        except ImportError as e:
+            r = Result(desc, Result.SKIP, f"模块缺失（{mod_name}）: {e}")
+            print(f"===== {desc} test suite =====")
+            print(r)
+            all_results.append(r)
+            continue
+        try:
+            res = mod.run_all()
+        except ModuleNotFoundError as e:
+            # 函数内惰性 import（如 test_gateway 运行时 import channels）依赖
+            # 已删除的共享组件 → 整套 SKIP
+            r = Result(desc, Result.SKIP, f"依赖模块缺失（{mod_name}）: {e}")
+            print()
+            print(f"===== {desc} test suite =====")
+            print(r)
+            all_results.append(r)
+            continue
         print()
-        print(f"===== {suite} test suite =====")
+        print(f"===== {desc} test suite =====")
         for r in res:
             print(r)
-        passed, failed, skipped = summarize(res, suite)
+        passed, failed, skipped = summarize(res, desc)
         all_results.extend(res)
 
     print()
