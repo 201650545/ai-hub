@@ -3,6 +3,10 @@
 飞书多维表格同步模块 (task_003)
 定时将本地 JSON 数据同步到飞书多维表格：gateways / api_channels / conversations / daily_stats
 
+独占写入声明（P2-3）：本模块为 AI Hub 网关数据 4 表（gateways/api_channels/
+conversations/daily_stats）的**唯一写入方**。英语教学流水线 feishu_sync.py 写的是
+另一张飞书 Base（英语教学课程进度看板），与本模块无交集；双写分工见 TOPOLOGY.md。
+
 依赖: pip install httpx
 认证:
   - 环境变量 FEISHU_APP_ID / FEISHU_APP_SECRET
