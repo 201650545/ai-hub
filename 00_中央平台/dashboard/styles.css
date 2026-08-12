@@ -379,6 +379,21 @@ body {
     color: var(--text-dim);
 }
 
+.badge.warning {
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--amber);
+}
+
+.badge.danger {
+    background: rgba(244, 63, 94, 0.12);
+    color: var(--rose);
+}
+
+.badge.info {
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--primary);
+}
+
 .gw-name {
     font-size: 18px;
     font-weight: 700;

@@ -7,7 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
         gateways: {},
         stats: {},
         repos: [],
-        syncLogs: []
+        syncLogs: [],
+        resources: null
     };
 
     // DOM Elements
@@ -39,7 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
         gateways: { title: '网关管理', subtitle: '集中配置、心跳监控与节点运维' },
         github: { title: 'GitHub 项目', subtitle: '团队代码仓库同步与 Issue 跟踪' },
         feishu: { title: '飞书同步', subtitle: '多维表格 JSON 增量同步中心' },
-        stats: { title: '统计分析', subtitle: '全域调用量与健康度多维分析' }
+        stats: { title: '统计分析', subtitle: '全域调用量与健康度多维分析' },
+        resources: { title: '资源清单', subtitle: 'ai-resource-hub 公开数据桥 · 能力与实例清单（飞书表 → GitHub Pages → 门户）' }
     };
 
     // ---------------------------------------------------- Navigation & Tab Switching
@@ -76,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Trigger view-specific data refresh
         if (tab === 'github') fetchGitHubRepos();
         if (tab === 'stats') fetchStats();
+        if (tab === 'resources') fetchResources();
     }
 
     // ---------------------------------------------------- Toasts
@@ -285,6 +288,94 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    // ---------------------------------------------------- 资源清单（ai-resource-hub 数据桥）
+    function quotaBadge(status) {
+        const s = status || '未知';
+        if (s.includes('耗尽')) return '<span class="badge danger">' + s + '</span>';
+        if (s.includes('接近') || s.includes('偏低')) return '<span class="badge warning">' + s + '</span>';
+        if (s.includes('中等')) return '<span class="badge info">' + s + '</span>';
+        if (s.includes('充足')) return '<span class="badge online">' + s + '</span>';
+        return '<span class="badge offline">' + s + '</span>';
+    }
+    function qualityBadge(lv) {
+        const m = { T1: 'online', T2: 'warning', T3: 'offline' };
+        return '<span class="badge ' + (m[lv] || 'offline') + '">' + (lv || '-') + '</span>';
+    }
+    async function fetchResources() {
+        try {
+            const res = await fetch('/api/resources');
+            const data = await res.json();
+            if (data.ok) {
+                state.resources = data;
+                renderResources();
+            } else {
+                renderResourcesError(data.error || '数据桥不可用');
+            }
+        } catch (err) {
+            renderResourcesError('无法获取资源清单');
+        }
+    }
+    function renderResources() {
+        const d = state.resources;
+        if (!d) return;
+        const meta = d.meta || {};
+        const counts = d.counts || {};
+
+        document.getElementById('res-cap-count').innerText = counts.capabilities ?? '—';
+        document.getElementById('res-inst-count').innerText = counts.instances ?? '—';
+
+        const srcEl = document.getElementById('res-source');
+        const isRemote = d.source === 'remote';
+        srcEl.innerText = isRemote ? '线上 GitHub Pages' : '本地 public 产物';
+        srcEl.classList.toggle('text-emerald', isRemote);
+        srcEl.classList.toggle('text-rose', !isRemote);
+
+        document.getElementById('res-generated').innerText = (meta.generated_at || '').slice(0, 16) || '—';
+
+        const freshEl = document.getElementById('res-fresh');
+        if (meta.fresh === false) freshEl.innerHTML = '<span class="badge warning">数据已陈旧 (>48h)</span>';
+        else if (meta.fresh === true) freshEl.innerHTML = '<span class="badge online">数据新鲜</span>';
+        else freshEl.innerHTML = '<span class="badge offline">新鲜度未知</span>';
+
+        const capBody = document.getElementById('res-capabilities-body');
+        const caps = d.capabilities || [];
+        capBody.innerHTML = caps.length
+            ? caps.map(c => '<tr>'
+                + '<td><code>' + (c.capability_id || '') + '</code></td>'
+                + '<td><strong>' + (c['资源名称'] || '') + '</strong></td>'
+                + '<td>' + (c['类别'] || '') + '</td>'
+                + '<td>' + (c['逻辑模型'] || '') + '</td>'
+                + '<td>' + qualityBadge(c['质量等级']) + '</td>'
+                + '<td>' + (c['调用方式'] || '') + '</td>'
+                + '<td>' + (c['模型族'] || '') + '</td>'
+                + '</tr>').join('')
+            : '<tr><td colspan="7" style="text-align:center; color:#888;">暂无能力数据</td></tr>';
+
+        const instBody = document.getElementById('res-instances-body');
+        const insts = d.instances || [];
+        instBody.innerHTML = insts.length
+            ? insts.map(i => '<tr>'
+                + '<td><code>' + (i.instance_id || '') + '</code></td>'
+                + '<td><strong>' + (i['平台'] || '') + '</strong></td>'
+                + '<td>' + (i['实际模型名'] || '') + '</td>'
+                + '<td><code>' + (i['所属能力'] || '') + '</code></td>'
+                + '<td>' + (i['额度单位'] || '') + '</td>'
+                + '<td>' + (i['重置规则'] || '') + '</td>'
+                + '<td>' + quotaBadge(i['额度状态']) + '</td>'
+                + '</tr>').join('')
+            : '<tr><td colspan="7" style="text-align:center; color:#888;">暂无实例数据</td></tr>';
+    }
+    function renderResourcesError(msg) {
+        const row = '<tr><td colspan="7" style="text-align:center; color:var(--rose);">⚠️ ' + msg + '</td></tr>';
+        const capBody = document.getElementById('res-capabilities-body');
+        const instBody = document.getElementById('res-instances-body');
+        if (capBody) capBody.innerHTML = row;
+        if (instBody) instBody.innerHTML = row;
+        document.getElementById('res-source').innerText = '—';
+        document.getElementById('res-generated').innerText = '—';
+        document.getElementById('res-fresh').innerHTML = '';
+    }
+
     // ---------------------------------------------------- Actions (Global functions)
 
     window.checkHealth = async function(id) {
@@ -386,6 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchGateways();
         fetchStats();
         if (state.currentTab === 'github') fetchGitHubRepos();
+        if (state.currentTab === 'resources') fetchResources();
     };
 
     // GitHub Search Filter

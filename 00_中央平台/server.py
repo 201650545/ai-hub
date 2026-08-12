@@ -329,6 +329,11 @@ async def github_merge_pull(owner: str, repo: str, number: int, request: Request
                                                    body.get("merge_method", "merge"))
 
 
+# ---------------------------------------------------------------- 资源清单（ai-resource-hub 数据桥）
+
+import resources_bridge
+
+
 # ---------------------------------------------------------------- 飞书同步
 
 import feishu_sync
@@ -352,6 +357,14 @@ async def feishu_tables():
         "tables": cfg.get("tables", {}),
         "configured": bool(cfg.get("app_token") and cfg.get("tables", {}).get("gateways")),
     }
+
+
+# ---------------------------------------------------------------- 资源清单（ai-resource-hub 数据桥）
+
+@app.get("/api/resources")
+async def api_resources(source: str = "auto"):
+    """ai-resource-hub 公开数据桥代理：能力清单 + 实例清单（线上优先，本地回退）。"""
+    return await resources_bridge.get_resources(source)
 
 
 # ---------------------------------------------------------------- 统计

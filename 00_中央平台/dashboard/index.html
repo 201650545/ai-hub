@@ -35,6 +35,9 @@
                 <button class="nav-item" data-tab="stats">
                     <span class="icon">📊</span> 统计分析
                 </button>
+                <button class="nav-item" data-tab="resources">
+                    <span class="icon">🗂️</span> 资源清单
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -192,6 +195,90 @@
                                 <strong class="text-emerald">99.2%</strong>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 6: 资源清单页（ai-resource-hub 公开数据桥） -->
+            <section class="tab-page" id="tab-resources">
+                <div class="stats-banner">
+                    <div class="stat-card">
+                        <div class="stat-icon">🧩</div>
+                        <div class="stat-body">
+                            <span class="stat-label">能力数</span>
+                            <span class="stat-value" id="res-cap-count">—</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon emerald">🗂️</div>
+                        <div class="stat-body">
+                            <span class="stat-label">实例数</span>
+                            <span class="stat-value text-emerald" id="res-inst-count">—</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📡</div>
+                        <div class="stat-body">
+                            <span class="stat-label">数据源</span>
+                            <span class="stat-value" id="res-source">—</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🕒</div>
+                        <div class="stat-body">
+                            <span class="stat-label">生成时间</span>
+                            <span class="stat-value" id="res-generated">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3>资源能力规格表</h3>
+                        <span class="table-subtitle">能力规格白名单 <span id="res-fresh"></span></span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>能力 ID</th>
+                                    <th>资源名称</th>
+                                    <th>类别</th>
+                                    <th>逻辑模型</th>
+                                    <th>质量等级</th>
+                                    <th>调用方式</th>
+                                    <th>模型族</th>
+                                </tr>
+                            </thead>
+                            <tbody id="res-capabilities-body">
+                                <tr><td colspan="7" style="text-align:center; color:#888;">加载中…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3>资源实例表</h3>
+                        <span class="table-subtitle">实例状态与额度（区间模糊化，不公开精确额度）</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>实例 ID</th>
+                                    <th>平台</th>
+                                    <th>实际模型名</th>
+                                    <th>所属能力</th>
+                                    <th>额度单位</th>
+                                    <th>重置规则</th>
+                                    <th>额度状态</th>
+                                </tr>
+                            </thead>
+                            <tbody id="res-instances-body">
+                                <tr><td colspan="7" style="text-align:center; color:#888;">加载中…</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </section>
