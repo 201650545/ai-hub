@@ -313,6 +313,27 @@ body {
     margin-bottom: 20px;
 }
 
+/* 资源清单元信息条（build_id / 桥版本 / 抓取时间 / 缓存状态） */
+.meta-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 28px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
+.meta-item code {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--text-main);
+}
+
 .section-title h3 {
     font-size: 18px;
     font-weight: 600;

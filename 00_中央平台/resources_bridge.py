@@ -11,7 +11,8 @@ ai-resource-hub 公开数据桥代理（子项目①雏形）
 回退策略: 全有或全无——3 个文件（index/capabilities/instances）任一拉取失败，
 即整体回退本地，避免混搭不同 build_id 的 index 与 capabilities。
 
-缓存: 进程内模块级 TTL 缓存（300s），dashbboard 反复切 Tab/点刷新不打爆 GitHub Pages。
+缓存: 进程内模块级 TTL（remote 成功 300s / local 回退 60s）+ single-flight 防击穿；
+命中缓存时 fresh 按当前时刻重算，不随缓存固化。Dashboard 反复切 Tab/点刷新不打爆 GitHub Pages。
 雏形只做「读」，不做任何写；数据桥公开产物无凭证。
 
 依赖: pip install httpx
@@ -28,9 +29,11 @@ import httpx
 REMOTE_BASE = "https://201650545.github.io/ai-resource-hub"
 FILES = ["index.json", "capabilities.json", "instances.json"]
 LOCAL_DIR = Path(__file__).parent.parent / "ai-resource-hub" / "public"  # D:\项目\ai-resource-hub\public
-CACHE_TTL = 300  # 秒
+CACHE_TTL = 300  # 秒 —— 远程成功缓存
+CACHE_TTL_LOCAL = 60  # 秒 —— 本地回退短缓存（防故障期反复打远端）
 
-_CACHE = {"ts": 0.0, "data": None}
+_CACHE = {"ts": 0.0, "data": None, "ttl": CACHE_TTL}
+_CACHE_LOCK = asyncio.Lock()  # single-flight：并发 auto 请求只拉一次远端
 
 
 def _load_local():
@@ -85,32 +88,42 @@ async def _fetch_remote():
         return {"index.json": index_a, "capabilities.json": caps, "instances.json": insts}
 
 
-def _is_fresh(index):
-    """由 generated_at 对照 stale_after_hours 判断新鲜度；解析失败返回 None（前端显示未知）。"""
+def _recompute_fresh(meta):
+    """由 meta 的 generated_at/stale_after_hours 按当前时刻重算 fresh。
+
+    无时区 / 未来时间（机器时钟错误）/ 解析失败 → 返回 None（前端显示未知）。
+    """
     try:
-        gen = datetime.fromisoformat(index.get("generated_at", ""))
-        hours = float(index.get("freshness", {}).get("stale_after_hours", 48))
+        gen = datetime.fromisoformat(meta.get("generated_at", ""))
+        if gen.tzinfo is None:
+            return None  # 无时区无法正确换算，按未知处理
         age = (datetime.now(timezone.utc) - gen.astimezone(timezone.utc)).total_seconds()
+        if age < 0:
+            return None  # 未来时间（时钟错误）→ 未知
+        hours = float(meta.get("stale_after_hours") or 48)
         return age <= hours * 3600  # True=新鲜 False=已陈旧 None=未知
     except Exception:  # noqa: BLE001
         return None
 
 
-def _aggregate(index, caps, insts, source):
+def _aggregate(index, caps, insts, source, fallback=False):
+    meta = {
+        "site": index.get("site", ""),
+        "repo": index.get("repo", ""),
+        "bridge_version": index.get("bridge_version"),
+        "build_id": index.get("build_id"),
+        "generated_at": index.get("generated_at", ""),
+        "stale_after_hours": index.get("freshness", {}).get("stale_after_hours"),
+        "note": index.get("note", ""),
+    }
+    meta["fresh"] = _recompute_fresh(meta)  # 构建时按当前时刻重算，不缓存死
     return {
         "ok": True,
         "source": source,  # "remote" | "local"
         "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "meta": {
-            "site": index.get("site", ""),
-            "repo": index.get("repo", ""),
-            "bridge_version": index.get("bridge_version"),
-            "build_id": index.get("build_id"),
-            "generated_at": index.get("generated_at", ""),
-            "stale_after_hours": index.get("freshness", {}).get("stale_after_hours"),
-            "fresh": _is_fresh(index),  # True=新鲜 False=已陈旧 None=未知
-            "note": index.get("note", ""),
-        },
+        "cache_hit": False,
+        "fallback": fallback,
+        "meta": meta,
         "counts": {"capabilities": len(caps or []), "instances": len(insts or [])},
         "capabilities": caps or [],
         "instances": insts or [],
@@ -121,8 +134,9 @@ async def get_resources(source="auto"):
     """返回聚合后的资源清单。
 
     source:
-      - auto   （默认）线上优先 + 300s 缓存，线上不可用回退本地
-      - remote （强制线上，不走缓存；验证/切换钩子）
+      - auto   （默认）线上优先；remote 成功缓存 300s、local 回退缓存 60s；
+               single-flight 防并发重复拉取；命中缓存时 fresh 按当前时刻重算
+      - remote （强制线上，绕过缓存；验证/切换钩子）
       - local  （强制本地；验证回退路径）
     """
     if source == "remote":
@@ -134,21 +148,27 @@ async def get_resources(source="auto"):
     if source == "local":
         files = _load_local()
         if _validate_files(files):
-            return _aggregate(files["index.json"], files["capabilities.json"], files["instances.json"], "local")
+            return _aggregate(files["index.json"], files["capabilities.json"], files["instances.json"], "local", fallback=True)
         return {"ok": False, "error": "本地 public 产物缺失或结构异常", "source": "local"}
 
-    # auto
-    if _CACHE["data"] and time.time() - _CACHE["ts"] < CACHE_TTL:
-        return _CACHE["data"]
+    # auto：single-flight + 双检缓存
+    async with _CACHE_LOCK:
+        if _CACHE["data"] and time.time() - _CACHE["ts"] < _CACHE["ttl"]:
+            data = _CACHE["data"]
+            data["meta"]["fresh"] = _recompute_fresh(data["meta"])  # 不缓存死 fresh
+            data["cache_hit"] = True
+            return data
 
-    files = await _fetch_remote()
-    if _validate_files(files):
-        data = _aggregate(files["index.json"], files["capabilities.json"], files["instances.json"], "remote")
-        _CACHE["ts"], _CACHE["data"] = time.time(), data
-        return data
+        files = await _fetch_remote()
+        if _validate_files(files):
+            data = _aggregate(files["index.json"], files["capabilities.json"], files["instances.json"], "remote")
+            _CACHE["ts"], _CACHE["data"], _CACHE["ttl"] = time.time(), data, CACHE_TTL
+            return data
 
-    # 原子回退本地
-    files = _load_local()
-    if _validate_files(files):
-        return _aggregate(files["index.json"], files["capabilities.json"], files["instances.json"], "local")
-    return {"ok": False, "error": "远程与本地数据桥均不可用", "source": "auto"}
+        # 原子回退本地（短缓存）
+        files = _load_local()
+        if _validate_files(files):
+            data = _aggregate(files["index.json"], files["capabilities.json"], files["instances.json"], "local", fallback=True)
+            _CACHE["ts"], _CACHE["data"], _CACHE["ttl"] = time.time(), data, CACHE_TTL_LOCAL
+            return data
+        return {"ok": False, "error": "远程与本地数据桥均不可用", "source": "auto"}

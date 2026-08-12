@@ -368,12 +368,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('res-generated').innerText = (meta.generated_at || '').slice(0, 16) || '—';
 
+        // 元信息条：build_id / 桥版本 / 抓取时间 / 缓存命中（验证链路的"证明值"）
+        document.getElementById('res-build-id').innerText = meta.build_id || '—';
+        document.getElementById('res-bridge-version').innerText = meta.bridge_version ?? '—';
+        document.getElementById('res-fetched-at').innerText = (d.fetched_at || '—').slice(0, 19).replace('T', ' ');
+        const cacheEl = document.getElementById('res-cache-hit');
+        cacheEl.innerText = d.cache_hit ? '命中' : '未命中';
+        cacheEl.className = d.cache_hit ? 'text-emerald' : 'text-rose';
+
         // 陈旧阈值由桥端 stale_after_hours 决定，前端不再硬编码 48h
         const freshEl = document.getElementById('res-fresh');
         freshEl.innerHTML = '';
         if (meta.fresh === false) freshEl.appendChild(makeBadge('数据已陈旧 (>' + (meta.stale_after_hours ?? 48) + 'h)', 'warning'));
         else if (meta.fresh === true) freshEl.appendChild(makeBadge('数据新鲜', 'online'));
         else freshEl.appendChild(makeBadge('新鲜度未知', 'offline'));
+
+        // 本地回退：黄标而非红色"故障"——数据仍可用，只是来自本地副本
+        if (d.fallback) {
+            freshEl.appendChild(makeBadge('本地回退', 'warning'));
+        }
 
         const capBody = document.getElementById('res-capabilities-body');
         const instBody = document.getElementById('res-instances-body');
@@ -425,6 +438,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('res-source').innerText = '—';
         document.getElementById('res-generated').innerText = '—';
         document.getElementById('res-fresh').innerHTML = '';
+        document.getElementById('res-build-id').innerText = '—';
+        document.getElementById('res-bridge-version').innerText = '—';
+        document.getElementById('res-fetched-at').innerText = '—';
+        const cacheEl = document.getElementById('res-cache-hit');
+        if (cacheEl) { cacheEl.innerText = '—'; cacheEl.className = ''; }
     }
 
     // ---------------------------------------------------- Actions (Global functions)

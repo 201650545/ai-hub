@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Literal
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
@@ -362,8 +363,11 @@ async def feishu_tables():
 # ---------------------------------------------------------------- 资源清单（ai-resource-hub 数据桥）
 
 @app.get("/api/resources")
-async def api_resources(source: str = "auto"):
-    """ai-resource-hub 公开数据桥代理：能力清单 + 实例清单（线上优先，本地回退）。"""
+async def api_resources(source: Literal["auto", "remote", "local"] = "auto"):
+    """ai-resource-hub 公开数据桥代理：能力清单 + 实例清单（线上优先，本地回退）。
+
+    source 已收紧为枚举：拼写错误返回 422，不再静默落进 auto 造成"看似成功、实际测错路径"。
+    """
     return await resources_bridge.get_resources(source)
 
 
