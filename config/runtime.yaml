@@ -1,0 +1,62 @@
+# ============================================================
+# AI Hub 运行时拓扑 — Desired State（唯一静态真源）
+# 运行程序（runtime/cli.py）只读此文件，绝不修改。
+# 动态状态（PID/status/started_at）见 data/runtime/state.json
+# 修改服务时：改这里 → 重启服务。
+# 新服务：加一段 services.<name>，改 schema_version。
+# ============================================================
+schema_version: "1.0"
+
+project:
+  name: ai-hub
+  description: AI Hub 三服务聚合平台（中央平台 / 搜索网关 / 组件编排器）
+  repo: https://github.com/201650545/ai-hub
+  python: python            # 可换 .venv\Scripts\python.exe
+
+runtime:
+  pid_dir: data/runtime/pids      # 相对仓库根
+  state_file: data/runtime/state.json
+  log_dir: logs
+
+services:
+  central:
+    label: 中央平台
+    cwd: services/central
+    command: server.py
+    host: 127.0.0.1
+    port: 8000
+    url: http://localhost:8000
+    health:
+      path: /api/stats
+      ok: 200
+    startup:
+      order: 1
+      depends_on: []
+
+  search_gateway:
+    label: 搜索网关
+    cwd: services/search_gateway
+    command: unified_gateway.py
+    host: 127.0.0.1
+    port: 3000
+    url: http://localhost:3000
+    health:
+      path: /health
+      ok: 200
+    startup:
+      order: 2
+      depends_on: []
+
+  orchestrator:
+    label: 组件编排器
+    cwd: services/orchestrator
+    command: canvas_server.py
+    host: 127.0.0.1
+    port: 8791
+    url: http://localhost:8791
+    health:
+      path: /health
+      ok: 200
+    startup:
+      order: 3
+      depends_on: []
