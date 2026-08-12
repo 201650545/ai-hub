@@ -1,0 +1,23 @@
+component: image_gen
+site: 哩布哩布 Liblib AI
+session: liblib_image
+url: https://www.liblib.art/
+style_lock: "flat cartoon, children's textbook illustration, bright colors"
+inject:
+  fill_selector: "textarea, input"
+  fill_nth: 0
+  input_method: type
+  submit: "keys:Enter"
+wait:
+  timeout_s: 60
+  poll_js: "(function(){ var imgs=Array.from(document.querySelectorAll('img')); return imgs.length > 2; })()"
+extract:
+  method: img_src
+  selector: "img"
+  prefer_last: true
+fallback:
+  - 换提示词重试
+  - 换备用站点（doubao / zhipu / chatgpt_mirror）
+budget:
+  max_retry: 2
+notes: 适合生成高品质插画与二次元风格图片。

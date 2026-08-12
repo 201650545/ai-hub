@@ -1,0 +1,21 @@
+component: image_gen
+site: 通义千问
+session: qianwen_image
+url: https://www.qianwen.com/
+style_lock: "flat cartoon, 儿童教材插画风, 明亮色调"
+inject:
+  fill_selector: "textarea, [contenteditable=true]"
+  submit: "enter:true"
+wait:
+  timeout_s: 90
+  poll_js: "!!document.querySelector('img[class*=image], img[src*=aliyuncs]')"
+extract:
+  method: img_src
+  selector: "img[class*=image], img[src*=aliyuncs]"
+  prefer_last: true
+fallback:
+  - 换提示词重试
+  - 换备用站点（doubao / chatgpt_mirror）
+budget:
+  max_retry: 2
+notes: 通义千问有生图额度限制，适合作为备用站点；生图入口可能需先切换至图像模式，勘探时确认。

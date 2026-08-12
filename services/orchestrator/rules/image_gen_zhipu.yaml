@@ -1,0 +1,24 @@
+component: image_gen
+site: 智谱清言 AI
+session: zhipu_image
+url: https://chatglm.cn/
+style_lock: "flat cartoon, 儿童教材插画风, 明亮色调"
+status: "✅ 已实测 — 2026-08-09 OpenCode：AI画图工具页全链路出图，真实样例 zhipu_pro.png (1024x1024)"
+inject:
+  fill_selector: "textarea"
+  fill_nth: 0
+  input_method: type
+  submit: "keys:Enter"
+wait:
+  timeout_s: 60
+  poll_js: "!!document.querySelector('.answer-content-wrap img[src*=testpath]')"
+extract:
+  method: img_src
+  selector: ".answer-content-wrap img[src*=testpath]"
+  prefer_last: true
+fallback:
+  - 换提示词重试（去敏感词）
+  - 换备用站点（doubao / chatgpt_mirror / liblib）
+budget:
+  max_retry: 2
+notes: 2026-08-09 实测修正：入口经侧栏「AI画图」进入 gdetail 工具页（SPA），输入区为 textarea；Enter 提交后生成结果在 .answer-content-wrap img[src*=testpath]，直链提取稳定。注意首页 .card 为推荐卡片非生成结果。

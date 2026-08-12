@@ -43,6 +43,7 @@ config/github.json
 
 # 调试脚本隔离区（不入库）
 06_组件编排器/_debug_quarantine/
+services/orchestrator/_debug_quarantine/
 
 # modelscope-daily 运行日志（不入库，P2-2）
 modelscope-daily/logs/
