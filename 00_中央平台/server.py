@@ -367,8 +367,13 @@ async def api_resources(source: Literal["auto", "remote", "local"] = "auto"):
     """ai-resource-hub 公开数据桥代理：能力清单 + 实例清单（线上优先，本地回退）。
 
     source 已收紧为枚举：拼写错误返回 422，不再静默落进 auto 造成"看似成功、实际测错路径"。
+    失败状态码：remote 上游不可用 → 502；local 缺失 / 双失败 → 503。
     """
-    return await resources_bridge.get_resources(source)
+    data = await resources_bridge.get_resources(source)
+    if not data.get("ok"):
+        status = 502 if data.get("source") == "remote" else 503
+        raise HTTPException(status, data.get("error", "数据桥不可用"))
+    return data
 
 
 # ---------------------------------------------------------------- 统计

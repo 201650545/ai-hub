@@ -154,8 +154,11 @@ async def get_resources(source="auto"):
     # auto：single-flight + 双检缓存
     async with _CACHE_LOCK:
         if _CACHE["data"] and time.time() - _CACHE["ts"] < _CACHE["ttl"]:
-            data = _CACHE["data"]
-            data["meta"]["fresh"] = _recompute_fresh(data["meta"])  # 不缓存死 fresh
+            # 返回浅拷贝：fresh 按当前时刻重算、cache_hit 标记，但不能原地改缓存对象
+            # （否则前一次请求已返回的同一 dict 会被后续命中请求污染）
+            data = dict(_CACHE["data"])
+            data["meta"] = dict(_CACHE["data"]["meta"])
+            data["meta"]["fresh"] = _recompute_fresh(data["meta"])
             data["cache_hit"] = True
             return data
 

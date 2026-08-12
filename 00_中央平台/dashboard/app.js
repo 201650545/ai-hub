@@ -340,12 +340,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchResources() {
         try {
             const res = await fetch('/api/resources');
-            const data = await res.json();
-            if (data.ok) {
+            const data = await res.json().catch(() => null);
+            if (res.ok && data && data.ok) {
                 state.resources = data;
                 renderResources();
             } else {
-                renderResourcesError(data.error || '数据桥不可用');
+                renderResourcesError((data && (data.detail || data.error)) || '数据桥不可用');
             }
         } catch (err) {
             renderResourcesError('无法获取资源清单');
