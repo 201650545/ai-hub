@@ -38,7 +38,7 @@ import engines
 PORT = int(os.environ.get("GATEWAY_PORT", "3000"))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 数据与代码分离：运行数据统一在 仓库根/data/search_gateway/
-DATA_DIR = os.path.join(os.path.dirname(BASE_DIR), "data", "search_gateway")
+DATA_DIR = os.path.normpath(os.path.join(os.path.dirname(BASE_DIR), "..", "data", "search_gateway"))
 HISTORY_FILE = Path(DATA_DIR) / "history.json"
 
 try:  # task_010：对话历史持久化模块（03_共享组件），缺失时降级

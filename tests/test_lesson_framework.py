@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-ORCH_DIR = os.path.normpath(os.path.join(BASE, "..", "06_组件编排器"))
+ORCH_DIR = os.path.normpath(os.path.join(BASE, "..", "services", "orchestrator"))
 for p in (BASE, ORCH_DIR):
     if os.path.isdir(p):
         sys.path.insert(0, p)
@@ -105,7 +105,7 @@ def test_full_phase12_integration():
         def run(self, slot, rule_card_path):
             return {"ok": True, "asset": '<div class="video-slot"><iframe src="//player.bilibili.com/player.html?bvid=BV1sVW6GcEkw"></iframe></div>', "error": ""}
 
-    card = str(Path(ORCH_DIR, "组件规则卡"))
+    card = str(Path(ORCH_DIR, "rules"))
     reg = {"image_gen": {"component": MockImg(), "rule_card": str(Path(card, "image_gen_doubao.yaml"))},
            "video_embed": {"component": MockVid(), "rule_card": str(Path(card, "video_embed_bilibili.yaml"))}}
     orch = Orchestrator(ldir, autonomy="L1", component_registry=reg)

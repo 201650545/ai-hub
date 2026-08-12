@@ -57,3 +57,7 @@ logs/
 runtime/__pycache__/
 services/*/__pycache__/
 
+# 独立仓库的本地副本（各有自己的 GitHub 仓库，不并入 ai-hub）
+ai-resource-hub/
+feishu-data-hub/
+

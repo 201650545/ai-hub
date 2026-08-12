@@ -23,8 +23,15 @@ import urllib.request
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 数据与代码分离：渠道配置统一在 仓库根/data/search_gateway/
-DATA_DIR = os.path.join(os.path.dirname(BASE_DIR), "data", "search_gateway")
+DATA_DIR = os.path.normpath(os.path.join(os.path.dirname(BASE_DIR), "..", "data", "search_gateway"))
 CHANNELS_JSON = os.path.join(DATA_DIR, "channels.json")
+
+# 本地额度统计（task_011）：调用成功后记录 quota.json，缺失时降级不记录
+GATEWAY_ID = os.environ.get("GATEWAY_ID", "ds_v4_cli")
+try:
+    from quota import record_call as _record_call  # noqa: F401
+except Exception:  # noqa: BLE001
+    _record_call = None
 
 # ---------------------------------------------------------------- 渠道注册表
 
@@ -343,8 +350,128 @@ def warm_start():
 
 # ---------------------------------------------------------------- 转发
 
+def _parse_trailing_json(data):
+    """容忍 chunked 编码尾部多余的十六进制长度/CRLF，返回最后一个完整 JSON 对象。"""
+    text = data.decode("utf-8", "ignore")
+    depth = 0
+    start = None
+    last_obj = None
+    in_str = False
+    esc = False
+    for i, ch in enumerate(text):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch in "{[":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch in "}]":
+            depth -= 1
+            if depth == 0 and start is not None:
+                candidate = text[start:i + 1]
+                try:
+                    last_obj = json.loads(candidate)
+                except Exception:  # noqa: BLE001
+                    last_obj = None
+    return last_obj
+
+
+def _sse_usage(text):
+    """从 SSE 流文本中提取末尾 usage 的 prompt_tokens/completion_tokens。"""
+    import re
+    pat = re.compile(r'"usage"\s*:\s*\{[^}]*\}')
+    matches = pat.findall(text)
+    if not matches:
+        return 0, 0
+    usage = matches[-1]
+    pt = re.search(r'"prompt_tokens"\s*:\s*(\d+)', usage)
+    ct = re.search(r'"completion_tokens"\s*:\s*(\d+)', usage)
+    return (int(pt.group(1)) if pt else 0), (int(ct.group(1)) if ct else 0)
+
+
+class _QuotaResponse:
+    """包装 urllib response：响应成功时记录本地额度（task_011）。接口与 urllib response 兼容。"""
+
+    def __init__(self, channel_id, model, is_stream, upstream):
+        self._channel = channel_id
+        self._model = model
+        self._is_stream = is_stream
+        self._up = upstream
+        self._recorded = False
+        self._stream_buf = bytearray()
+
+    def _record(self, success, input_tokens=0, output_tokens=0):
+        if self._recorded:
+            return
+        self._recorded = True
+        if _record_call is not None:
+            try:
+                _record_call(GATEWAY_ID, self._channel, self._model,
+                             input_tokens=input_tokens, output_tokens=output_tokens,
+                             success=success)
+            except Exception:  # noqa: BLE001
+                pass
+
+    def getheader(self, name, default=None):
+        return self._up.getheader(name, default)
+
+    def read(self, size=-1):
+        if self._is_stream:
+            chunk = self._up.read(size)
+            if chunk:
+                self._stream_buf.extend(chunk)
+                return chunk
+            self._finalize_stream()
+            return b""
+        # 非流式：读取全量（http.client 会自动剥离 chunked 终止符），解析 usage 后记录
+        data = self._up.read() if size < 0 else self._up.read(size)
+        if not data:
+            return b""
+        self._finalize_json(data)
+        return data
+
+    def read1(self, size=-1):
+        return self.read(size)
+
+    def _finalize_json(self, data):
+        try:
+            obj = _parse_trailing_json(data)
+            if obj is None:
+                self._record(False)
+                return
+            usage = obj.get("usage", {}) or {}
+            self._record(True,
+                         input_tokens=usage.get("prompt_tokens", 0),
+                         output_tokens=usage.get("completion_tokens", 0))
+        except Exception:  # noqa: BLE001
+            self._record(False)
+
+    def _finalize_stream(self):
+        # 从 SSE 尾部尝试解析 usage（尽力而为）
+        try:
+            text = bytes(self._stream_buf).decode("utf-8", "ignore")
+            data = _sse_usage(text)
+            self._record(True, input_tokens=data[0], output_tokens=data[1])
+        except Exception:  # noqa: BLE001
+            self._record(True)
+
+    def close(self):
+        try:
+            self._up.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def chat_completion(channel_id, payload):
-    """转发 chat/completions 到指定渠道。返回 urllib response（流式/非流式透传）。"""
+    """转发 chat/completions 到指定渠道。返回 _QuotaResponse（urllib 兼容 + 记录额度）。"""
     ch = CHANNELS[channel_id]
     key = get_key(channel_id)
     if not key:
@@ -364,7 +491,9 @@ def chat_completion(channel_id, payload):
     url = ch["base_url"].rstrip("/") + "/chat/completions"
     req = urllib.request.Request(url, data=json.dumps(req_payload).encode("utf-8"),
                                  headers=headers, method="POST")
-    return urllib.request.urlopen(req, timeout=120)
+    resp = urllib.request.urlopen(req, timeout=120)
+    model = req_payload.get("model") or ch.get("default_model", "")
+    return _QuotaResponse(channel_id, model, req_payload.get("stream"), resp)
 
 
 def model_to_chain(model):

@@ -8,7 +8,7 @@ import sys
 import os
 
 GATEWAY_DIR = os.path.normpath(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "..", "02_网关实例", "ds_v4_cli"))
+    os.path.dirname(os.path.abspath(__file__)), "..", "services", "search_gateway"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from common import Result, http_get, check_service, summarize  # noqa: E402

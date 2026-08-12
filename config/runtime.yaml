@@ -50,7 +50,7 @@ services:
   orchestrator:
     label: 组件编排器
     cwd: services/orchestrator
-    command: canvas_server.py
+    command: canvas_server.py --serve-only
     host: 127.0.0.1
     port: 8791
     url: http://localhost:8791

@@ -14,7 +14,7 @@ import urllib.request
 import common
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-SHARED = os.path.normpath(os.path.join(BASE, "..", "03_共享组件"))
+SHARED = os.path.normpath(os.path.join(BASE, "..", "services", "search_gateway"))
 sys.path.insert(0, SHARED)
 sys.path.insert(0, BASE)
 
@@ -25,7 +25,7 @@ GW = "ds_v4_cli"
 
 def _cleanup(channels):
     d = datetime.date.today().isoformat()
-    path = os.path.join(SHARED, "..", "02_网关实例", GW, "quota.json")
+    path = os.path.join(BASE, "..", "data", "search_gateway", GW, "quota.json")
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -95,7 +95,7 @@ def test_endpoint():
 
 def test_channel_integration():
     """真实渠道调用后 quota.json 累计 calls + usage。无可用 key 时 SKIP。"""
-    gate = os.path.normpath(os.path.join(BASE, "..", "02_网关实例", "ds_v4_cli"))
+    gate = os.path.normpath(os.path.join(BASE, "..", "services", "search_gateway"))
     try:
         sys.path.insert(0, gate)
         import channels

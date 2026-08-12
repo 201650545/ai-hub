@@ -264,7 +264,9 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="启动后打开 http://127.0.0.1:<port>/ 观看画布直播。",
     )
-    ap.add_argument("--topic", "-t", required=True, help="课程主题")
+    ap.add_argument("--topic", "-t", default="", help="课程主题")
+    ap.add_argument("--serve-only", action="store_true",
+                    help="只起画布服务不跑 pipeline（runtime 常驻模式）")
     ap.add_argument("--lesson", "-l", default="", help="课时号，如 L27；缺省自动生成")
     ap.add_argument("--style", "-s", default="flat cartoon, 儿童教材插画风, 明亮色调",
                     help="图片风格锁")
@@ -276,6 +278,9 @@ def main() -> None:
     ap.add_argument("--port", "-p", type=int, default=DEFAULT_PORT)
     args = ap.parse_args()
 
+    if not args.topic and not args.serve_only:
+        ap.error("--topic 必填（或使用 --serve-only 只起画布服务）")
+
     lid = args.lesson.strip() or f"L{datetime.now().strftime('%Y%m%d%H%M%S')}"
     # 产物默认输出到 仓库根/data/orchestrator/（数据与代码分离；--dir 可指定）
     _DATA_DIR = _THIS_DIR.parent.parent / "data" / "orchestrator"
@@ -286,15 +291,16 @@ def main() -> None:
     server = CanvasHTTPServer(("127.0.0.1", args.port), lesson_dir, hub)
     print(f"🎬 画布观察窗直播：http://127.0.0.1:{args.port}/")
     print(f"   课时目录：{lesson_dir}")
-    print(f"   主题：{args.topic} | 档位：{args.autonomy} | 规则卡：{args.card}")
+    print(f"   主题：{args.topic or '(serve-only)'} | 档位：{args.autonomy} | 规则卡：{args.card}")
     print("   画布页面先打开会显示空白，pipeline 事件到达后自动渲染。")
 
-    threading.Thread(
-        target=run_pipeline_live,
-        args=(args.topic, lesson_dir, lid, args.style, args.autonomy,
-              args.card, hub, server),
-        daemon=True,
-    ).start()
+    if not args.serve_only:
+        threading.Thread(
+            target=run_pipeline_live,
+            args=(args.topic, lesson_dir, lid, args.style, args.autonomy,
+                  args.card, hub, server),
+            daemon=True,
+        ).start()
 
     try:
         server.serve_forever()

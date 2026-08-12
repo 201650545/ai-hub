@@ -9,7 +9,7 @@ import os
 import sys
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-GATEWAY_DIR = os.path.normpath(os.path.join(BASE, "..", "02_网关实例", "ds_v4_cli"))
+GATEWAY_DIR = os.path.normpath(os.path.join(BASE, "..", "services", "search_gateway"))
 sys.path.insert(0, BASE)
 if os.path.isdir(GATEWAY_DIR):
     sys.path.insert(0, GATEWAY_DIR)
@@ -50,15 +50,15 @@ def test_engine_config_wiring(engines):
         db = engines.ENGINES["doubao"]
         checks.append(("豆包 type 原生键入", db.get("input_method") == "type",
                        f"method={db.get('input_method')}"))
-        checks.append(("豆包温和提交", db.get("gentle_submit") is True,
-                       f"gentle={db.get('gentle_submit')}"))
+        checks.append(("豆包 js_click 提交", bool(db.get("submit", {}).get("js_click")),
+                       f"submit_js={bool(db.get('submit', {}).get('js_click'))}"))
         qw = engines.ENGINES["qianwen"]
-        checks.append(("通义专用提取器", qw["extract_js"] is engines.QIANWEN_EXTRACT_JS,
-                       f"extract={qw['extract_js'] is engines.QIANWEN_EXTRACT_JS}"))
-        checks.append(("通义 type 原生键入", qw.get("input_method") == "type",
-                       f"method={qw.get('input_method')}"))
-        checks.append(("通义 enter+发送按钮提交", bool(qw.get("submit", {}).get("enter")) and bool(qw.get("submit", {}).get("click")),
-                       f"submit={qw.get('submit', {}).get('click')}"))
+        checks.append(("通义提取器", qw["extract_js"] is getattr(engines, "GENERIC_EXTRACT_JS", None),
+                       f"extract={qw['extract_js'] is getattr(engines, 'GENERIC_EXTRACT_JS', None)}"))
+        checks.append(("通义 enter 提交", bool(qw.get("submit", {}).get("enter")),
+                       f"submit={bool(qw.get('submit', {}).get('enter'))}"))
+        checks.append(("通义输入选择器", bool(qw.get("fill_selector")),
+                       f"selector={bool(qw.get('fill_selector'))}"))
 
         for name, ok, info in checks:
             if not ok:
@@ -70,7 +70,10 @@ def test_engine_config_wiring(engines):
 
 
 def test_a2a_auto_conversation(engines):
-    """start_conversation 无参时返回自动生成的 conversation_id。"""
+    """start_conversation 无参时返回自动生成的 conversation_id（旧版会话 API）。"""
+    if not hasattr(engines, "start_conversation"):
+        return Result("引擎会话自动生成", Result.SKIP,
+                      "当前引擎为 ask_engine 一次性问答（会话由 history.py 管理），无会话 API")
     try:
         cid = engines.start_conversation("kimi")
         ok = isinstance(cid, str) and cid.startswith("conv_")
@@ -84,6 +87,9 @@ def test_a2a_auto_conversation(engines):
 
 def test_multi_turn(engines, eid):
     """连接引擎上的多轮：start→ask→history→end。"""
+    if not hasattr(engines, "start_conversation"):
+        return Result("引擎多轮对话", Result.SKIP,
+                      "当前引擎为 ask_engine 一次性问答，无会话 API")
     cid = None
     try:
         cid = engines.start_conversation(eid)

@@ -12,14 +12,14 @@ import tempfile
 from pathlib import Path
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-ORCH_DIR = os.path.normpath(os.path.join(BASE, "..", "06_组件编排器"))
+ORCH_DIR = os.path.normpath(os.path.join(BASE, "..", "services", "orchestrator"))
 sys.path.insert(0, BASE)
 if os.path.isdir(ORCH_DIR):
     sys.path.insert(0, ORCH_DIR)
 
 from common import Result, summarize  # noqa: E402
 
-RULE_CARD = str(Path(ORCH_DIR, "组件规则卡", "video_embed_bilibili.yaml"))
+RULE_CARD = str(Path(ORCH_DIR, "rules", "video_embed_bilibili.yaml"))
 KNOWN_GOOD_BV = "BV12J41137hp"     # 儿童教学儿歌，可公开访问
 KNOWN_BAD_BV = "BV0000000001"      # 伪造 BV
 

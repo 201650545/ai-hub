@@ -37,7 +37,7 @@ MAX_FILE_BYTES = 10 * 1024 * 1024  # 10MB
 def _gateway_dir(gateway_id):
     """定位网关实例数据目录（仓库根/data/search_gateway/<gateway_id>/）。"""
     here = os.path.dirname(os.path.abspath(__file__))
-    base = os.path.join(os.path.dirname(here), "data", "search_gateway")
+    base = os.path.normpath(os.path.join(here, "..", "..", "data", "search_gateway"))
     path = os.path.join(base, gateway_id)
     os.makedirs(path, exist_ok=True)
     return os.path.normpath(path)
@@ -49,7 +49,7 @@ def _history_file(gateway_id):
 
 def _all_gateway_dirs():
     here = os.path.dirname(os.path.abspath(__file__))
-    base = os.path.join(os.path.dirname(here), "data", "search_gateway")
+    base = os.path.normpath(os.path.join(here, "..", "..", "data", "search_gateway"))
     out = []
     if os.path.isdir(base):
         for name in os.listdir(base):

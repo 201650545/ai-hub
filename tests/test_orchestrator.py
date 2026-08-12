@@ -13,7 +13,7 @@ import threading
 from pathlib import Path
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-ORCH_DIR = os.path.normpath(os.path.join(BASE, "..", "06_组件编排器"))
+ORCH_DIR = os.path.normpath(os.path.join(BASE, "..", "services", "orchestrator"))
 sys.path.insert(0, BASE)
 if os.path.isdir(ORCH_DIR):
     sys.path.insert(0, ORCH_DIR)
@@ -64,7 +64,7 @@ def _iframe(bv):
 
 
 def _registry(img_ok=True, vid_ok=True):
-    card_dir = Path(ORCH_DIR, "组件规则卡")
+    card_dir = Path(ORCH_DIR, "rules")
     return {
         "image_gen": {"component": MockImageComponent(img_ok),
                       "rule_card": str(card_dir / "image_gen_doubao.yaml")},
@@ -285,7 +285,7 @@ def test_real_image_gen_two_arg_contract():
 
     slot = {"id": "p12", "topic": "测试", "prompt": "a red apple",
             "mode": "download", "lesson_dir": ldir}
-    card = os.path.join(ORCH_DIR, "组件规则卡", "image_gen_doubao.yaml")
+    card = os.path.join(ORCH_DIR, "rules", "image_gen_doubao.yaml")
     r = image_gen.run(slot, card)
     image_gen.inject_and_generate = _REAL_INJECT
     image_gen.extract_image = _REAL_EXTRACT
@@ -350,7 +350,7 @@ def test_image_gen_slot_isolation_regression():
         return {"ok": True, "stdout": "not handled", "stderr": ""}
 
     image_gen.run_cli = fake_run_cli
-    card = os.path.join(ORCH_DIR, "组件规则卡", "image_gen_doubao.yaml")
+    card = os.path.join(ORCH_DIR, "rules", "image_gen_doubao.yaml")
 
     def gen(slot_id, prompt):
         slot = {"id": slot_id, "topic": "t", "prompt": prompt,
@@ -373,7 +373,7 @@ def test_image_gen_slot_isolation_regression():
 
 
 def test_rule_card_load():
-    card = Path(ORCH_DIR, "组件规则卡", "video_embed_bilibili.yaml")
+    card = Path(ORCH_DIR, "rules", "video_embed_bilibili.yaml")
     from orchestrator import load_rule_card
     data = load_rule_card(str(card))
     if not data:

@@ -27,7 +27,7 @@ _MAX_RECORDS = 100000
 def _gateway_dir(gateway_id):
     """网关实例数据目录（仓库根/data/search_gateway/<gateway_id>/）。"""
     here = os.path.dirname(os.path.abspath(__file__))
-    base = os.path.join(os.path.dirname(here), "data", "search_gateway")
+    base = os.path.normpath(os.path.join(here, "..", "..", "data", "search_gateway"))
     path = os.path.join(base, gateway_id)
     os.makedirs(path, exist_ok=True)
     return os.path.normpath(path)
@@ -218,7 +218,7 @@ def reset_daily():
 
 def _all_gateway_dirs():
     here = os.path.dirname(os.path.abspath(__file__))
-    base = os.path.join(here, "..", "02_网关实例")
+    base = os.path.join(here, "..", "..", "data", "search_gateway")
     out = []
     if os.path.isdir(base):
         for name in os.listdir(base):

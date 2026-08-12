@@ -15,7 +15,7 @@ import common
 from common import Result
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-SHARED = os.path.normpath(os.path.join(BASE, "..", "03_共享组件"))
+SHARED = os.path.normpath(os.path.join(BASE, "..", "services", "search_gateway"))
 sys.path.insert(0, SHARED)
 sys.path.insert(0, BASE)
 
