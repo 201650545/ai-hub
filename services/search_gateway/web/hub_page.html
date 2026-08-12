@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Universal AI Hub — 手机/桌面全端无限画布控制台</title>
+<style>
+:root {
+  --bg-canvas: #f1f3f8;
+  --bg-glass: rgba(255, 255, 255, 0.92);
+  --bg-card: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --hairline: #cbd5e1;
+  --card-border: #e2e8f0;
+  --primary: #0052cc;
+  --primary-hover: #0041a3;
+  --green: #16a34a;
+  --amber: #d97706;
+  --red: #dc2626;
+  --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+  background: var(--bg-canvas);
+  color: var(--text-main);
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  touch-action: none;
+}
+
+/* ---------- 顶部全域悬浮控制栏 ---------- */
+.top-nav {
+  position: fixed;
+  top: 14px;
+  left: 16px;
+  right: 16px;
+  height: 60px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border: 1.5px solid var(--card-border);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.brand {
+  font-size: 16px;
+  font-weight: 800;
+  color: #000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.brand span {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: #e2e8f0;
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+
+.global-search-box {
+  flex: 1;
+  max-width: 540px;
+  margin: 0 14px;
+  display: flex;
+  gap: 8px;
+}
+.global-search-box input {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 980px;
+  border: 1.5px solid var(--hairline);
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  background: #fff;
+  transition: all 0.15s;
+}
+.global-search-box input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.12);
+}
+
+.btn {
+  background: #000;
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 980px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+.btn:hover { background: #222; transform: translateY(-1px); }
+.btn-secondary {
+  background: #f1f5f9;
+  color: var(--text-main);
+  border: 1.5px solid var(--card-border);
+}
+.btn-secondary:hover { background: #e2e8f0; }
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- 左侧可折叠功能组件 Dock 抽屉 ---------- */
+.left-dock {
+  position: fixed;
+  top: 86px;
+  left: 16px;
+  bottom: 16px;
+  width: 280px;
+  z-index: 90;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid var(--card-border);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.left-dock.collapsed {
+  transform: translateX(-310px);
+}
+.dock-toggle-btn {
+  position: absolute;
+  right: -36px;
+  top: 18px;
+  width: 34px;
+  height: 34px;
+  background: #fff;
+  border: 1.5px solid var(--card-border);
+  border-radius: 0 10px 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  font-size: 14px;
+}
+
+.dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1.5px solid var(--card-border);
+}
+.dock-header h3 { font-size: 15px; font-weight: 800; }
+
+.widget-library {
+  flex: 1;
+  max-height: calc(100vh - 170px);
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+}
+.widget-library::-webkit-scrollbar {
+  width: 6px;
+}
+.widget-library::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+.widget-library::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.widget-library::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+.library-card {
+  background: #fff;
+  border: 1.5px solid var(--card-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: grab;
+  transition: all 0.2s;
+  user-select: none;
+}
+.library-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(0,82,204,0.08);
+  transform: translateY(-1px);
+}
+
+/* ---------- 无限空间画布 Viewport & Canvas ---------- */
+#canvas-viewport {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #f1f5f9;
+  background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+  background-position: 0 0;
+  cursor: grab;
+  touch-action: none;
+}
+#canvas-viewport:active { cursor: grabbing; }
+
+#spatial-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+/* ---------- 画布上的功能组件 Widget Card ---------- */
+.spatial-widget {
+  position: absolute;
+  pointer-events: auto;
+  background: var(--bg-card);
+  border: 1.5px solid var(--card-border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  resize: both;
+  overflow: hidden;
+  min-width: 300px;
+  min-height: 220px;
+  user-select: text;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  touch-action: auto;
+}
+.spatial-widget:focus-within, .spatial-widget.active-widget {
+  border-color: var(--primary);
+  box-shadow: 0 12px 36px rgba(0, 82, 204, 0.15);
+}
+
+.widget-head {
+  padding: 10px 14px;
+  background: #fafbfc;
+  border-bottom: 1.5px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+.widget-title {
+  font-size: 14px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.widget-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-canvas);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.widget-actions {
+  display: flex;
+  gap: 4px;
+}
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  touch-action: manipulation;
+}
+.icon-btn:hover { background: #e2e8f0; color: #000; }
+
+.widget-body {
+  flex: 1;
+  padding: 14px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.75;
+  color: #0f172a !important;
+}
+
+.node-body, .node-body *, .formatted-answer, .formatted-answer * {
+  color: #0f172a !important;
+}
+
+.formatted-answer h1, .formatted-answer h2, .formatted-answer h3, .formatted-answer h4 {
+  color: #0f172a !important;
+  font-weight: 800 !important;
+  margin-top: 14px !important;
+  margin-bottom: 8px !important;
+  line-height: 1.4 !important;
+}
+.formatted-answer p {
+  margin-bottom: 10px !important;
+  color: #0f172a !important;
+}
+.formatted-answer ul, .formatted-answer ol {
+  padding-left: 22px !important;
+  margin-bottom: 10px !important;
+  color: #0f172a !important;
+}
+.formatted-answer li {
+  margin-bottom: 6px !important;
+  color: #0f172a !important;
+}
+.formatted-answer strong, .formatted-answer b {
+  color: #000000 !important;
+  font-weight: 800 !important;
+}
+.formatted-answer pre, .formatted-answer code {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  padding: 4px 8px !important;
+  border-radius: 6px !important;
+  font-family: Consolas, monospace !important;
+  font-size: 13px !important;
+}
+
+.widget-foot {
+  padding: 6px 12px;
+  border-top: 1.5px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  user-select: none;
+  background: #fafbfc;
+}
+
+/* ---------- 浮动画布视图控制 Toolbar ---------- */
+.canvas-controls-toolbar {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid var(--card-border);
+  border-radius: 14px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--shadow-lg);
+  user-select: none;
+}
+.zoom-badge {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-main);
+  min-width: 44px;
+  text-align: center;
+}
+
+/* ---------- 锁定时视觉风格 ---------- */
+.canvas-locked .widget-head { cursor: default !important; }
+.canvas-locked .spatial-widget { resize: none !important; }
+.lock-badge {
+  display: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--amber);
+  background: rgba(217, 119, 6, 0.12);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.canvas-locked .lock-badge { display: inline-block; }
+
+/* ---------- 编排监工 Widget 特殊样式 ---------- */
+.stepper-mini {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.step-chip {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  padding: 5px 2px;
+  border-radius: 6px;
+  background: var(--bg-canvas);
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+.step-chip.active { background: var(--primary); color: #fff; box-shadow: 0 0 10px rgba(0,82,204,0.3); }
+.step-chip.done { background: rgba(22, 163, 74, 0.12); color: var(--green); }
+
+.orch-logs-box {
+  background: #0f172a;
+  color: #f8fafc;
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  border-radius: 8px;
+  padding: 10px;
+  height: 120px;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+
+/* ---------- Modal 弹窗 ---------- */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .top-nav { top: 8px; left: 10px; right: 10px; height: 52px; padding: 0 10px; }
+  .brand b, .brand span { display: none; }
+  .global-search-box { margin: 0 6px; }
+  .global-search-box input { font-size: 13px; padding: 6px 12px; }
+  .left-dock { top: auto; bottom: 70px; left: 10px; width: calc(100vw - 20px); max-height: 50vh; }
+  .dock-toggle-btn { top: -32px; right: 16px; width: 32px; height: 32px; }
+  .canvas-controls-toolbar { bottom: 10px; right: 10px; left: 10px; justify-content: space-between; }
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+<!-- 1. 顶部全域悬浮控制与搜索 Bar -->
+<header class="top-nav">
+  <div class="brand">
+    🌐 Universal <b>AI Canvas</b> <span class="lock-badge" id="lock-badge-top">🔒 画布已锁定</span>
+  </div>
+
+  <div class="global-search-box">
+    <input id="global-prompt-input" type="text" placeholder="输入问题或自动编排指令，发起对比与生成…" onkeydown="if(event.key==='Enter') triggerGlobalCanvasSearch()">
+    <button type="button" id="global-search-btn" class="btn" onclick="triggerGlobalCanvasSearch()">🚀 组合执行</button>
+  </div>
+
+  <div class="top-actions">
+    <button type="button" class="btn btn-secondary" onclick="openPresetModal()" title="保存或切换组合视图预设">💾 组合视图</button>
+    <button type="button" class="btn btn-secondary" onclick="openHistoryModal()">📜 历史</button>
+  </div>
+</header>
+
+<!-- 2. 左侧可折叠功能组件 Dock 抽屉 -->
+<aside class="left-dock" id="left-dock" onwheel="event.stopPropagation()" ontouchmove="event.stopPropagation()">
+  <div class="dock-toggle-btn" onclick="toggleDock()" title="展开/收起组件库">◀</div>
+  
+  <div class="dock-header">
+    <h3>🧩 功能组件库</h3>
+    <div style="display:flex;gap:4px;">
+      <button type="button" style="font-size:10px;padding:2px 6px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;cursor:pointer;" onclick="toggleAllCategoryGroups(true)">全展开</button>
+      <button type="button" style="font-size:10px;padding:2px 6px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;cursor:pointer;" onclick="toggleAllCategoryGroups(false)">全折叠</button>
+    </div>
+  </div>
+
+  <div style="padding:2px 0;">
+    <input type="text" id="dock-search-filter" placeholder="🔍 查找组件 (如: Kimi, API)..." oninput="filterWidgetLibrary(this.value)" style="width:100%;padding:5px 10px;border:1.5px solid var(--card-border);border-radius:8px;font-size:11px;background:#f8fafc;box-sizing:border-box;">
+  </div>
+
+  <div class="widget-library" id="widget-library" onwheel="event.stopPropagation()" ontouchmove="event.stopPropagation()"></div>
+</aside>
+
+<!-- 3. 全屏无限空间画布 Viewport -->
+<main id="canvas-viewport"
+      onwheel="handleCanvasWheel(event)"
+      onmousedown="handleCanvasMouseDown(event)"
+      ontouchstart="handleCanvasTouchStart(event)"
+      ontouchmove="handleCanvasTouchMove(event)"
+      ontouchend="handleCanvasTouchEnd(event)"
+      ondragover="handleCanvasDragOver(event)"
+      ondrop="handleCanvasDrop(event)">
+  <div id="spatial-canvas"></div>
+</main>
+
+<!-- 4. 浮动画布视图控制 Toolbar -->
+<div class="canvas-controls-toolbar">
+  <button type="button" id="lock-btn" class="btn btn-secondary" style="padding:6px 12px;font-size:13px;" onclick="toggleCanvasLock()" title="锁定组合视图">🔓 未锁定</button>
+  <button type="button" id="hand-mode-btn" class="btn btn-secondary" style="padding:6px 12px;font-size:13px;" onclick="toggleHandMode()" title="切换抓手平移模式">🖐️ 抓手平移</button>
+  <span class="zoom-badge" id="zoom-badge">100%</span>
+  <button type="button" class="btn btn-secondary" style="padding:6px 10px;font-size:14px;" onclick="zoomCanvas(0.1)" title="放大视角">➕</button>
+  <button type="button" class="btn btn-secondary" style="padding:6px 10px;font-size:14px;" onclick="zoomCanvas(-0.1)" title="缩小视角">➖</button>
+  <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="resetCanvasTransform()" title="重置视角">🎯 重置</button>
+  <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="autoAlignWidgets()" title="整齐网格对齐">📐 整理</button>
+  <button type="button" class="btn" style="padding:6px 12px;font-size:12px;" onclick="addAllSearchEnginesToCanvas()" title="一键挂载全部 6 大 AI 搜索引擎卡片">⚡ 一键挂载全 AI 引擎</button>
+</div>
+
+<!-- 5. 组合视图预设 Modal 弹窗 -->
+<div id="preset-modal" class="modal-overlay">
+  <div class="spatial-widget" style="width:90%;max-width:680px;height:auto;max-height:85vh;position:relative;resize:none;pointer-events:auto;">
+    <div class="widget-head" style="cursor:default;">
+      <div class="widget-title">💾 组合视图预设方案管理</div>
+      <button type="button" class="icon-btn" onclick="closePresetModal()">✕</button>
+    </div>
+    <div class="widget-body" style="display:flex;flex-direction:column;gap:14px;padding:16px;">
+      <div style="display:flex;gap:10px;">
+        <input id="preset-name-input" type="text" placeholder="输入新的组合视图名称（例如：我的课件工作台）" style="flex:1;padding:8px 12px;border:1.5px solid var(--card-border);border-radius:8px;font-size:13px;">
+        <button type="button" class="btn" onclick="saveNewPreset()">💾 保存当前视图</button>
+      </div>
+      <div style="font-size:13px;font-weight:700;margin-top:6px;">📋 预设方案列表 (一键切换):</div>
+      <div id="preset-list-container" style="display:flex;flex-direction:column;gap:10px;max-height:300px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 6. 搜索历史 Modal 弹窗 -->
+<div id="history-modal" class="modal-overlay">
+  <div class="spatial-widget" style="width:85%;max-width:1000px;height:75vh;position:relative;resize:none;pointer-events:auto;">
+    <div class="widget-head" style="cursor:default;">
+      <div class="widget-title">📜 AI 搜索历史沉淀记录</div>
+      <button type="button" class="icon-btn" onclick="closeHistoryModal()">✕</button>
+    </div>
+    <div class="widget-body" style="display:flex;gap:16px;padding:16px;">
+      <div id="modal-history-list" style="width:34%;border-right:1.5px solid var(--hairline);padding-right:12px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;"></div>
+      <div id="modal-history-detail" style="flex:1;overflow-y:auto;background:var(--bg-canvas);border-radius:12px;padding:16px;display:flex;flex-direction:column;">
+        <div style="color:var(--text-muted);font-size:14px;margin:auto;">👈 选择左侧记录查看详情</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==========================================================================
+   全屏无限 Spatial Canvas 引擎 (包含黑色文本与 Markdown 标准渲染修复)
+   ========================================================================== */
+
+const AVAILABLE_WIDGET_TYPES = {
+  "orchestrator_canvas": { id: "orchestrator_canvas", type: "tool", category: "html_gen", name: "AI 课件编排监工", icon: "🎬", badge: "全自动 HTML 课件生成与观察窗" },
+  "yuanbao": { id: "yuanbao", type: "search", category: "search", name: "腾讯元宝 AI 搜", icon: "🐧", badge: "微信公众号 + 全网" },
+  "doubao": { id: "doubao", type: "search", category: "search", name: "字节豆包 AI 搜", icon: "🧩", badge: "字节抖音全网实时" },
+  "kimi": { id: "kimi", type: "search", category: "search", name: "月之暗面 Kimi", icon: "🌙", badge: "200万字长上下文" },
+  "qianwen": { id: "qianwen", type: "search", category: "search", name: "通义千问智搜", icon: "🎈", badge: "阿里通义全网检索" },
+  "grok": { id: "grok", type: "search", category: "search", name: "xAI Grok", icon: "🤖", badge: "Grok 实时全网智搜" },
+  "perplexity": { id: "perplexity", type: "search", category: "search", name: "Perplexity 搜", icon: "🔍", badge: "Perplexity 深度检索" },
+  "zai": { id: "zai", type: "search", category: "search", name: "Z.ai 智搜", icon: "⚡", badge: "Z.ai 智能全网检索" },
+  "llm_chat": { id: "llm_chat", type: "tool", category: "api_relay", name: "多渠道对话 Box", icon: "💬", badge: "API 中转即时对话" },
+  "channel_status": { id: "channel_status", type: "tool", category: "api_relay", name: "中转站路由中心", icon: "📡", badge: "白嫖 API 路由监控" },
+  "memo_note": { id: "memo_note", type: "tool", category: "html_gen", name: "AI 灵感便签", icon: "📝", badge: "Markdown 随手记" }
+};
+
+let activeWidgets = JSON.parse(localStorage.getItem('spatial_widgets_state_v4') || '[]');
+if (!activeWidgets || !activeWidgets.length) {
+  activeWidgets = ['yuanbao', 'doubao', 'kimi', 'qianwen', 'grok', 'perplexity'];
+}
+let widgetPositions = JSON.parse(localStorage.getItem('spatial_widgets_pos_v4') || '{}');
+
+let canvasPanX = 40, canvasPanY = 90, canvasZoomScale = 1.0;
+let isPanning = false, startPanX = 0, startPanY = 0;
+let isHandMode = false, isSpacePressed = false, isCanvasLocked = false;
+let touchPinchStartDist = 0, initialTouchZoom = 1.0;
+let channelCache = {};
+let orchEventSource = null;
+
+/* ---------- 切换与锁定画布 ---------- */
+function toggleCanvasLock() {
+  isCanvasLocked = !isCanvasLocked;
+  const vp = document.getElementById('canvas-viewport');
+  const btn = document.getElementById('lock-btn');
+  if (vp) vp.classList.toggle('canvas-locked', isCanvasLocked);
+  if (btn) {
+    btn.innerText = isCanvasLocked ? '🔒 已锁定' : '🔓 未锁定';
+    btn.style.background = isCanvasLocked ? 'var(--amber)' : '#f1f5f9';
+    btn.style.color = isCanvasLocked ? '#fff' : 'var(--text-main)';
+  }
+}
+
+function toggleHandMode() {
+  if (isCanvasLocked) return;
+  isHandMode = !isHandMode;
+  const btn = document.getElementById('hand-mode-btn');
+  const vp = document.getElementById('canvas-viewport');
+  if (btn) {
+    btn.style.background = isHandMode ? 'var(--primary)' : '#f1f5f9';
+    btn.style.color = isHandMode ? '#fff' : 'var(--text-main)';
+  }
+  if (vp) vp.style.cursor = isHandMode ? 'grab' : 'default';
+}
+
+function updateCanvasTransform() {
+  const canvas = document.getElementById('spatial-canvas');
+  const viewport = document.getElementById('canvas-viewport');
+  const badge = document.getElementById('zoom-badge');
+  if (canvas) {
+    canvas.style.transform = `translate(${canvasPanX}px, ${canvasPanY}px) scale(${canvasZoomScale})`;
+  }
+  if (viewport) {
+    const gridGradSize = 28 * canvasZoomScale;
+    viewport.style.backgroundSize = `${gridGradSize}px ${gridGradSize}px`;
+    viewport.style.backgroundPosition = `${canvasPanX}px ${canvasPanY}px`;
+  }
+  if (badge) badge.innerText = `${Math.round(canvasZoomScale * 100)}%`;
+}
+
+function zoomCanvas(delta) {
+  if (isCanvasLocked) return;
+  canvasZoomScale = Math.min(Math.max(0.2, canvasZoomScale + delta), 2.5);
+  updateCanvasTransform();
+}
+
+function resetCanvasTransform() {
+  canvasPanX = 40; canvasPanY = 90; canvasZoomScale = 1.0;
+  updateCanvasTransform();
+}
+
+function handleCanvasWheel(ev) {
+  if (isCanvasLocked) return;
+  ev.preventDefault();
+  if (ev.ctrlKey || ev.metaKey) {
+    const zoomFactor = ev.deltaY < 0 ? 1.06 : 0.94;
+    const newScale = Math.min(Math.max(0.2, canvasZoomScale * zoomFactor), 2.5);
+    const viewport = document.getElementById('canvas-viewport');
+    const rect = viewport ? viewport.getBoundingClientRect() : { left: 0, top: 0 };
+    const mouseX = ev.clientX - rect.left;
+    const mouseY = ev.clientY - rect.top;
+
+    canvasPanX = mouseX - (mouseX - canvasPanX) * (newScale / canvasZoomScale);
+    canvasPanY = mouseY - (mouseY - canvasPanY) * (newScale / canvasZoomScale);
+    canvasZoomScale = newScale;
+  } else {
+    canvasPanX -= ev.deltaX;
+    canvasPanY -= ev.deltaY;
+  }
+  updateCanvasTransform();
+}
+
+function handleCanvasMouseDown(ev) {
+  if (isCanvasLocked) return;
+  const isWidgetClick = ev.target.closest('.spatial-widget');
+  if (isWidgetClick && !isSpacePressed && !isHandMode) return;
+
+  isPanning = true;
+  startPanX = ev.clientX - canvasPanX;
+  startPanY = ev.clientY - canvasPanY;
+  const viewport = document.getElementById('canvas-viewport');
+  if (viewport) viewport.style.cursor = 'grabbing';
+
+  function onMouseMove(e) {
+    if (!isPanning) return;
+    canvasPanX = e.clientX - startPanX;
+    canvasPanY = e.clientY - startPanY;
+    updateCanvasTransform();
+  }
+
+  function onMouseUp() {
+    isPanning = false;
+    if (viewport) viewport.style.cursor = (isHandMode || isSpacePressed) ? 'grab' : 'default';
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  }
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+}
+
+function getTouchDistance(touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function handleCanvasTouchStart(ev) {
+  if (isCanvasLocked) return;
+  if (ev.touches.length === 1) {
+    const isWidgetTouch = ev.target.closest('.spatial-widget');
+    if (!isWidgetTouch || isHandMode) {
+      isPanning = true;
+      startPanX = ev.touches[0].clientX - canvasPanX;
+      startPanY = ev.touches[0].clientY - canvasPanY;
+    }
+  } else if (ev.touches.length === 2) {
+    isPanning = false;
+    touchPinchStartDist = getTouchDistance(ev.touches);
+    initialTouchZoom = canvasZoomScale;
+  }
+}
+
+function handleCanvasTouchMove(ev) {
+  if (isCanvasLocked) return;
+  if (ev.touches.length === 1 && isPanning) {
+    canvasPanX = ev.touches[0].clientX - startPanX;
+    canvasPanY = ev.touches[0].clientY - startPanY;
+    updateCanvasTransform();
+  } else if (ev.touches.length === 2 && touchPinchStartDist > 0) {
+    const currentDist = getTouchDistance(ev.touches);
+    const factor = currentDist / touchPinchStartDist;
+    canvasZoomScale = Math.min(Math.max(0.2, initialTouchZoom * factor), 2.5);
+    updateCanvasTransform();
+  }
+}
+
+function handleCanvasTouchEnd() {
+  isPanning = false; touchPinchStartDist = 0;
+}
+
+function toggleDock() {
+  const dock = document.getElementById('left-dock');
+  const btn = dock.querySelector('.dock-toggle-btn');
+  dock.classList.toggle('collapsed');
+  btn.innerText = dock.classList.contains('collapsed') ? '▶' : '◀';
+}
+
+const WIDGET_CATEGORIES = [
+  { id: "search", title: "🔍 AI 全网搜索引擎", badge: "7大AI智搜" },
+  { id: "api_relay", title: "📡 API 中转与通道监控", badge: "中转与路由" },
+  { id: "html_gen", title: "🎬 HTML 课件生成与编排", badge: "生成与便签" }
+];
+
+let categoryExpandedState = {
+  search: true,
+  api_relay: true,
+  html_gen: true
+};
+
+function toggleCategoryGroup(catId) {
+  categoryExpandedState[catId] = !categoryExpandedState[catId];
+  renderWidgetLibrary();
+}
+
+function toggleAllCategoryGroups(openState) {
+  Object.keys(categoryExpandedState).forEach(k => {
+    categoryExpandedState[k] = openState;
+  });
+  renderWidgetLibrary();
+}
+
+function filterWidgetLibrary(query) {
+  renderWidgetLibrary();
+}
+
+function renderWidgetLibrary() {
+  const library = document.getElementById('widget-library');
+  if (!library) return;
+  library.innerHTML = '';
+
+  const filterQuery = (document.getElementById('dock-search-filter') ? document.getElementById('dock-search-filter').value : '').toLowerCase().trim();
+
+  WIDGET_CATEGORIES.forEach(cat => {
+    let items = Object.values(AVAILABLE_WIDGET_TYPES).filter(w => w.category === cat.id);
+    if (filterQuery) {
+      items = items.filter(w => (w.name + w.badge).toLowerCase().includes(filterQuery));
+    }
+    if (!items.length) return;
+
+    const isOpen = categoryExpandedState[cat.id] !== false;
+    const group = document.createElement('div');
+    group.className = 'category-group';
+    group.style.cssText = 'margin-bottom:10px;background:#f8fafc;border:1px solid var(--card-border);border-radius:10px;';
+
+    const countAdded = items.filter(w => activeWidgets.includes(w.id)).length;
+
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:8px 10px;font-size:12px;font-weight:700;color:var(--text-main);cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;background:#f1f5f9;border-radius:10px;';
+    header.onclick = () => toggleCategoryGroup(cat.id);
+    header.innerHTML = `
+      <span>${isOpen ? '▼' : '▶'} ${cat.title} <span style="font-size:10px;font-weight:500;color:var(--text-muted);">(${cat.badge})</span></span>
+      <span style="font-size:10px;background:var(--primary);color:#fff;padding:1px 6px;border-radius:8px;">${countAdded}/${items.length} 挂载</span>
+    `;
+    group.appendChild(header);
+
+    if (isOpen) {
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'category-content';
+      contentDiv.style.cssText = 'padding:6px;display:flex;flex-direction:column;gap:6px;';
+
+      items.forEach(item => {
+        const isAdded = activeWidgets.includes(item.id);
+        const card = document.createElement('div');
+        card.className = 'library-card';
+        card.draggable = true;
+        card.ondragstart = (e) => handleLibraryDragStart(e, item.id);
+
+        card.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-weight:800;font-size:13px;color:#0f172a;">${item.icon} ${item.name}</span>
+            <button type="button" class="btn" onclick="addWidgetToCanvas('${item.id}')" 
+                    style="font-size:11px;padding:2px 8px;${isAdded ? 'background:#e2e8f0;color:#94a3b8;cursor:default;' : 'background:var(--primary);color:#fff;'}" 
+                    ${isAdded ? 'disabled' : ''}>${isAdded ? '已挂载' : '+ 放置'}</button>
+          </div>
+          <span style="font-size:11px;color:var(--text-muted);">${item.badge}</span>
+        `;
+        contentDiv.appendChild(card);
+      });
+      group.appendChild(contentDiv);
+    }
+
+    library.appendChild(group);
+  });
+}
+
+function renderCanvasWidgets() {
+  const canvas = document.getElementById('spatial-canvas');
+  if (!canvas) return;
+  canvas.innerHTML = '';
+
+  if (activeWidgets.length === 0) {
+    activeWidgets = ["orchestrator_canvas", "yuanbao", "doubao", "channel_status"];
+    saveWidgetState();
+  }
+
+  activeWidgets.forEach((id, idx) => {
+    const info = AVAILABLE_WIDGET_TYPES[id] || { id, name: id, icon: "🧩", badge: "组件" };
+    const pos = widgetPositions[id] || {
+      x: 30 + (idx % 3) * 440,
+      y: 30 + Math.floor(idx / 3) * 430,
+      w: id === 'orchestrator_canvas' ? 840 : (id === 'channel_status' ? 840 : 420),
+      h: id === 'orchestrator_canvas' ? 440 : (id === 'channel_status' ? 380 : 400)
+    };
+
+    const widget = document.createElement('div');
+    widget.className = 'spatial-widget';
+    widget.dataset.id = id;
+    widget.style.cssText = `left:${pos.x}px;top:${pos.y}px;width:${pos.w}px;height:${pos.h}px;`;
+
+    let bodyHTML = '';
+    if (info.type === 'search') {
+      bodyHTML = `<div class="node-body" id="body-${id}">等待发起搜索…</div>`;
+    } else if (id === 'orchestrator_canvas') {
+      bodyHTML = `
+        <div style="display:flex;flex-direction:column;gap:10px;height:100%;">
+          <div class="stepper-mini" id="orch-stepper">
+            <div class="step-chip active" id="chip-framework">1. 框架生成</div>
+            <div class="step-chip" id="chip-scan">2. 槽位扫描</div>
+            <div class="step-chip" id="chip-asset_fill">3. 资产生图</div>
+            <div class="step-chip" id="chip-verify">4. 规则校验</div>
+            <div class="step-chip" id="chip-deliver">5. 交付完工</div>
+          </div>
+
+          <div style="display:flex;gap:10px;flex:1;overflow:hidden;">
+            <div id="orch-slot-grid" style="flex:1;display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;overflow-y:auto;background:var(--bg-canvas);border-radius:10px;padding:10px;">
+              <div style="font-size:12px;color:var(--text-muted);margin:auto;grid-column:span 2;">点击下方【🚀 发起 AI 课件自动编排】推演生图</div>
+            </div>
+            <div class="orch-logs-box" id="orch-logs-box" style="width:260px;">
+              <div style="font-weight:700;color:#3b82f6;margin-bottom:4px;">📡 编排器实时事件流:</div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;border-top:1.5px solid var(--card-border);padding-top:8px;">
+            <button type="button" class="btn" onclick="startOrchestratorPipeline()" style="background:var(--primary);font-size:12px;padding:6px 14px;">🚀 发起 AI 课件全自动编排</button>
+            <button type="button" class="btn btn-secondary" onclick="confirmL2Action()" style="font-size:12px;padding:6px 14px;">✓ L2 关键节点确认</button>
+          </div>
+        </div>
+      `;
+    } else if (id === 'llm_chat') {
+      bodyHTML = `
+        <div style="display:flex;flex-direction:column;gap:10px;height:100%;">
+          <div style="display:flex;gap:8px;">
+            <select id="chat-ch-sel" onchange="loadChannelModels()" style="flex:1;padding:8px;border:1.5px solid var(--hairline);border-radius:8px;font-size:13px;font-weight:600;"></select>
+            <select id="chat-md-sel" style="flex:1.2;padding:8px;border:1.5px solid var(--hairline);border-radius:8px;font-size:13px;font-weight:600;"></select>
+          </div>
+          <textarea id="chat-input" placeholder="输入提示词对话…" style="height:70px;padding:8px;border:1.5px solid var(--hairline);border-radius:8px;font-size:13px;font-weight:600;resize:none;">你好，用一句话介绍你自己</textarea>
+          <button type="button" class="btn" onclick="sendLlmChat()" style="padding:8px 16px;font-size:13px;">发送对话</button>
+          <div id="chat-reply" style="flex:1;background:var(--bg-canvas);border-radius:8px;padding:10px;font-size:13px;overflow-y:auto;white-space:pre-wrap;font-family:monospace;">等待发送…</div>
+        </div>
+      `;
+    } else if (id === 'channel_status') {
+      bodyHTML = `
+        <div style="display:flex;flex-direction:column;gap:10px;height:100%;overflow:hidden;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:13px;font-weight:700;">📡 聚合中转路由监控</span>
+            <button type="button" class="btn btn-secondary" onclick="refreshChannels()" style="padding:4px 10px;font-size:12px;">🔄 刷新状态</button>
+          </div>
+          <div style="flex:1;overflow-y:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead>
+                <tr style="background:var(--bg-canvas);border-bottom:1.5px solid var(--hairline);">
+                  <th style="padding:8px;text-align:left;">渠道与来源</th>
+                  <th style="padding:8px;text-align:left;">类型</th>
+                  <th style="padding:8px;text-align:left;">状态</th>
+                  <th style="padding:8px;text-align:left;">可用模型</th>
+                </tr>
+              </thead>
+              <tbody id="ch-tbody-canvas"></tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    } else if (id === 'memo_note') {
+      bodyHTML = `
+        <textarea style="width:100%;height:100%;border:none;outline:none;resize:none;font-size:14px;line-height:1.7;font-family:inherit;background:transparent;" 
+                  placeholder="✍️ 随意记录您的 AI 灵感便签与思考…"></textarea>
+      `;
+    }
+
+    widget.innerHTML = `
+      <div class="widget-head" onmousedown="initWidgetDrag(event, '${id}')" ontouchstart="initWidgetTouchDrag(event, '${id}')">
+        <div class="widget-title">${info.icon} ${info.name} <span class="widget-badge">${info.badge}</span></div>
+        <div class="widget-actions">
+          <button type="button" class="icon-btn" onclick="removeWidgetFromCanvas('${id}')" title="移除组件">✕</button>
+        </div>
+      </div>
+      <div class="widget-body">${bodyHTML}</div>
+      <div class="widget-foot">
+        <span id="status-${id}">就绪</span>
+        <span>↘ 手指/鼠标拉伸右下角改变形状大小</span>
+      </div>
+    `;
+
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(entries => {
+        for (let entry of entries) {
+          const w = Math.round(entry.contentRect.width);
+          const h = Math.round(entry.contentRect.height);
+          if (widgetPositions[id]) {
+            widgetPositions[id].w = w;
+            widgetPositions[id].h = h;
+            saveWidgetPositions();
+          }
+        }
+      });
+      ro.observe(widget);
+    }
+
+    canvas.appendChild(widget);
+  });
+
+  renderWidgetLibrary();
+  updateCanvasTransform();
+  refreshChannels();
+  initOrchestratorStream();
+  restoreCanvasSearchResults();
+}
+
+/* ---------- 编排监工 Widget SSE 消息处理 ---------- */
+function initOrchestratorStream() {
+  if (orchEventSource) return;
+  try {
+    orchEventSource = new EventSource('/api/orchestrator/stream');
+    orchEventSource.onmessage = (ev) => {
+      try {
+        const d = JSON.parse(ev.data);
+        handleOrchSSE(d);
+      } catch(e){}
+    };
+  } catch(e){}
+}
+
+function handleOrchSSE(data) {
+  const logBox = document.getElementById('orch-logs-box');
+  if (logBox) {
+    const line = document.createElement('div');
+    line.style.cssText = 'margin-bottom:4px;line-height:1.4;';
+    line.innerHTML = `<span style="color:#94a3b8;">[${data.ts||'14:00'}] ${data.phase}:</span> <b>${data.event}</b> ${data.detail||''}`;
+    logBox.appendChild(line);
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  const phases = ["framework", "scan", "asset_fill", "verify", "deliver"];
+  const currIdx = phases.indexOf(data.phase);
+  phases.forEach((p, idx) => {
+    const chip = document.getElementById('chip-' + p);
+    if (!chip) return;
+    chip.classList.remove('active', 'done');
+    if (idx < currIdx) chip.classList.add('done');
+    else if (idx === currIdx) chip.classList.add('active');
+  });
+
+  if (data.slot && data.slot !== 'main') {
+    const grid = document.getElementById('orch-slot-grid');
+    if (grid) {
+      let card = document.getElementById('slot-card-' + data.slot);
+      if (!card) {
+        card = document.createElement('div');
+        card.id = 'slot-card-' + data.slot;
+        card.style.cssText = 'background:#fff;border:1px solid var(--card-border);border-radius:8px;padding:8px;font-size:12px;display:flex;flex-direction:column;gap:4px;';
+        grid.appendChild(card);
+      }
+      let badge = '⏳ 待处理';
+      if (data.event === 'generating') badge = '🔄 生图中';
+      else if (data.event === 'done') badge = '✅ 完工';
+
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;font-weight:700;">
+          <span>#${data.slot}</span>
+          <span style="color:var(--primary);">${badge}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);">${data.detail||'媒体槽位'}</div>
+        ${data.preview ? `<img src="${data.preview}" style="width:100%;height:70px;object-fit:cover;border-radius:6px;margin-top:4px;">` : ''}
+      `;
+    }
+  }
+}
+
+function startOrchestratorPipeline() {
+  fetch('/api/orchestrator/start', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => alert('🚀 AI 课件全自动编排推演已成功启动！'));
+}
+
+function confirmL2Action() {
+  fetch('/api/orchestrator/confirm', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => alert('✅ L2 节点人工确认通过，继续自治推进！'));
+}
+
+/* ---------- 拖拽组件 Card ---------- */
+function initWidgetDrag(ev, id) {
+  if (isCanvasLocked) return;
+  ev.stopPropagation();
+  const widget = document.querySelector(`.spatial-widget[data-id="${id}"]`);
+  if (!widget) return;
+
+  document.querySelectorAll('.spatial-widget').forEach(w => w.classList.remove('active-widget'));
+  widget.classList.add('active-widget');
+
+  const startX = ev.clientX;
+  const startY = ev.clientY;
+  const initialLeft = widget.offsetLeft;
+  const initialTop = widget.offsetTop;
+
+  function onMouseMove(e) {
+    const dx = (e.clientX - startX) / canvasZoomScale;
+    const dy = (e.clientY - startY) / canvasZoomScale;
+    const newLeft = initialLeft + dx;
+    const newTop = initialTop + dy;
+    widget.style.left = `${newLeft}px`;
+    widget.style.top = `${newTop}px`;
+    
+    if (!widgetPositions[id]) widgetPositions[id] = { w: 420, h: 400 };
+    widgetPositions[id].x = Math.round(newLeft);
+    widgetPositions[id].y = Math.round(newTop);
+  }
+
+  function onMouseUp() {
+    saveWidgetPositions();
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  }
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+}
+
+function initWidgetTouchDrag(ev, id) {
+  if (isCanvasLocked) return;
+  if (ev.touches.length !== 1) return;
+  ev.stopPropagation();
+
+  const widget = document.querySelector(`.spatial-widget[data-id="${id}"]`);
+  if (!widget) return;
+
+  document.querySelectorAll('.spatial-widget').forEach(w => w.classList.remove('active-widget'));
+  widget.classList.add('active-widget');
+
+  const touch = ev.touches[0];
+  const startX = touch.clientX;
+  const startY = touch.clientY;
+  const initialLeft = widget.offsetLeft;
+  const initialTop = widget.offsetTop;
+
+  function onTouchMove(e) {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dx = (t.clientX - startX) / canvasZoomScale;
+    const dy = (t.clientY - startY) / canvasZoomScale;
+    const newLeft = initialLeft + dx;
+    const newTop = initialTop + dy;
+    widget.style.left = `${newLeft}px`;
+    widget.style.top = `${newTop}px`;
+
+    if (!widgetPositions[id]) widgetPositions[id] = { w: 420, h: 400 };
+    widgetPositions[id].x = Math.round(newLeft);
+    widgetPositions[id].y = Math.round(newTop);
+  }
+
+  function onTouchEnd() {
+    saveWidgetPositions();
+    window.removeEventListener('touchmove', onTouchMove);
+    window.removeEventListener('touchend', onTouchEnd);
+  }
+
+  window.addEventListener('touchmove', onTouchMove);
+  window.addEventListener('touchend', onTouchEnd);
+}
+
+function handleLibraryDragStart(ev, widgetId) {
+  ev.dataTransfer.setData('text/plain', widgetId);
+}
+function handleCanvasDragOver(ev) { ev.preventDefault(); }
+function handleCanvasDrop(ev) {
+  ev.preventDefault();
+  const id = ev.dataTransfer.getData('text/plain');
+  if (id && AVAILABLE_WIDGET_TYPES[id]) addWidgetToCanvas(id);
+}
+
+function addWidgetToCanvas(id) {
+  if (!activeWidgets.includes(id)) {
+    activeWidgets.push(id);
+    saveWidgetState();
+    renderCanvasWidgets();
+  }
+}
+
+function addAllSearchEnginesToCanvas() {
+  const searchIds = ['yuanbao', 'doubao', 'kimi', 'qianwen', 'grok', 'perplexity', 'zai'];
+  searchIds.forEach(id => {
+    if (!activeWidgets.includes(id)) {
+      activeWidgets.push(id);
+    }
+  });
+  saveWidgetState();
+  renderCanvasWidgets();
+  autoAlignWidgets();
+}
+
+function removeWidgetFromCanvas(id) {
+  if (isCanvasLocked) return;
+  activeWidgets = activeWidgets.filter(item => item !== id);
+  saveWidgetState();
+  renderCanvasWidgets();
+}
+
+function clearAllCanvasWidgets() {
+  if (isCanvasLocked) return;
+  if (confirm('确定要清空画布上的所有组件吗？')) {
+    activeWidgets = [];
+    saveWidgetState();
+    renderCanvasWidgets();
+  }
+}
+
+function autoAlignWidgets() {
+  if (isCanvasLocked) return;
+  activeWidgets.forEach((id, idx) => {
+    widgetPositions[id] = {
+      x: 30 + (idx % 3) * 440,
+      y: 30 + Math.floor(idx / 3) * 430,
+      w: widgetPositions[id] ? widgetPositions[id].w : (id === 'orchestrator_canvas' ? 840 : (id === 'channel_status' ? 840 : 420)),
+      h: widgetPositions[id] ? widgetPositions[id].h : (id === 'orchestrator_canvas' ? 440 : (id === 'channel_status' ? 380 : 400))
+    };
+  });
+  saveWidgetPositions();
+  resetCanvasTransform();
+  renderCanvasWidgets();
+}
+
+function saveWidgetState() {
+  localStorage.setItem('spatial_widgets_state_v4', JSON.stringify(activeWidgets));
+}
+function saveWidgetPositions() {
+  localStorage.setItem('spatial_widgets_pos_v4', JSON.stringify(widgetPositions));
+}
+
+/* ==========================================================================
+   预设方案 Preset Views
+   ========================================================================== */
+
+const BUILTIN_PRESETS = {
+  "default_search": {
+    id: "default_search",
+    name: "🌐 多 AI 全域对比视图",
+    activeWidgets: ["yuanbao", "doubao", "kimi", "qianwen", "grok", "perplexity"],
+    zoomScale: 0.85,
+    panX: 40,
+    panY: 80
+  },
+  "courseware_monitor": {
+    id: "courseware_monitor",
+    name: "🎬 AI 自动化课件生成观察台",
+    activeWidgets: ["orchestrator_canvas", "yuanbao", "doubao", "channel_status"],
+    zoomScale: 0.9,
+    panX: 30,
+    panY: 70
+  },
+  "llm_workbench": {
+    id: "llm_workbench",
+    name: "💬 LLM 渠道对话与控制台视图",
+    activeWidgets: ["llm_chat", "channel_status", "memo_note"],
+    zoomScale: 1.0,
+    panX: 40,
+    panY: 80
+  }
+};
+
+function openPresetModal() {
+  document.getElementById('preset-modal').style.display = 'flex';
+  renderPresetList();
+}
+function closePresetModal() {
+  document.getElementById('preset-modal').style.display = 'none';
+}
+
+function renderPresetList() {
+  const container = document.getElementById('preset-list-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const userPresets = JSON.parse(localStorage.getItem('spatial_canvas_presets_v1') || '{}');
+  const allPresets = { ...BUILTIN_PRESETS, ...userPresets };
+
+  Object.values(allPresets).forEach(preset => {
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#fff;border:1.5px solid var(--card-border);border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:space-between;';
+    card.innerHTML = `
+      <div>
+        <div style="font-weight:800;font-size:14px;color:#000;">${preset.name}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">包含 ${preset.activeWidgets.length} 个组件 · 缩放: ${Math.round((preset.zoomScale||1)*100)}%</div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button type="button" class="btn" style="padding:5px 12px;font-size:12px;" onclick="loadCompositionPreset('${preset.id}')">⚡ 切换加载</button>
+        ${preset.isUserSaved ? `<button type="button" class="icon-btn" onclick="deleteUserPreset('${preset.id}')" title="删除预设">✕</button>` : ''}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function saveNewPreset() {
+  const nameInput = document.getElementById('preset-name-input');
+  const name = nameInput ? nameInput.value.trim() : '';
+  if (!name) { alert('请输入预设视图名称'); return; }
+
+  const userPresets = JSON.parse(localStorage.getItem('spatial_canvas_presets_v1') || '{}');
+  const presetId = 'custom_' + Date.now();
+  userPresets[presetId] = {
+    id: presetId,
+    name: "📁 " + name,
+    isUserSaved: true,
+    activeWidgets: [...activeWidgets],
+    widgetPositions: JSON.parse(JSON.stringify(widgetPositions)),
+    zoomScale: canvasZoomScale,
+    panX: canvasPanX,
+    panY: canvasPanY
+  };
+
+  localStorage.setItem('spatial_canvas_presets_v1', JSON.stringify(userPresets));
+  if (nameInput) nameInput.value = '';
+  alert('✅ 成功保存组合视图: ' + name);
+  renderPresetList();
+}
+
+function deleteUserPreset(presetId) {
+  const userPresets = JSON.parse(localStorage.getItem('spatial_canvas_presets_v1') || '{}');
+  if (userPresets[presetId]) {
+    delete userPresets[presetId];
+    localStorage.setItem('spatial_canvas_presets_v1', JSON.stringify(userPresets));
+    renderPresetList();
+  }
+}
+
+function loadCompositionPreset(presetId) {
+  const userPresets = JSON.parse(localStorage.getItem('spatial_canvas_presets_v1') || '{}');
+  const allPresets = { ...BUILTIN_PRESETS, ...userPresets };
+  const target = allPresets[presetId];
+
+  if (!target) return;
+  activeWidgets = [...target.activeWidgets];
+  if (target.widgetPositions) widgetPositions = JSON.parse(JSON.stringify(target.widgetPositions));
+  if (target.zoomScale) canvasZoomScale = target.zoomScale;
+  if (target.panX !== undefined) canvasPanX = target.panX;
+  if (target.panY !== undefined) canvasPanY = target.panY;
+
+  saveWidgetState();
+  saveWidgetPositions();
+  renderCanvasWidgets();
+  updateCanvasTransform();
+  closePresetModal();
+}
+
+/* ==========================================================================
+   全局搜索与 AI 交互 (包含标准 Markdown 黑色排版规范渲染)
+   ========================================================================== */
+
+function triggerGlobalCanvasSearch() {
+  const input = document.getElementById('global-prompt-input');
+  const prompt = input ? input.value.trim() : '';
+  if (!prompt) { alert('请输入搜索或编排问题'); return; }
+
+  let searchEngineIds = activeWidgets.filter(id => AVAILABLE_WIDGET_TYPES[id] && AVAILABLE_WIDGET_TYPES[id].type === 'search');
+  if (searchEngineIds.length === 0) {
+    const defaultSearchEngines = ['yuanbao', 'doubao', 'kimi', 'qianwen', 'grok', 'perplexity', 'zai'];
+    defaultSearchEngines.forEach(id => {
+      if (!activeWidgets.includes(id)) activeWidgets.push(id);
+    });
+    saveWidgetState();
+    renderCanvasWidgets();
+    autoAlignWidgets();
+    searchEngineIds = activeWidgets.filter(id => AVAILABLE_WIDGET_TYPES[id] && AVAILABLE_WIDGET_TYPES[id].type === 'search');
+  }
+
+  if (searchEngineIds.length > 0) {
+    searchEngineIds.forEach(id => {
+      const eng = AVAILABLE_WIDGET_TYPES[id];
+      const body = document.getElementById('body-' + id);
+      const status = document.getElementById('status-' + id);
+      if (body) body.innerHTML = `正在连接 ${eng.name}…<span class="cursor-blink"></span>`;
+      if (status) status.innerText = '检索中…';
+    });
+
+    const currentResults = {};
+    const enginesParam = encodeURIComponent(searchEngineIds.join(','));
+    const es = new EventSource('/api/unified_stream?prompt=' + encodeURIComponent(prompt) + '&engines=' + enginesParam);
+
+    es.onmessage = ev => {
+      if (ev.data === '[DONE]') {
+        es.close();
+        searchEngineIds.forEach(id => {
+          const b = document.getElementById('body-' + id);
+          const c = b ? b.querySelector('.cursor-blink') : null;
+          if (c) c.remove();
+        });
+        saveSearchHistory(prompt, currentResults);
+        saveCanvasSearchResults(prompt, currentResults);
+        return;
+      }
+      try {
+        const d = JSON.parse(ev.data);
+        if (d.id && searchEngineIds.includes(d.id)) {
+          const b = document.getElementById('body-' + d.id);
+          const s = document.getElementById('status-' + d.id);
+          if (d.status === 'progress' && b) {
+            b.innerText = d.msg;
+          } else if (d.status === 'done' && b) {
+            const answerText = d.answer || d.text || '';
+            b.innerHTML = renderResultHTML(d.thinking, answerText, d.answer_html || '');
+            const statusText = d.refs ? `完成 · 引用 ${d.refs} 条` : '完成';
+            currentResults[d.id] = { answer: answerText, html: b.innerHTML, statusText: statusText };
+            if (s) s.innerText = statusText;
+          }
+        }
+      } catch(e){}
+    };
+    es.onerror = () => es.close();
+  }
+
+  if (activeWidgets.includes('orchestrator_canvas')) {
+    startOrchestratorPipeline();
+  }
+}
+
+function escapeHTML(str) {
+  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function formatInline(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#000 !important;font-weight:800 !important;">$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em style="color:#334155 !important;">$1</em>')
+    .replace(/`([^`]+)`/g, '<code style="background:#f1f5f9 !important;color:#0f172a !important;padding:2px 6px;border-radius:4px;font-family:Consolas,monospace;font-size:13px;">$1</code>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#0052cc !important;font-weight:600;text-decoration:underline;">$1 ↗</a>');
+}
+
+function safeMarkdownParse(str) {
+  if (!str) return '';
+  if (window.marked && typeof window.marked.parse === 'function') {
+    try {
+      return window.marked.parse(str);
+    } catch(e){}
+  }
+
+  let src = str.replace(/\r\n/g, '\n');
+  let html = '';
+  let lines = src.split('\n');
+  let inList = false, listType = '';
+  let inCode = false, codeBuf = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    
+    if (line.trim().startsWith('```')) {
+      if (inCode) {
+        html += `<pre style="background:#f1f5f9;padding:10px 12px;border-radius:8px;overflow-x:auto;font-family:Consolas,monospace;font-size:13px;margin:10px 0;color:#0f172a;"><code>${escapeHTML(codeBuf)}</code></pre>`;
+        codeBuf = '';
+        inCode = false;
+      } else {
+        inCode = true;
+      }
+      continue;
+    }
+    if (inCode) {
+      codeBuf += (codeBuf ? '\n' : '') + line;
+      continue;
+    }
+
+    let trimmed = line.trim();
+    if (!trimmed) {
+      if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
+      continue;
+    }
+
+    if (trimmed.startsWith('# ')) {
+      if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
+      html += `<h1 style="font-size:18px;font-weight:800;color:#0f172a;margin:16px 0 8px 0;line-height:1.4;">${formatInline(trimmed.slice(2))}</h1>`;
+      continue;
+    }
+    if (trimmed.startsWith('## ')) {
+      if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
+      html += `<h2 style="font-size:16px;font-weight:800;color:#0f172a;margin:14px 0 6px 0;line-height:1.4;">${formatInline(trimmed.slice(3))}</h2>`;
+      continue;
+    }
+    if (trimmed.startsWith('### ')) {
+      if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
+      html += `<h3 style="font-size:15px;font-weight:700;color:#0f172a;margin:12px 0 4px 0;line-height:1.4;">${formatInline(trimmed.slice(4))}</h3>`;
+      continue;
+    }
+    if (trimmed.startsWith('#### ')) {
+      if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
+      html += `<h4 style="font-size:14px;font-weight:700;color:#0f172a;margin:10px 0 4px 0;line-height:1.4;">${formatInline(trimmed.slice(5))}</h4>`;
+      continue;
+    }
+
+    let isUl = /^[*\-+]\s+/.test(trimmed);
+    let isOl = /^\d+\.\s+/.test(trimmed);
+
+    if (isUl || isOl) {
+      let type = isUl ? 'ul' : 'ol';
+      let content = isUl ? trimmed.replace(/^[*\-+]\s+/, '') : trimmed.replace(/^\d+\.\s+/, '');
+      if (!inList) {
+        inList = true;
+        listType = type;
+        html += type === 'ul' ? '<ul style="padding-left:22px;margin:8px 0;color:#0f172a;">' : '<ol style="padding-left:22px;margin:8px 0;color:#0f172a;">';
+      }
+      html += `<li style="margin-bottom:6px;line-height:1.7;">${formatInline(content)}</li>`;
+      continue;
+    }
+
+    if (inList) {
+      html += (listType === 'ul' ? '</ul>' : '</ol>');
+      inList = false;
+    }
+
+    if (trimmed.startsWith('> ')) {
+      html += `<blockquote style="border-left:4px solid #0052cc;padding:6px 12px;background:#f8fafc;color:#334155;margin:10px 0;border-radius:0 6px 6px 0;">${formatInline(trimmed.slice(2))}</blockquote>`;
+      continue;
+    }
+
+    html += `<p style="margin-bottom:10px;line-height:1.75;color:#0f172a;">${formatInline(line)}</p>`;
+  }
+
+  if (inList) html += (listType === 'ul' ? '</ul>' : '</ol>');
+  return html;
+}
+
+function renderResultHTML(thinking, answer, answerHTML) {
+  let html = '';
+  if (thinking) {
+    html += `<details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-bottom:12px;">` +
+      `<summary style="font-size:12px;font-weight:700;color:var(--text-muted);cursor:pointer;">💡 展开思考过程</summary>` +
+      `<div style="font-size:13px;color:#475569;margin-top:6px;white-space:pre-wrap;">${thinking}</div></details>`;
+  }
+
+  let content = '';
+  if (answerHTML && answerHTML.trim().length > 10) {
+    content = answerHTML;
+  } else if (answer && answer.trim().length > 0) {
+    content = safeMarkdownParse(answer);
+  } else {
+    content = '暂无详细回答';
+  }
+
+  html += `<div class="formatted-answer" style="color:#0f172a;font-size:14px;line-height:1.75;">${content}</div>`;
+  return html;
+}
+
+function saveCanvasSearchResults(prompt, resultsMap) {
+  const data = {
+    prompt: prompt,
+    results: resultsMap,
+    timestamp: Date.now()
+  };
+  localStorage.setItem('spatial_canvas_last_search_v2', JSON.stringify(data));
+}
+
+function restoreCanvasSearchResults() {
+  const raw = localStorage.getItem('spatial_canvas_last_search_v2');
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    if (data && data.prompt) {
+      const input = document.getElementById('global-prompt-input');
+      if (input && !input.value) input.value = data.prompt;
+    }
+    if (data && data.results) {
+      Object.entries(data.results).forEach(([id, item]) => {
+        const body = document.getElementById('body-' + id);
+        const status = document.getElementById('status-' + id);
+        if (body && item.html) {
+          body.innerHTML = item.html;
+        }
+        if (status && item.statusText) {
+          status.innerText = item.statusText;
+        }
+      });
+    }
+  } catch(e){}
+}
+
+async function refreshChannels() {
+  try {
+    const d = await (await fetch('/api/channels')).json();
+    channelCache = d.channels || {};
+    const csel = document.getElementById('chat-ch-sel');
+    if (csel) {
+      csel.innerHTML = '';
+      Object.entries(channelCache).forEach(([id, ch]) => {
+        const ok = ch.key_set && ch.reachable;
+        csel.innerHTML += `<option value="${id}">${ok ? '✓ ' : ''}${ch.name}${ok ? '' : '（待配置）'}</option>`;
+      });
+      loadChannelModels();
+    }
+    const tbody = document.getElementById('ch-tbody-canvas');
+    if (tbody) {
+      tbody.innerHTML = '';
+      Object.entries(channelCache).forEach(([id, ch]) => {
+        const ok = ch.key_set && ch.reachable;
+        const statusBadge = ok ? '<span style="color:var(--green);font-weight:700;">已连接</span>' : '<span style="color:var(--amber);font-weight:700;">待配置</span>';
+        const models = (ch.models && ch.models.length) ? ch.models.join(', ') : '—';
+        tbody.innerHTML += `
+          <tr style="border-bottom:1px solid var(--card-border);">
+            <td style="padding:8px;font-weight:700;">${ch.icon || '🔗'} ${ch.name}</td>
+            <td style="padding:8px;font-size:12px;">${ch.billing_tag || '免费'}</td>
+            <td style="padding:8px;">${statusBadge}</td>
+            <td style="padding:8px;font-size:12px;font-family:monospace;">${models}</td>
+          </tr>
+        `;
+      });
+    }
+  } catch(e){}
+}
+
+function loadChannelModels() {
+  const csel = document.getElementById('chat-ch-sel');
+  const msel = document.getElementById('chat-md-sel');
+  if (!csel || !msel) return;
+  const ch = channelCache[csel.value];
+  if (!ch) return;
+  msel.innerHTML = '';
+  const models = (ch.models && ch.models.length) ? ch.models : [ch.default_model || '—'];
+  models.forEach(m => msel.innerHTML += `<option value="${m}">${m}</option>`);
+}
+
+function sendLlmChat() {
+  const msel = document.getElementById('chat-md-sel');
+  const prompt = document.getElementById('chat-input').value;
+  const reply = document.getElementById('chat-reply');
+  if (!msel || !reply) return;
+  const model = msel.value;
+  reply.innerText = '请求 ' + model + ' 中…';
+  const es = new EventSource('/v1/sse?model=' + encodeURIComponent(model) + '&prompt=' + encodeURIComponent(prompt));
+  let buf = '';
+  es.onmessage = ev => {
+    if (ev.data === '[DONE]') { es.close(); return; }
+    try {
+      const o = JSON.parse(ev.data);
+      const c = o.choices[0].delta.content;
+      if (c) { buf += c; reply.innerText = buf; }
+    } catch(e){}
+  };
+  es.onerror = () => { es.close(); if(!buf) reply.innerText = '请求失败：渠道未就绪'; };
+}
+
+function openHistoryModal() {
+  document.getElementById('history-modal').style.display = 'flex';
+  renderModalHistoryList();
+}
+function closeHistoryModal() {
+  document.getElementById('history-modal').style.display = 'none';
+}
+function saveSearchHistory(query, resultsData) {
+  if (!query || !query.trim()) return;
+  let list = JSON.parse(localStorage.getItem('ai_search_history_v1') || '[]');
+  list.unshift({ query: query.trim(), time_str: new Date().toLocaleTimeString(), results: resultsData });
+  if (list.length > 20) list = list.slice(0, 20);
+  localStorage.setItem('ai_search_history_v1', JSON.stringify(list));
+}
+function restoreHistoryItemToCanvas(item) {
+  if (!item) return;
+  const q = item.query || item.question || '';
+  const input = document.getElementById('global-prompt-input');
+  if (input && q) input.value = q;
+
+  let resultsMap = {};
+
+  if (item.results && typeof item.results === 'object' && Object.keys(item.results).length > 0) {
+    resultsMap = item.results;
+  } else if (item.answer || item.html || item.text) {
+    const engineId = item.engine || 'yuanbao';
+    const answerText = item.answer || item.text || '';
+    const answerHTML = item.answer_html || item.html || '';
+    const formatted = renderResultHTML(item.thinking || '', answerText, answerHTML);
+    resultsMap[engineId] = {
+      answer: answerText,
+      html: formatted,
+      statusText: item.refs ? `完成 · 引用 ${item.refs} 条` : '完成'
+    };
+  }
+
+  Object.keys(resultsMap).forEach(id => {
+    if (AVAILABLE_WIDGET_TYPES[id] && !activeWidgets.includes(id)) {
+      activeWidgets.push(id);
+    }
+  });
+  saveWidgetState();
+  renderCanvasWidgets();
+
+  saveCanvasSearchResults(q, resultsMap);
+  restoreCanvasSearchResults();
+  closeHistoryModal();
+}
+
+async function renderModalHistoryList() {
+  const listEl = document.getElementById('modal-history-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">加载中…</div>';
+  let list = JSON.parse(localStorage.getItem('ai_search_history_v1') || '[]');
+  try {
+    const res = await fetch('/api/history');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.history && data.history.length) list = data.history;
+    }
+  } catch(e){}
+  listEl.innerHTML = '';
+  if (list.length === 0) {
+    listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">暂无历史记录</div>';
+    return;
+  }
+  list.forEach(item => {
+    const div = document.createElement('div');
+    div.style.cssText = 'background:#fff;border:1px solid var(--card-border);border-radius:8px;padding:10px;cursor:pointer;';
+    const q = item.query || item.question || '历史搜索';
+    div.innerHTML = `<div style="font-weight:700;font-size:14px;margin-bottom:4px;">🔍 ${q}</div><div style="font-size:11px;color:var(--text-muted);">时间: ${item.time_str || (item.created_at || '').slice(11,16)}</div>`;
+    
+    div.onclick = () => {
+      const detailEl = document.getElementById('modal-history-detail');
+      if (detailEl) {
+        window._current_selected_history_item = item;
+        const answerText = item.answer || (item.results ? JSON.stringify(item.results, null, 2) : '');
+        detailEl.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;border-bottom:1.5px solid var(--card-border);padding-bottom:8px;">
+            <div style="font-weight:800;font-size:15px;color:#0f172a;">🔍 ${q}</div>
+            <button type="button" class="btn" style="font-size:12px;padding:6px 14px;background:var(--primary);" onclick="restoreHistoryItemToCanvas(window._current_selected_history_item)">⚡ 一键还原到画布</button>
+          </div>
+          <div style="font-size:13px;line-height:1.7;color:#0f172a;white-space:pre-wrap;background:#fff;padding:12px;border-radius:8px;border:1px solid var(--card-border);">${answerText || '历史记录详细文本已保留'}</div>
+        `;
+      }
+    };
+    listEl.appendChild(div);
+  });
+}
+
+window.onload = () => {
+  renderCanvasWidgets();
+  updateCanvasTransform();
+};
+</script>
+</body>
+</html>
