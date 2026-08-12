@@ -14,7 +14,7 @@ from pathlib import Path
 import httpx
 
 # token 优先级：环境变量 GITHUB_TOKEN > config/github.json（gitignore 不入库）
-CONFIG_DIR = Path(__file__).parent.parent / "config"
+CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
 LOCAL_REPOS_FILE = CONFIG_DIR / "repos.json"
 
 

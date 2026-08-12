@@ -2,7 +2,7 @@
 """resources_bridge 针对性测试组（GPT 审阅第 6 步的 8+ 场景）。
 
 零依赖：标准库 unittest + httpx.MockTransport（httpx 为项目既有依赖）。
-运行：cd 00_中央平台 && python -m unittest tests.test_resources_bridge -v
+运行：cd services/central && python -m unittest tests.test_resources_bridge -v
 """
 
 import asyncio

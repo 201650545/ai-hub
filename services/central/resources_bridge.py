@@ -35,7 +35,7 @@ REMOTE_BASE = "https://201650545.github.io/ai-resource-hub"
 MANIFEST = "manifest.json"
 # 哈希校验目标：4 个产物全校验（含 schema），与 manifest.files 声明一致
 DATA_FILES = ["index.json", "capabilities.json", "instances.json", "schema.json"]
-LOCAL_DIR = Path(__file__).parent.parent / "ai-resource-hub" / "public"  # D:\项目\ai-resource-hub\public
+LOCAL_DIR = Path(__file__).parent.parent.parent / "ai-resource-hub" / "public"  # D:\项目\ai-resource-hub\public
 CACHE_TTL = 300  # 秒 —— 远程成功缓存
 CACHE_TTL_LOCAL = 60  # 秒 —— 本地回退短缓存（防故障期反复打远端）
 

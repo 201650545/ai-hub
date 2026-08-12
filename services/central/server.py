@@ -22,9 +22,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 BASE_DIR = Path(__file__).parent
-PROJECT_DIR = BASE_DIR.parent
+PROJECT_DIR = BASE_DIR.parent.parent
 CONFIG_DIR = PROJECT_DIR / "config"
-GATEWAYS_DIR = PROJECT_DIR / "02_网关实例"
 
 # 确保配置目录存在
 CONFIG_DIR.mkdir(exist_ok=True)
@@ -35,14 +34,6 @@ app = FastAPI(title="AI Hub 中央平台", version="1.0.0")
 dashboard_dir = BASE_DIR / "dashboard"
 if dashboard_dir.exists():
     app.mount("/dashboard", StaticFiles(directory=str(dashboard_dir)), name="dashboard")
-
-# 挂载各网关实例的静态页面（通过 /gateway/{name}/ 访问）
-if GATEWAYS_DIR.exists():
-    for gw in GATEWAYS_DIR.iterdir():
-        if gw.is_dir():
-            html_file = gw / "hub_page.html"
-            if html_file.exists():
-                app.mount(f"/gateway/{gw.name}", StaticFiles(directory=str(gw)), name=f"gw_{gw.name}")
 
 
 # ---------------------------------------------------------------- 配置读写
@@ -78,6 +69,12 @@ def save_gateways(data):
 
 
 # ---------------------------------------------------------------- 路由
+
+@app.get("/health")
+async def health():
+    """统一健康检查（Monorepo runtime 约定）。"""
+    return {"status": "ok", "service": "central", "version": "1.0"}
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index():

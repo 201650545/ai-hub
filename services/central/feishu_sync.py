@@ -28,8 +28,9 @@ from pathlib import Path
 
 import httpx
 
-CONFIG_DIR = Path(__file__).parent.parent / "config"
-GATEWAYS_DIR = Path(__file__).parent.parent / "02_网关实例"
+CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
+# 网关运行数据（monorepo 数据分离：仓库根/data/search_gateway/）
+GATEWAYS_DIR = Path(__file__).parent.parent.parent / "data" / "search_gateway"
 
 FEISHU_APP_ID = os.environ.get("FEISHU_APP_ID", "")
 FEISHU_APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")

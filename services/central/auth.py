@@ -9,7 +9,7 @@ import secrets
 import time
 from pathlib import Path
 
-CONFIG_DIR = Path(__file__).parent.parent / "config"
+CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
 AUTH_JSON = CONFIG_DIR / "auth.json"
 
 
