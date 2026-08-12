@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 画布 · 白板动态图解</title>
+<style>
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%; overflow:hidden; font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+  body{background:#1b1813;}
+  #stage{position:fixed; inset:0;}
+  canvas{display:block; width:100%; height:100%; background:#faf9f5; cursor:crosshair; touch-action:none;}
+
+  /* ---------- top toolbar ---------- */
+  #bar{position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:30;
+       display:flex; align-items:center; gap:4px; background:rgba(27,24,19,.92);
+       border:1px solid #3a352c; border-radius:12px; padding:6px 8px;
+       box-shadow:0 6px 24px rgba(0,0,0,.35); backdrop-filter:blur(6px);}
+  #bar .brand{color:#f2d8a7; font-weight:700; font-size:13px; padding:0 10px 0 6px; letter-spacing:.4px;}
+  #bar .brand small{display:block; font-weight:400; font-size:9.5px; color:#8f8672; letter-spacing:1px;}
+  #bar .sep{width:1px; height:22px; background:#3a352c; margin:0 4px;}
+  .tbtn{background:none; border:none; color:#d8d2c4; font-size:12px; padding:6px 10px; border-radius:8px;
+        cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:6px;}
+  .tbtn:hover{background:rgba(255,255,255,.08); color:#fff;}
+  .tbtn.on{background:#5e7f62; color:#fff;}
+  .tbtn.acc{background:#c06a3f; color:#fff;}
+  .tbtn.acc:hover{background:#d17a4d;}
+  .tbtn.acc:disabled{opacity:.5; cursor:not-allowed;}
+  .tbtn svg{width:14px; height:14px; fill:currentColor;}
+  .tbtn .key{font-size:9px; color:#8f8672; border:1px solid #4a4436; border-radius:4px; padding:1px 4px;}
+
+  /* ---------- left tool rail ---------- */
+  #rail{position:fixed; left:12px; top:50%; transform:translateY(-50%); z-index:30;
+        display:flex; flex-direction:column; gap:4px; background:rgba(27,24,19,.92);
+        border:1px solid #3a352c; border-radius:12px; padding:6px; box-shadow:0 6px 24px rgba(0,0,0,.35);}
+  .rbtn{width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:none;
+        background:none; color:#c9c2b2; border-radius:9px; cursor:pointer;}
+  .rbtn svg{width:20px; height:20px; fill:currentColor;}
+  .rbtn:hover{background:rgba(255,255,255,.08); color:#fff;}
+  .rbtn.on{background:#5e7f62; color:#fff;}
+
+  /* ---------- options panel ---------- */
+  #opts{position:fixed; left:12px; top:50%; transform:translateY(-50%); z-index:29;
+        margin-left:52px; background:rgba(27,24,19,.94); border:1px solid #3a352c; border-radius:12px;
+        padding:10px 12px; display:none; flex-direction:column; gap:9px; min-width:168px;
+        box-shadow:0 6px 24px rgba(0,0,0,.35);}
+  #opts.show{display:flex;}
+  #opts .lbl{font-size:10.5px; color:#8f8672; letter-spacing:1px;}
+  #colors{display:flex; gap:5px; flex-wrap:wrap;}
+  .c{width:22px; height:22px; border-radius:50%; border:2px solid transparent; cursor:pointer;}
+  .c.on{border-color:#fff; box-shadow:0 0 0 1px #000;}
+  #widthRange{width:100%; accent-color:#c06a3f;}
+  #widthVal{font-size:11px; color:#d8d2c4; text-align:right;}
+
+  /* ---------- bottom status ---------- */
+  #status{position:fixed; left:50%; bottom:12px; transform:translateX(-50%); z-index:30;
+          background:rgba(27,24,19,.92); border:1px solid #3a352c; border-radius:99px;
+          color:#b9b1a0; font-size:11.5px; padding:6px 16px; display:flex; gap:14px;
+          box-shadow:0 4px 16px rgba(0,0,0,.3);}
+  #status b{color:#f2d8a7; font-weight:600;}
+
+  /* ---------- float text input ---------- */
+  #ftext{position:fixed; z-index:60; display:none; background:#fff; border:2px solid #c06a3f;
+         border-radius:6px; padding:6px 8px; font-size:15px; min-width:120px; outline:none;
+         font-family:inherit; box-shadow:0 4px 14px rgba(0,0,0,.25);}
+
+  /* ---------- right panel ---------- */
+  #panel{position:fixed; right:12px; top:12px; bottom:12px; width:min(360px,90vw); z-index:40;
+         background:#fbf7ec; border:1px solid #e0d6c2; border-radius:14px; display:none;
+         flex-direction:column; box-shadow:0 10px 40px rgba(0,0,0,.4); overflow:hidden;}
+  #panel.show{display:flex;}
+  #panel .ph{display:flex; align-items:center; gap:8px; padding:13px 16px; border-bottom:1px solid #e0d6c2;}
+  #panel .ph b{font-size:14px; color:#2f2a21;}
+  #panel .ph .sp{flex:1;}
+  #panel .ph button{background:none; border:none; font-size:18px; cursor:pointer; color:#8a7f6a;}
+  #panel .pb{flex:1; overflow:auto; padding:14px 16px;}
+  #panel .pb h4{font-size:12.5px; color:#8a7f6a; margin:12px 0 6px; letter-spacing:1px;}
+  #panel .pb h4:first-child{margin-top:0;}
+  #panel .pb p{font-size:13.5px; line-height:1.8; color:#3c362b;}
+  #thumb{width:100%; border:1px solid #e0d6c2; border-radius:8px; background:#fff; margin-top:4px;}
+  .tag{display:inline-block; font-size:10px; letter-spacing:1px; background:#5e7f62; color:#fff;
+       border-radius:99px; padding:2px 8px; margin-bottom:6px;}
+  .note{font-size:12px; color:#8a7f6a; background:#f3ecd8; border-radius:8px; padding:8px 10px; margin-top:10px; line-height:1.7;}
+
+  /* 识别结果编辑 */
+  #recogEdit{width:100%; min-height:120px; border:1px solid #d9c9a8; border-radius:8px; background:#fff;
+             padding:8px 10px; font-size:13px; line-height:1.7; color:#3c362b; font-family:inherit; resize:vertical;}
+
+  /* 候选方案卡片 */
+  .scheme{display:block; width:100%; text-align:left; background:#fff; border:1px solid #d9c9a8; border-radius:10px;
+          padding:12px 14px; margin-bottom:10px; cursor:pointer; font-family:inherit; transition:all .15s;}
+  .scheme:hover{border-color:#c06a3f; box-shadow:0 2px 10px rgba(192,106,63,.15);}
+  .scheme .st{font-size:14px; font-weight:700; color:#2f2a21; margin-bottom:4px;}
+  .scheme .sd{font-size:12.5px; color:#7a7160; line-height:1.6;}
+
+  /* 播放控制条 */
+  #playerCtl{display:flex; gap:8px; align-items:center; margin-top:12px; flex-wrap:wrap;}
+  #playerCtl button{font-size:12px; border:1px solid #d9c9a8; background:#fff; color:#5a4a2c;
+                    border-radius:99px; padding:7px 12px; cursor:pointer; font-family:inherit;}
+  #playerCtl button:hover{background:#f3ecd8;}
+  #playerCtl button.on{background:#5e7f62; color:#fff; border-color:#5e7f62;}
+  #playerCtl .pbar{flex:1; min-width:120px; height:6px; background:#efe7d5; border-radius:99px; overflow:hidden;}
+  #playerCtl .pbar i{display:block; height:100%; background:#c06a3f; width:0%;}
+
+  /* 加载态 */
+  .loading{display:flex; align-items:center; gap:8px; color:#8a7f6a; font-size:13px; padding:8px 0;}
+  .loading .dot{width:6px; height:6px; border-radius:50%; background:#c06a3f; animation:blink 1s infinite;}
+  .loading .dot:nth-child(2){animation-delay:.2s;} .loading .dot:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,100%{opacity:.2;}50%{opacity:1;}}
+
+  /* AI 设置浮层 */
+  #aiCfg{position:fixed; z-index:70; right:12px; bottom:56px; background:rgba(27,24,19,.96); border:1px solid #3a352c;
+         border-radius:12px; padding:14px 16px; display:none; flex-direction:column; gap:10px; min-width:260px;
+         box-shadow:0 8px 30px rgba(0,0,0,.5);}
+  #aiCfg.show{display:flex;}
+  #aiCfg .lbl{font-size:10.5px; color:#8f8672; letter-spacing:1px;}
+  #aiCfg input, #aiCfg select{background:#241f18; border:1px solid #3a352c; color:#e8e2d2; border-radius:7px;
+                              padding:7px 9px; font-size:12.5px; font-family:inherit; width:100%;}
+  #aiCfg .row{display:flex; gap:8px; align-items:center;}
+  #aiCfg .row input{flex:1;}
+
+  @media (max-width:760px){
+    #bar{top:8px; max-width:96vw; flex-wrap:wrap; justify-content:center;}
+    #rail{left:8px;} #opts{margin-left:48px; left:8px;}
+    #panel{width:min(92vw,360px);}
+  }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv"></canvas></div>
+
+<!-- 顶部工具栏 -->
+<div id="bar">
+  <div class="brand">AI 画布<small>白板 · 动态图解</small></div>
+  <div class="sep"></div>
+  <button class="tbtn" data-cmd="undo" title="撤销 (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 6L3 12l6 6v-4h5c3 0 5-2 5-5s-2-5-5-5H9V6z"/></svg>撤销</button>
+  <button class="tbtn" data-cmd="clear" title="清空画布"><svg viewBox="0 0 24 24"><path d="M6 6h12l-1.2 14H7.2L6 6zm3-3h6l1 2H8l1-2z"/></svg>清空</button>
+  <div class="sep"></div>
+  <button class="tbtn" data-cmd="recognise" title="识别画布内容（接 Gemini 视觉）"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 4a2 2 0 110 4 2 2 0 010-4zm-3 14v-1c0-2 2-3 3-4s3-2 3-4v-.5a6 6 0 10-6 5.5z"/></svg>Recognise</button>
+  <button class="tbtn acc" data-cmd="reason" title="生成动态图解（接 DeepSeek）"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.6H22l-6 4.4 2.3 7.4-6.3-4.5-6.3 4.5L8 14l-6-4.4h7.6L12 2z"/></svg>Reason · AI 图解</button>
+  <div class="sep"></div>
+  <button class="tbtn" data-cmd="export" title="导出 PNG (Ctrl+S)"><svg viewBox="0 0 24 24"><path d="M12 3l5 5h-3v6h-4V8H7l5-5zm-7 14v3h14v-3H5z"/></svg>导出</button>
+  <button class="tbtn" data-cmd="cfg" title="AI 网关设置"><svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zm9 4a9 9 0 01-1.1 4.4l1.5 1.5-1.4 1.4-1.5-1.5A9 9 0 0115 20.9V23h-2v-2.1A9 9 0 018.6 19l-1.5 1.5-1.4-1.4 1.5-1.5A9 9 0 015.1 13H3v-2h2.1A9 9 0 016 8.6L4.5 7.1l1.4-1.4L7.4 7.2A9 9 0 0111 5.1V3h2v2.1A9 9 0 0117.4 7.2l1.5-1.5 1.4 1.4-1.5 1.5A9 9 0 0121 12z"/></svg>设置</button>
+</div>
+
+<!-- 左侧工具 -->
+<div id="rail">
+  <button class="rbtn on" data-tool="pen" title="画笔 (P)"><svg viewBox="0 0 24 24"><path d="M3 17l11-11 4 4L7 21H3v-4zm13.5-13.5l2.8 2.8 1.9-1.9a1 1 0 000-1.4L18 2.6a1 1 0 00-1.4 0l-1.9 1.9z"/></svg></button>
+  <button class="rbtn" data-tool="select" title="框选 (S)"><svg viewBox="0 0 24 24"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg></button>
+  <button class="rbtn" data-tool="text" title="文字 (T)"><svg viewBox="0 0 24 24"><path d="M5 5h14v3h-5v11h-4V8H5V5z"/></svg></button>
+  <button class="rbtn" data-tool="eraser" title="橡皮 (E)"><svg viewBox="0 0 24 24"><path d="M16.2 3.8a2 2 0 012.8 0l1.2 1.2a2 2 0 010 2.8L10 18H6l-2-2 12.2-12.2zM3 20h8l2-2H5l-2 2z"/></svg></button>
+  <button class="rbtn" data-tool="pan" title="平移 (空格拖拽 / 中键)"><svg viewBox="0 0 24 24"><path d="M12 2l3 4h-2v4h4V8l4 3-4 3v-2h-4v4h2l-3 4-3-4h2v-4H7v2l-4-3 4-3v2h4V6H9l3-4z"/></svg></button>
+</div>
+
+<!-- 画笔选项 -->
+<div id="opts">
+  <span class="lbl">颜色</span>
+  <div id="colors"></div>
+  <span class="lbl">粗细 <span id="widthVal">3</span></span>
+  <input type="range" id="widthRange" min="1" max="16" step="0.5" value="3">
+  <span class="lbl" style="margin-top:2px;">空格=平移 · 滚轮=缩放 · 手写笔支持</span>
+</div>
+
+<!-- 状态条 -->
+<div id="status">
+  <span>工具 <b id="stTool">画笔</b></span>
+  <span>缩放 <b id="stZoom">100%</b></span>
+  <span>笔迹 <b id="stStrokes">0</b></span>
+  <span id="stAi" style="display:none;">AI <b>●</b></span>
+</div>
+
+<!-- 浮动文字输入 -->
+<input id="ftext" placeholder="输入文字，回车确认">
+
+<!-- 结果面板 -->
+<div id="panel">
+  <div class="ph"><b id="pTitle">识别结果</b><div class="sp"></div><button id="pClose">×</button></div>
+  <div class="pb"><div id="pBody"></div></div>
+</div>
+
+<!-- AI 设置浮层 -->
+<div id="aiCfg">
+  <span class="lbl">AI 网关地址（本地搜索网关）</span>
+  <input id="cfgBase" placeholder="http://localhost:3000">
+  <span class="lbl">Recognise 视觉模型</span>
+  <input id="cfgVision" placeholder="gemini-2.5-flash">
+  <span class="lbl">Reason 文本模型</span>
+  <input id="cfgText" placeholder="gemini-2.5-flash">
+  <div class="row"><button class="tbtn acc" id="cfgSave" style="flex:1;justify-content:center;">保存并测试连接</button></div>
+  <div id="cfgResult" class="note" style="display:none;"></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+ * 白板内核（Canvas 世界坐标：screen = world*scale + offset）
+ * ============================================================ */
+var cv = document.getElementById("cv");
+var ctx = cv.getContext("2d");
+var DPR = Math.max(1, window.devicePixelRatio || 1);
+var view = {scale:1, ox:0, oy:0};
+var shapes = [];
+var history = [];
+var tool = "pen";
+var penColor = "#2f2a21";
+var penWidth = 3;
+var selection = null;   // 框选矩形 {x1,y1,x2,y2}（世界坐标）
+
+function resize(){
+  cv.width = window.innerWidth * DPR;
+  cv.height = window.innerHeight * DPR;
+  cv.style.width = window.innerWidth + "px";
+  cv.style.height = window.innerHeight + "px";
+  render();
+}
+window.addEventListener("resize", resize);
+
+function toScreen(x,y){ return {x:x*view.scale+view.ox, y:y*view.scale+view.oy}; }
+function toWorld(sx,sy){ return {x:(sx-view.ox)/view.scale, y:(sy-view.oy)/view.scale}; }
+
+function drawGrid(){
+  if(view.scale < 0.15) return;
+  var g = 40*view.scale;
+  ctx.strokeStyle="#e9e4d6"; ctx.lineWidth=1; ctx.beginPath();
+  for(var x=view.ox%g; x<cv.width; x+=g){ ctx.moveTo(x,0); ctx.lineTo(x,cv.height); }
+  for(var y=view.oy%g; y<cv.height; y+=g){ ctx.moveTo(0,y); ctx.lineTo(cv.width,y); }
+  ctx.stroke();
+}
+
+function render(){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle="#faf9f5"; ctx.fillRect(0,0,cv.width/DPR,cv.height/DPR);
+  drawGrid();
+  ctx.save(); ctx.translate(view.ox,view.oy); ctx.scale(view.scale,view.scale);
+  drawShapes();
+  if(drawing) drawStroke(drawing);
+  if(selection) drawSelection();
+  ctx.restore();
+  if(playback) drawPlayback();
+}
+
+function drawShapes(){
+  shapes.forEach(function(sh){
+    if(sh.type==="stroke"){
+      ctx.strokeStyle=sh.color; ctx.lineWidth=sh.width; ctx.lineCap="round"; ctx.lineJoin="round";
+      ctx.beginPath(); sh.pts.forEach(function(p,i){ i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y); }); ctx.stroke();
+    } else if(sh.type==="text"){
+      ctx.fillStyle=sh.color; ctx.font="500 "+sh.size+"px 'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif";
+      ctx.textBaseline="top"; ctx.fillText(sh.text, sh.x, sh.y);
+    }
+  });
+}
+function drawStroke(s){
+  if(!s.pts.length) return;
+  ctx.strokeStyle=s.color; ctx.lineWidth=s.width; ctx.lineCap="round"; ctx.lineJoin="round";
+  ctx.beginPath(); s.pts.forEach(function(p,i){ i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y); }); ctx.stroke();
+}
+function drawSelection(){
+  if(!selection) return;
+  var a=toScreen(selection.x1,selection.y1), b=toScreen(selection.x2,selection.y2);
+  var x=Math.min(a.x,b.x), y=Math.min(a.y,b.y), w=Math.abs(b.x-a.x), h=Math.abs(b.y-a.y);
+  ctx.setLineDash([6,4]); ctx.strokeStyle="#c06a3f"; ctx.lineWidth=1.5;
+  ctx.strokeRect(x/view.scale, y/view.scale, w/view.scale, h/view.scale);
+  ctx.fillStyle="rgba(192,106,63,0.08)";
+  ctx.fillRect(x/view.scale, y/view.scale, w/view.scale, h/view.scale);
+  ctx.setLineDash([]);
+}
+
+/* ============================================================
+ * 绘制输入
+ * ============================================================ */
+var drawing=null, panning=null, selecting=null, spaceDown=false;
+
+function pointerPos(e){ var r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+function w2(p){ var w=toWorld(p.x,p.y); return {x:w.x,y:w.y}; }
+
+cv.addEventListener("pointerdown", function(e){
+  cv.setPointerCapture(e.pointerId);
+  var p=pointerPos(e);
+  var panKey = spaceDown || e.button===1 || e.button===2;
+  if(panKey){ panning={lastX:p.x,lastY:p.y}; cv.style.cursor="grabbing"; return; }
+  if(tool==="text"){ var w=toWorld(p.x,p.y); showTextInput(p.x,p.y,w.x,w.y); return; }
+  if(tool==="select"){ selecting=w2(p); selection={x1:selecting.x,y1:selecting.y,x2:selecting.x,y2:selecting.y}; render(); return; }
+  drawing={type:"stroke", tool:tool, color: tool==="eraser"?"#faf9f5":penColor,
+           width: tool==="eraser"?Math.max(penWidth,10):penWidth, pts:[w2(p)]};
+  render();
+});
+
+cv.addEventListener("pointermove", function(e){
+  var p=pointerPos(e);
+  if(panning){ view.ox+=p.x-panning.lastX; view.oy+=p.y-panning.lastY; panning.lastX=p.x; panning.lastY=p.y; render(); return; }
+  if(selecting){ var w=toWorld(p.x,p.y); selection.x2=w.x; selection.y2=w.y; render(); return; }
+  if(drawing){ drawing.pts.push(w2(p)); render(); }
+});
+
+cv.addEventListener("pointerup", function(e){
+  if(panning){ panning=null; cv.style.cursor=tool==="pan"?"grab":"crosshair"; return; }
+  if(selecting){ selecting=null; render(); return; }
+  if(drawing){ drawing.pts.push(w2(pointerPos(e))); commit(drawing); drawing=null; render(); }
+});
+cv.addEventListener("wheel", function(e){
+  e.preventDefault();
+  var p=pointerPos(e);
+  var factor = e.deltaY<0?1.12:1/1.12;
+  var ns=Math.min(6,Math.max(0.05,view.scale*factor));
+  var wx=(p.x-view.ox)/view.scale, wy=(p.y-view.oy)/view.scale;
+  view.scale=ns; view.ox=p.x-wx*ns; view.oy=p.y-wy*ns; updateStatus(); render();
+},{passive:false});
+cv.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+
+function commit(sh){
+  history.push(JSON.parse(JSON.stringify(shapes)));
+  if(history.length>60) history.shift();
+  shapes.push(sh); updateStatus();
+}
+
+/* ============================================================
+ * 文字工具
+ * ============================================================ */
+var ftext=document.getElementById("ftext");
+var textPos={sx:0,sy:0,wx:0,wy:0};
+function showTextInput(sx,sy,wx,wy){
+  textPos={sx:sx,sy:sy,wx:wx,wy:wy};
+  ftext.style.display="block"; ftext.style.left=Math.min(sx,window.innerWidth-140)+"px";
+  ftext.style.top=sy+"px"; ftext.value=""; ftext.focus();
+}
+ftext.addEventListener("keydown", function(e){
+  if(e.key==="Enter"){
+    var t=ftext.value.trim();
+    if(t){ history.push(JSON.parse(JSON.stringify(shapes)));
+      shapes.push({type:"text",x:textPos.wx,y:textPos.wy,text:t,color:penColor,size:Math.max(14,penWidth*6)}); updateStatus(); }
+    ftext.style.display="none"; render();
+  }
+  if(e.key==="Escape"){ ftext.style.display="none"; render(); }
+});
+ftext.addEventListener("blur", function(){ ftext.style.display="none"; render(); });
+
+/* ============================================================
+ * 工具栏 / 命令
+ * ============================================================ */
+var railBtns=document.querySelectorAll(".rbtn");
+railBtns.forEach(function(b){
+  b.addEventListener("click", function(){ setTool(b.getAttribute("data-tool")); });
+});
+function setTool(t){
+  railBtns.forEach(function(x){ x.classList.toggle("on", x.getAttribute("data-tool")===t); });
+  tool=t;
+  cv.style.cursor = t==="pan"?"grab":(t==="text"||t==="select")?"text":"crosshair";
+  showOpts(t==="pen"||t==="eraser");
+  updateStatus();
+}
+
+var opts=document.getElementById("opts");
+var colorsBox=document.getElementById("colors");
+var PALETTE=["#2f2a21","#c0392b","#e67e22","#f1c40f","#27ae60","#2980b9","#8e44ad","#ecf0f1"];
+PALETTE.forEach(function(c){
+  var d=document.createElement("button");
+  d.className="c"+(c===penColor?" on":""); d.style.background=c; d.setAttribute("data-c",c);
+  d.addEventListener("click", function(){ penColor=c; colorsBox.querySelectorAll(".c").forEach(function(x){x.classList.remove("on");}); d.classList.add("on"); });
+  colorsBox.appendChild(d);
+});
+var widthRange=document.getElementById("widthRange"), widthVal=document.getElementById("widthVal");
+widthRange.addEventListener("input", function(){ penWidth=parseFloat(widthRange.value); widthVal.textContent=penWidth; });
+function showOpts(show){ opts.classList.toggle("show", show); }
+
+document.querySelectorAll("[data-cmd]").forEach(function(b){
+  b.addEventListener("click", function(){ runCmd(b.getAttribute("data-cmd")); });
+});
+function runCmd(cmd){
+  if(cmd==="undo"){ if(history.length){ shapes=history.pop(); updateStatus(); render(); } }
+  else if(cmd==="clear"){ if(!shapes.length&&!playback) return; history.push(JSON.parse(JSON.stringify(shapes))); shapes=[]; selection=null; stopPlayback(); updateStatus(); render(); }
+  else if(cmd==="export"){ exportPNG(); }
+  else if(cmd==="cfg"){ aiCfg.classList.toggle("show"); }
+  else if(cmd==="recognise"){ recognise(); }
+  else if(cmd==="reason"){ reason(); }
+}
+
+/* ============================================================
+ * 导出 / 缩略图 / 截图
+ * ============================================================ */
+function bbox(){
+  if(!shapes.length) return null;
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  shapes.forEach(function(sh){
+    if(sh.type==="stroke"){ sh.pts.forEach(function(p){ if(p.x<minX)minX=p.x; if(p.y<minY)minY=p.y; if(p.x>maxX)maxX=p.x; if(p.y>maxY)maxY=p.y; }); }
+    else{ if(sh.x<minX)minX=sh.x; if(sh.y<minY)minY=sh.y; if(sh.x+sh.text.length*sh.size*0.6>maxX)maxX=sh.x+sh.text.length*sh.size*0.6; if(sh.y+sh.size>maxY)maxY=sh.y+sh.size; }
+  });
+  var pad=20; return {x:minX-pad,y:minY-pad,w:(maxX-minX)+pad*2,h:(maxY-minY)+pad*2};
+}
+function exportPNG(){
+  var bb=bbox(); if(!bb){ alert("画布为空，没有可导出的内容。"); return; }
+  var scale=Math.min(2,3000/bb.w);
+  var out=document.createElement("canvas"); out.width=bb.w*scale; out.height=bb.h*scale;
+  var c2=out.getContext("2d"); c2.fillStyle="#fff"; c2.fillRect(0,0,out.width,out.height);
+  c2.translate(-bb.x*scale,-bb.y*scale); c2.scale(scale,scale);
+  drawShapesTo(c2);
+  var a=document.createElement("a"); a.download="AI画布_导出_"+Date.now()+".png"; a.href=out.toDataURL("image/png"); a.click();
+}
+function drawShapesTo(c2){
+  shapes.forEach(function(sh){
+    if(sh.type==="stroke"){ c2.strokeStyle=sh.color; c2.lineWidth=sh.width; c2.lineCap="round"; c2.lineJoin="round";
+      c2.beginPath(); sh.pts.forEach(function(p,i){ i?c2.lineTo(p.x,p.y):c2.moveTo(p.x,p.y); }); c2.stroke(); }
+    else{ c2.fillStyle=sh.color; c2.font="500 "+sh.size+"px sans-serif"; c2.textBaseline="top"; c2.fillText(sh.text,sh.x,sh.y); }
+  });
+}
+/* 截图：框选优先，否则内容 bbox，否则整屏 */
+function captureRegion(){
+  var bb;
+  if(selection){
+    var x=Math.min(selection.x1,selection.x2), y=Math.min(selection.y1,selection.y2);
+    var w=Math.abs(selection.x2-selection.x1), h=Math.abs(selection.y2-selection.y1);
+    if(w>5&&h>5) bb={x:x,y:y,w:w,h:h};
+  }
+  if(!bb) bb=bbox();
+  if(!bb){ alert("画布为空，请先画点东西或框选区域。"); return null; }
+  var scale=Math.min(2,1600/bb.w);
+  var c=document.createElement("canvas"); c.width=Math.max(10,bb.w*scale); c.height=Math.max(10,bb.h*scale);
+  var cc=c.getContext("2d"); cc.fillStyle="#fff"; cc.fillRect(0,0,c.width,c.height);
+  cc.translate(-bb.x*scale,-bb.y*scale); cc.scale(scale,scale); drawShapesTo(cc);
+  return c;
+}
+function makeThumb(){
+  var bb=bbox(); var can=document.createElement("canvas");
+  if(!bb){ can.width=1; can.height=1; return can; }
+  var w=280,h=Math.max(40,Math.round(bb.h/bb.w*w)); can.width=w; can.height=h;
+  var c2=can.getContext("2d"); c2.fillStyle="#fff"; c2.fillRect(0,0,w,h);
+  var s=Math.min(w/bb.w,h/bb.h); c2.translate((w-bb.w*s)/2-bb.x*s,(h-bb.h*s)/2-bb.y*s); c2.scale(s,s);
+  drawShapesTo(c2); return can;
+}
+
+/* ============================================================
+ * AI 配置与网关调用
+ * ============================================================ */
+var aiCfg=document.getElementById("aiCfg");
+var cfgBase=document.getElementById("cfgBase"), cfgVision=document.getElementById("cfgVision"), cfgText=document.getElementById("cfgText");
+var cfgResult=document.getElementById("cfgResult");
+
+function aiConfig(){
+  return {
+    base: (cfgBase.value||"http://localhost:3000").replace(/\/+$/,""),
+    vision: cfgVision.value||"gemini-2.5-flash",
+    text: cfgText.value||"gemini-2.5-flash"
+  };
+}
+function loadCfg(){
+  try{ var s=JSON.parse(localStorage.getItem("aiCanvasCfg")||"{}");
+    if(s.base) cfgBase.value=s.base; if(s.vision) cfgVision.value=s.vision; if(s.text) cfgText.value=s.text;
+  }catch(e){}
+}
+function saveCfg(){ localStorage.setItem("aiCanvasCfg", JSON.stringify(aiConfig())); }
+loadCfg();
+
+document.getElementById("cfgSave").addEventListener("click", async function(){
+  saveCfg(); cfgResult.style.display="block";
+  cfgResult.textContent="测试连接中...";
+  try{
+    var cfg=aiConfig();
+    var r=await fetch(cfg.base+"/v1/models");
+    cfgResult.textContent = r.ok ? "✅ 连接成功，网关在线" : "❌ 网关返回 "+r.status;
+  }catch(e){ cfgResult.textContent="❌ 无法连接网关："+e.message; }
+});
+
+function setAiBusy(on){
+  var el=document.getElementById("stAi"); el.style.display=on?"":"none";
+}
+
+async function gatewayChat(model, messages, extra){
+  var cfg=aiConfig();
+  var body={model:model, messages:messages, stream:false};
+  if(extra) for(var k in extra) body[k]=extra[k];
+  var r=await fetch(cfg.base+"/v1/chat/completions",{
+    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)
+  });
+  if(!r.ok){ var t=await r.text().catch(function(){return "";}); throw new Error("网关 "+r.status+"："+t.slice(0,200)); }
+  var d=await r.json();
+  var msg=d.choices&&d.choices[0]&&d.choices[0].message;
+  return (msg&&msg.content)||"";
+}
+/* 从 LLM 返回里稳健抽取 JSON（容忍 ```json 围栏 / 前后杂文） */
+function extractJSON(text){
+  if(!text) throw new Error("空响应");
+  var m=text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if(m) text=m[1];
+  var a=text.indexOf("{"); var b=text.lastIndexOf("}");
+  if(a<0||b<=a) throw new Error("未找到 JSON");
+  return JSON.parse(text.slice(a,b+1));
+}
+
+/* ============================================================
+ * Recognise：截图 → Gemini 视觉识别
+ * ============================================================ */
+var panel=document.getElementById("panel"), pTitle=document.getElementById("pTitle"), pBody=document.getElementById("pBody");
+document.getElementById("pClose").addEventListener("click", function(){ panel.classList.remove("show"); });
+function openPanel(title, html){ pTitle.textContent=title; pBody.innerHTML=html; panel.classList.add("show"); }
+
+async function recognise(){
+  var img=captureRegion(); if(!img) return;
+  openPanel("Recognise · 识别中", '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span>正在识别画布内容（Gemini 视觉）...</div>');
+  setAiBusy(true);
+  try{
+    var cfg=aiConfig();
+    var b64=img.toDataURL("image/png").split(",")[1];
+    var prompt="你是白板识别助手。请识别这张白板截图的内容，包括：\n1. 手写或印刷的文字（中文/英文/公式）\n2. 图形（几何图形、箭头、示意图）\n3. 用户想表达的概念或意图\n\n请用简洁中文回答，用以下结构：\n【文字】...\n【图形】...\n【意图】...";
+    var content=await gatewayChat(cfg.vision,[{role:"user",content:[
+      {type:"text",text:prompt},
+      {type:"image_url",image_url:{url:"data:image/png;base64,"+b64}}
+    ]}]);
+    var html='<span class="tag">Recognise · 已识别</span>';
+    html+='<h4>识别结果（可编辑后用于 Reason）</h4>';
+    html+='<textarea id="recogEdit">'+escHtml(content)+'</textarea>';
+    html+='<h4>识别预览</h4><img id="thumb">';
+    html+='<div class="note">✏️ 识别结果可编辑——若 AI 识别有误，改完再点「Reason」生成图解，避免"AI 误解就全错"。</div>';
+    openPanel("Recognise · 已识别", html);
+    setTimeout(function(){ var im=document.getElementById("thumb"); if(im) im.src=img.toDataURL("image/png"); },30);
+  }catch(e){
+    openPanel("Recognise · 失败", '<p style="color:#c0392b;">识别失败：'+escHtml(e.message)+'</p><div class="note">请确认「设置」里的网关地址正确、网关 :3000 已启动、视觉模型可用。</div>');
+  }finally{ setAiBusy(false); }
+}
+function escHtml(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+
+/* ============================================================
+ * Reason：两阶段生成动态图解
+ *   阶段1 → 3 个候选方案（#16 通用原则：AI 提议，用户决策）
+ *   阶段2 → 选中方案生成动画脚本 JSON → 解释器播放
+ * ============================================================ */
+var lastRecog="";
+
+async function reason(){
+  var recog="";
+  var edit=document.getElementById("recogEdit");
+  if(edit){ recog=edit.value.trim(); }
+  if(!recog){ recog=lastRecog; }
+  if(!recog && !shapes.length){ openPanel("Reason · 无内容",'<p>画布上还没有内容，也没有识别结果。</p><div class="note">先画点东西（或写一句话），点「Recognise」识别，再点「Reason」生成图解。</div>'); return; }
+  if(!recog){
+    // 没有识别结果但有内容：先用视觉识别兜底
+    recog = await quickRecognise();
+  }
+  lastRecog=recog;
+
+  openPanel("Reason · 构思中", '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span>AI 正在构思 3 个图解方案...</div>');
+  setAiBusy(true);
+  try{
+    var cfg=aiConfig();
+    var p1="你要把下面这段「白板识别到的概念」，做成一个动态图解动画，在白板上把抽象概念讲明白。\n\n白板识别内容：\n"+recog+"\n\n请给出 3 个不同的动态图解方案，方案之间角度要有差异（呈现方式不同）。每个方案给：一句话标题 + 一句话说明它怎么用动画讲明白。\n\n严格输出 JSON（不要任何其他文字、不要代码块标记）：\n{\"schemes\":[{\"title\":\"...\",\"desc\":\"...\"},{\"title\":\"...\",\"desc\":\"...\"},{\"title\":\"...\",\"desc\":\"...\"}]}";
+    var raw=await gatewayChat(cfg.text,[{role:"user",content:p1}]);
+    var obj=extractJSON(raw);
+    var schemes=obj.schemes||[];
+    if(!schemes.length) throw new Error("未生成候选方案");
+
+    var html='<span class="tag">Reason · 选一个方案</span>';
+    html+='<h4>AI 给出 '+schemes.length+' 个图解方案，选一个：</h4>';
+    schemes.forEach(function(s,i){
+      html+='<button class="scheme" data-i="'+i+'"><div class="st">'+escHtml(s.title)+'</div><div class="sd">'+escHtml(s.desc)+'</div></button>';
+    });
+    html+='<div class="note">💡 多方案比选：AI 提议、你来决策。选定后 AI 生成完整动画脚本。</div>';
+    openPanel("Reason · 选方案", html);
+    document.querySelectorAll("#pBody .scheme").forEach(function(b){
+      b.addEventListener("click", function(){ generateAnimation(schemes[parseInt(b.getAttribute("data-i"),10)]); });
+    });
+  }catch(e){
+    openPanel("Reason · 失败", '<p style="color:#c0392b;">构思方案失败：'+escHtml(e.message)+'</p><div class="note">可重试，或检查「设置」里的文本模型。若 AI 不稳定，点下面用内置示例动画。</div><button class="scheme" id="fallbackDemo"><div class="st">用内置示例动画（勾股定理）</div><div class="sd">跳过 AI，直接播放一个预置演示</div></button>');
+    var fb=document.getElementById("fallbackDemo");
+    if(fb) fb.addEventListener("click", function(){ playDemoScript(builtinPythagoras()); });
+  }finally{ setAiBusy(false); }
+}
+
+/* 无识别结果时兜底识别（复用视觉） */
+async function quickRecognise(){
+  var img=captureRegion(); if(!img) return "";
+  var cfg=aiConfig();
+  var b64=img.toDataURL("image/png").split(",")[1];
+  return await gatewayChat(cfg.vision,[{role:"user",content:[
+    {type:"text",text:"请用一句话识别这张白板内容表达的概念。"},
+    {type:"image_url",image_url:{url:"data:image/png;base64,"+b64}}
+  ]}]);
+}
+
+/* 阶段2：生成动画脚本并播放 */
+async function generateAnimation(scheme){
+  openPanel("Reason · 生成中", '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span>正在生成动画脚本（'+escHtml(scheme.title)+'）...</div>');
+  setAiBusy(true);
+  try{
+    var cfg=aiConfig();
+    var p2="你要生成一个动态图解动画的播放脚本，在白板上逐笔演示概念。\n\n概念："+lastRecog+"\n选定的方案：「"+scheme.title+"」—— "+scheme.desc+"\n\n坐标用 0-100 归一化（x 向右 y 向下）。图形指令 type 支持 text/line/rect/circle/arrow，每个都要有 t 字段（出现时刻秒）。\n\ntext 示例：{\"type\":\"text\",\"t\":0,\"text\":\"标题\",\"x\":50,\"y\":8,\"size\":16,\"color\":\"#333\"}\nline 示例：{\"type\":\"line\",\"t\":1,\"x1\":30,\"y1\":65,\"x2\":70,\"y2\":65,\"color\":\"#c0392b\",\"width\":3}\nrect 示例：{\"type\":\"rect\",\"t\":2,\"x\":20,\"y\":40,\"w\":20,\"h\":20,\"color\":\"#333\",\"fill\":\"rgba(241,196,15,0.5)\",\"width\":2}\ncircle 示例：{\"type\":\"circle\",\"t\":3,\"cx\":50,\"cy\":50,\"r\":14,\"color\":\"#333\",\"fill\":\"rgba(41,128,185,0.35)\",\"width\":2}\narrow 示例：{\"type\":\"arrow\",\"t\":4,\"x1\":70,\"y1\":65,\"x2\":88,\"y2\":65,\"color\":\"#2980b9\",\"width\":3}\n\n要求：t 从 0 递增，共 8-15 个图形，颜色柔和，文字简洁，布局在 0-100 内。\n\n只输出 JSON（不要代码块、不要其他文字）：\n{\"title\":\"...\",\"steps\":[...]}";
+    var raw=await gatewayChat(cfg.text,[{role:"user",content:p2}]);
+    var obj=extractJSON(raw);
+    if(!obj.steps||!obj.steps.length) throw new Error("脚本为空");
+    playDemoScript(obj);
+  }catch(e){
+    openPanel("Reason · 生成失败", '<p style="color:#c0392b;">生成动画失败：'+escHtml(e.message)+'</p><div class="note">AI 输出可能不稳定，点下面重试或用内置示例。</div><button class="scheme" id="retryBtn"><div class="st">重试</div><div class="sd">重新生成这个方案</div></button><button class="scheme" id="fallbackDemo2"><div class="st">用内置示例（勾股定理）</div><div class="sd">跳过 AI 直接播放</div></button>');
+    document.getElementById("retryBtn").addEventListener("click", function(){ generateAnimation(scheme); });
+    document.getElementById("fallbackDemo2").addEventListener("click", function(){ playDemoScript(builtinPythagoras()); });
+  }finally{ setAiBusy(false); }
+}
+
+/* ============================================================
+ * 动画播放器（声明式脚本解释器）
+ *   脚本 {title, steps:[{t,type,...}]}
+ *   播放区域：屏幕中央固定矩形，脚本 0-100 坐标映射进去
+ *   支持 暂停/重播/步进/变速，逐笔绘制（line/arrow 有生长动画）
+ * ============================================================ */
+var playback=null;   // {title,steps,startTime,playing,speed,idx,elapsed,anim}
+function playDemoScript(script){
+  stopPlayback();
+  // 归一化 steps：t 排序，补 title
+  var steps=(script.steps||[]).slice().sort(function(a,b){return (a.t||0)-(b.t||0);});
+  playback={title:script.title||"动态图解", steps:steps, startTime:performance.now(),
+            playing:true, speed:1, idx:0, elapsed:0, anim:null};
+  openPanel("AI 图解 · 播放中", playerHtml());
+  bindPlayer();
+  panel.querySelector("#pBody .ph-t").textContent=script.title||"动态图解";
+  tick();
+}
+
+function playerHtml(){
+  return '<span class="tag">Reason · 动态图解</span>'+
+    '<h4 class="ph-t">'+escHtml(playback.title)+'</h4>'+
+    '<div id="playerCtl">'+
+      '<button data-p="toggle">⏸ 暂停</button>'+
+      '<button data-p="replay">↺ 重播</button>'+
+      '<button data-p="step">⏭ 下一步</button>'+
+      '<button data-p="speed" title="切换播放速度">1×</button>'+
+      '<div class="pbar"><i id="pfill"></i></div>'+
+    '</div>'+
+    '<div class="note">动画正在画布上播放（画面中央）。也可点右侧「×」关闭面板后继续看画布。</div>';
+}
+function bindPlayer(){
+  var ctl=document.getElementById("playerCtl"); if(!ctl) return;
+  ctl.addEventListener("click", function(e){
+    var b=e.target.closest("[data-p]"); if(!b) return;
+    var k=b.getAttribute("data-p");
+    if(k==="toggle"){ playback.playing=!playback.playing; b.textContent=playback.playing?"⏸ 暂停":"▶ 播放";
+      if(playback.playing){ playback.startTime=performance.now()-playback.elapsed*1000; tick(); } }
+    else if(k==="replay"){ playback.idx=0; playback.elapsed=0; playback.playing=true; playback.startTime=performance.now();
+      ctl.querySelector('[data-p="toggle"]').textContent="⏸ 暂停"; tick(); }
+    else if(k==="step"){ playback.playing=false; ctl.querySelector('[data-p="toggle"]').textContent="▶ 播放"; stepForward(); render(); }
+    else if(k==="speed"){ playback.speed = playback.speed>=4?0.5:playback.speed*2; b.textContent=playback.speed+"×"; }
+  });
+}
+function stepForward(){ if(!playback) return; if(playback.idx<playback.steps.length) playback.idx++; }
+
+/* 播放区（屏幕中央固定像素矩形） */
+function playRect(){
+  var W=Math.min(window.innerWidth*0.9, 920);
+  var H=Math.round(W*0.62);
+  return {x:(window.innerWidth-W)/2, y:(window.innerHeight-H)/2, w:W, h:H};
+}
+function pt(p){ // 0-100 → 像素
+  var r=playRect();
+  return {x:r.x+p.x/100*r.w, y:r.y+p.y/100*r.h};
+}
+
+function tick(){
+  if(!playback||!playback.playing) return;
+  var dt=(performance.now()-playback.startTime)/1000;
+  playback.elapsed=dt*playback.speed;
+  render();
+  var dur=totalDur();
+  if(playback.elapsed<dur){
+    playback.anim=requestAnimationFrame(tick);
+  }else{
+    playback.playing=false; playback.idx=playback.steps.length;
+    var tb=document.querySelector('[data-p="toggle"]'); if(tb) tb.textContent="▶ 播放";
+    render();
+  }
+}
+function totalDur(){ var m=0; playback.steps.forEach(function(s){ m=Math.max(m,(s.t||0)); }); return m+2.5; }
+
+function drawPlayback(){
+  if(!playback) return;
+  var r=playRect();
+  var dcv=document.createElement("canvas"); dcv.width=cv.width; dcv.height=cv.height;
+  var dc=dcv.getContext("2d"); dc.setTransform(DPR,0,0,DPR,0,0);
+  // 半透明遮罩
+  dc.fillStyle="rgba(27,24,19,0.82)"; dc.fillRect(0,0,cv.width/DPR,cv.height/DPR);
+  // 播放区白底卡片
+  var pad=14;
+  dc.fillStyle="#fbf7ec"; roundRect(dc,r.x-pad,r.y-pad,r.w+pad*2,r.h+pad*2,16); dc.fill();
+  dc.strokeStyle="#3a352c"; dc.lineWidth=1; roundRect(dc,r.x-pad,r.y-pad,r.w+pad*2,r.h+pad*2,16); dc.stroke();
+  // 标题
+  dc.fillStyle="#2f2a21"; dc.font="600 16px 'Segoe UI','PingFang SC',sans-serif";
+  dc.textAlign="left"; dc.textBaseline="middle";
+  dc.fillText(playback.title, r.x, r.y-pad+14);
+  // 已出现的图形（逐笔）
+  var shown=playback.idx;
+  for(var i=0;i<shown && i<playback.steps.length;i++){
+    drawStep(dc, playback.steps[i], 1.0, r);
+  }
+  // 正在生长的那一笔
+  if(playback.playing && shown<playback.steps.length){
+    var s=playback.steps[shown];
+    var since=playback.elapsed-(s.t||0);
+    if(since>=0 && since<0.5 && (s.type==="line"||s.type==="arrow")){
+      drawStep(dc, s, Math.min(1,since/0.5), r);
+    }
+  }
+  // 进度条
+  var p=Math.min(1,playback.elapsed/totalDur());
+  dc.fillStyle="rgba(255,255,255,0.25)"; dc.fillRect(r.x, r.y+r.h+pad+2, r.w, 5);
+  dc.fillStyle="#c06a3f"; dc.fillRect(r.x, r.y+r.h+pad+2, r.w*p, 5);
+  var pf=document.getElementById("pfill"); if(pf) pf.style.width=Math.round(p*100)+"%";
+  ctx.drawImage(dcv,0,0);
+}
+
+function drawStep(dc, s, grow, r){
+  var sc=s.size? s.size/100*r.w : 14;
+  var lw=s.width||2.5;
+  var col=s.color||"#333";
+  if(s.type==="text"){
+    dc.fillStyle=col; dc.font="600 "+Math.max(11,sc)+"px 'Segoe UI','PingFang SC',sans-serif";
+    dc.textAlign="center"; dc.textBaseline="middle";
+    dc.fillText(s.text, r.x+s.x/100*r.w, r.y+s.y/100*r.h);
+  }else if(s.type==="line"){
+    var a=pt(s.x1!==undefined?{x:s.x1,y:s.y1}:{x:0,y:0});
+    var b=pt({x:s.x2!==undefined?s.x2:s.x1,y:s.y2!==undefined?s.y2:s.y1});
+    var gx=a.x+(b.x-a.x)*grow, gy=a.y+(b.y-a.y)*grow;
+    dc.strokeStyle=col; dc.lineWidth=lw; dc.lineCap="round";
+    dc.beginPath(); dc.moveTo(a.x,a.y); dc.lineTo(gx,gy); dc.stroke();
+  }else if(s.type==="arrow"){
+    var a=pt({x:s.x1,y:s.y1}), b=pt({x:s.x2,y:s.y2});
+    var gx=a.x+(b.x-a.x)*grow, gy=a.y+(b.y-a.y)*grow;
+    dc.strokeStyle=col; dc.lineWidth=lw; dc.lineCap="round";
+    dc.beginPath(); dc.moveTo(a.x,a.y); dc.lineTo(gx,gy); dc.stroke();
+    if(grow>=1){
+      var ang=Math.atan2(b.y-a.y,b.x-a.x), L=Math.max(10,lw*3.5);
+      dc.beginPath(); dc.moveTo(b.x,b.y);
+      dc.lineTo(b.x-Math.cos(ang-0.45)*L,b.y-Math.sin(ang-0.45)*L);
+      dc.moveTo(b.x,b.y); dc.lineTo(b.x-Math.cos(ang+0.45)*L,b.y-Math.sin(ang+0.45)*L); dc.stroke();
+    }
+  }else if(s.type==="rect"){
+    var x=r.x+s.x/100*r.w, y=r.y+s.y/100*r.h, w=s.w/100*r.w, h=s.h/100*r.h;
+    if(s.fill){ dc.fillStyle=s.fill; dc.fillRect(x,y,w,h); }
+    dc.strokeStyle=col; dc.lineWidth=lw; dc.strokeRect(x,y,w,h);
+  }else if(s.type==="circle"){
+    var cx=r.x+s.cx/100*r.w, cy=r.y+s.cy/100*r.h, rad=s.r/100*r.w;
+    dc.beginPath(); dc.arc(cx,cy,rad,0,Math.PI*2);
+    if(s.fill){ dc.fillStyle=s.fill; dc.fill(); }
+    dc.strokeStyle=col; dc.lineWidth=lw; dc.stroke();
+  }
+}
+function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+
+function stopPlayback(){ playback=null; render(); }
+
+/* ============================================================
+ * 内置示例动画（AI 失败时的兜底）
+ * ============================================================ */
+function builtinPythagoras(){
+  return {title:"勾股定理：a² + b² = c²", steps:[
+    {t:0.0,type:"text",text:"勾股定理（直角三角形）",x:50,y:8,size:18,color:"#2f2a21"},
+    {t:0.6,type:"line",x1:26,y1:78,x2:26,y2:34,color:"#2f2a21",width:3},
+    {t:1.0,type:"line",x1:26,y1:78,x2:66,y2:78,color:"#2f2a21",width:3},
+    {t:1.4,type:"line",x1:26,y1:34,x2:66,y2:78,color:"#2f2a21",width:3},
+    {t:2.0,type:"rect",x:26,y:78,w:40,h:40,color:"#2f2a21",fill:"rgba(241,196,15,0.5)",width:2},
+    {t:2.4,type:"rect",x:26,y:-6,w:40,h:40,color:"#2f2a21",fill:"rgba(39,174,96,0.45)",width:2},
+    {t:2.8,type:"text",text:"a",x:46,y:82,size:14,color:"#c0392b"},
+    {t:3.2,type:"text",text:"b",x:12,y:56,size:14,color:"#27ae60"},
+    {t:3.6,type:"text",text:"c",x:40,y:46,size:14,color:"#2980b9"},
+    {t:4.2,type:"text",text:"a² + b² = c²",x:50,y:92,size:18,color:"#c06a3f"},
+  ]};
+}
+
+/* ============================================================
+ * 键盘
+ * ============================================================ */
+window.addEventListener("keydown", function(e){
+  if(e.target===ftext || e.target.tagName==="TEXTAREA" || e.target.tagName==="INPUT") return;
+  if(e.key===" "){ spaceDown=true; e.preventDefault(); cv.style.cursor="grab"; }
+  else if(e.key.toLowerCase()==="p") setTool("pen");
+  else if(e.key.toLowerCase()==="s") setTool("select");
+  else if(e.key.toLowerCase()==="t") setTool("text");
+  else if(e.key.toLowerCase()==="e") setTool("eraser");
+  else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){ e.preventDefault(); runCmd("undo"); }
+});
+window.addEventListener("keyup", function(e){ if(e.key===" "){ spaceDown=false; cv.style.cursor=tool==="pan"?"grab":"crosshair"; } });
+
+/* ============================================================
+ * 状态
+ * ============================================================ */
+var stTool=document.getElementById("stTool"), stZoom=document.getElementById("stZoom"), stStrokes=document.getElementById("stStrokes");
+var TOOL_ZH={pen:"画笔",text:"文字",eraser:"橡皮",pan:"平移",select:"框选"};
+function updateStatus(){
+  stTool.textContent=TOOL_ZH[tool]||tool;
+  stZoom.textContent=Math.round(view.scale*100)+"%";
+  stStrokes.textContent=shapes.length;
+}
+
+resize(); updateStatus(); cv.style.cursor="crosshair"; showOpts(true);
+})();
+</script>
+</body>
+</html>
