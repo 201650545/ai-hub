@@ -5,6 +5,8 @@ let eventLogList = [];
 let startTime = Date.now();
 let totalSlots = 5;
 let completedSlots = 0;
+let es = null;
+let receivedRealEvent = false;
 
 const PHASES = ["framework", "scan", "asset_fill", "verify", "deliver"];
 
@@ -12,21 +14,27 @@ function initCanvas() {
   updateTimer();
   setInterval(updateTimer, 1000);
 
-  // 尝试连接真实 SSE 端点；若失败则使用 Mock 数据流畅演展
+  // 尝试连接真实 SSE 端点；仅当从未收到真实事件时才回退 Mock
   try {
-    const es = new EventSource('/api/orchestrator/stream');
+    es = new EventSource('/api/orchestrator/stream');
     es.onmessage = (ev) => {
       try {
         const d = JSON.parse(ev.data);
+        receivedRealEvent = true;
+        if (d.event === 'stream_end') {
+          es.close();
+          updatePhaseTimeline('deliver');
+          return;
+        }
         handleSSEEvent(d);
       } catch(e){}
     };
     es.onerror = () => {
       es.close();
-      startMockStream();
+      if (!receivedRealEvent) startMockStream();
     };
   } catch(e) {
-    startMockStream();
+    if (!receivedRealEvent) startMockStream();
   }
 }
 
@@ -44,7 +52,13 @@ function handleSSEEvent(data) {
   renderLogItem(data);
   updatePhaseTimeline(data.phase);
 
-  if (data.slot && data.slot !== 'main') {
+  // 真实槽位总数（scan done 事件携带 total）
+  if (typeof data.total === 'number' && data.total > 0) {
+    totalSlots = data.total;
+    updateProgress();
+  }
+
+  if (data.slot && data.slot !== 'main' && data.slot !== 'all') {
     if (!slotsMap[data.slot]) {
       slotsMap[data.slot] = {
         id: data.slot,
