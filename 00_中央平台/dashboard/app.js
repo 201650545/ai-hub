@@ -289,17 +289,53 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ---------------------------------------------------- 资源清单（ai-resource-hub 数据桥）
+    // P0 加固：全部走 DOM 节点 + textContent 构建，杜绝上游文本被当 HTML 解析（XSS/DOM 注入面）
+    function makeBadge(text, cls) {
+        const span = document.createElement('span');
+        span.className = 'badge ' + cls;
+        span.textContent = text;
+        return span;
+    }
     function quotaBadge(status) {
         const s = status || '未知';
-        if (s.includes('耗尽')) return '<span class="badge danger">' + s + '</span>';
-        if (s.includes('接近') || s.includes('偏低')) return '<span class="badge warning">' + s + '</span>';
-        if (s.includes('中等')) return '<span class="badge info">' + s + '</span>';
-        if (s.includes('充足')) return '<span class="badge online">' + s + '</span>';
-        return '<span class="badge offline">' + s + '</span>';
+        let cls = 'offline';
+        if (s.includes('耗尽')) cls = 'danger';
+        else if (s.includes('接近') || s.includes('偏低')) cls = 'warning';
+        else if (s.includes('中等')) cls = 'info';
+        else if (s.includes('充足')) cls = 'online';
+        return makeBadge(s, cls);
     }
     function qualityBadge(lv) {
         const m = { T1: 'online', T2: 'warning', T3: 'offline' };
-        return '<span class="badge ' + (m[lv] || 'offline') + '">' + (lv || '-') + '</span>';
+        return makeBadge(lv || '-', m[lv] || 'offline');
+    }
+    function makeCell(text, code) {
+        const td = document.createElement('td');
+        if (code) {
+            const el = document.createElement('code');
+            el.textContent = text;
+            td.appendChild(el);
+        } else {
+            td.textContent = text;
+        }
+        return td;
+    }
+    function fillTable(body, rows, colSpan, emptyMsg) {
+        body.innerHTML = '';
+        if (!rows.length) {
+            const tr = document.createElement('tr');
+            const td = document.createElement('td');
+            td.colSpan = colSpan;
+            td.style.textAlign = 'center';
+            td.style.color = '#888';
+            td.textContent = emptyMsg;
+            tr.appendChild(td);
+            body.appendChild(tr);
+            return;
+        }
+        const frag = document.createDocumentFragment();
+        rows.forEach(tr => frag.appendChild(tr));
+        body.appendChild(frag);
     }
     async function fetchResources() {
         try {
@@ -332,45 +368,60 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('res-generated').innerText = (meta.generated_at || '').slice(0, 16) || '—';
 
+        // 陈旧阈值由桥端 stale_after_hours 决定，前端不再硬编码 48h
         const freshEl = document.getElementById('res-fresh');
-        if (meta.fresh === false) freshEl.innerHTML = '<span class="badge warning">数据已陈旧 (>48h)</span>';
-        else if (meta.fresh === true) freshEl.innerHTML = '<span class="badge online">数据新鲜</span>';
-        else freshEl.innerHTML = '<span class="badge offline">新鲜度未知</span>';
+        freshEl.innerHTML = '';
+        if (meta.fresh === false) freshEl.appendChild(makeBadge('数据已陈旧 (>' + (meta.stale_after_hours ?? 48) + 'h)', 'warning'));
+        else if (meta.fresh === true) freshEl.appendChild(makeBadge('数据新鲜', 'online'));
+        else freshEl.appendChild(makeBadge('新鲜度未知', 'offline'));
 
         const capBody = document.getElementById('res-capabilities-body');
-        const caps = d.capabilities || [];
-        capBody.innerHTML = caps.length
-            ? caps.map(c => '<tr>'
-                + '<td><code>' + (c.capability_id || '') + '</code></td>'
-                + '<td><strong>' + (c['资源名称'] || '') + '</strong></td>'
-                + '<td>' + (c['类别'] || '') + '</td>'
-                + '<td>' + (c['逻辑模型'] || '') + '</td>'
-                + '<td>' + qualityBadge(c['质量等级']) + '</td>'
-                + '<td>' + (c['调用方式'] || '') + '</td>'
-                + '<td>' + (c['模型族'] || '') + '</td>'
-                + '</tr>').join('')
-            : '<tr><td colspan="7" style="text-align:center; color:#888;">暂无能力数据</td></tr>';
-
         const instBody = document.getElementById('res-instances-body');
+        const caps = d.capabilities || [];
         const insts = d.instances || [];
-        instBody.innerHTML = insts.length
-            ? insts.map(i => '<tr>'
-                + '<td><code>' + (i.instance_id || '') + '</code></td>'
-                + '<td><strong>' + (i['平台'] || '') + '</strong></td>'
-                + '<td>' + (i['实际模型名'] || '') + '</td>'
-                + '<td><code>' + (i['所属能力'] || '') + '</code></td>'
-                + '<td>' + (i['额度单位'] || '') + '</td>'
-                + '<td>' + (i['重置规则'] || '') + '</td>'
-                + '<td>' + quotaBadge(i['额度状态']) + '</td>'
-                + '</tr>').join('')
-            : '<tr><td colspan="7" style="text-align:center; color:#888;">暂无实例数据</td></tr>';
+
+        const capRows = caps.map(c => {
+            const tr = document.createElement('tr');
+            tr.appendChild(makeCell(c.capability_id || '', true));
+            tr.appendChild(makeCell(c['资源名称'] || '', false));
+            tr.appendChild(makeCell(c['类别'] || '', false));
+            tr.appendChild(makeCell(c['逻辑模型'] || '', false));
+            const tdQ = document.createElement('td');
+            tdQ.appendChild(qualityBadge(c['质量等级']));
+            tr.appendChild(tdQ);
+            tr.appendChild(makeCell(c['调用方式'] || '', false));
+            tr.appendChild(makeCell(c['模型族'] || '', false));
+            return tr;
+        });
+        fillTable(capBody, capRows, 7, '暂无能力数据');
+
+        const instRows = insts.map(i => {
+            const tr = document.createElement('tr');
+            tr.appendChild(makeCell(i.instance_id || '', true));
+            tr.appendChild(makeCell(i['平台'] || '', false));
+            tr.appendChild(makeCell(i['实际模型名'] || '', false));
+            tr.appendChild(makeCell(i['所属能力'] || '', true));
+            tr.appendChild(makeCell(i['额度单位'] || '', false));
+            tr.appendChild(makeCell(i['重置规则'] || '', false));
+            const tdQ = document.createElement('td');
+            tdQ.appendChild(quotaBadge(i['额度状态']));
+            tr.appendChild(tdQ);
+            return tr;
+        });
+        fillTable(instBody, instRows, 7, '暂无实例数据');
     }
     function renderResourcesError(msg) {
-        const row = '<tr><td colspan="7" style="text-align:center; color:var(--rose);">⚠️ ' + msg + '</td></tr>';
         const capBody = document.getElementById('res-capabilities-body');
         const instBody = document.getElementById('res-instances-body');
-        if (capBody) capBody.innerHTML = row;
-        if (instBody) instBody.innerHTML = row;
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 7;
+        td.style.textAlign = 'center';
+        td.style.color = 'var(--rose)';
+        td.textContent = '⚠️ ' + msg;
+        tr.appendChild(td);
+        if (capBody) { capBody.innerHTML = ''; capBody.appendChild(tr.cloneNode(true)); }
+        if (instBody) { instBody.innerHTML = ''; instBody.appendChild(tr); }
         document.getElementById('res-source').innerText = '—';
         document.getElementById('res-generated').innerText = '—';
         document.getElementById('res-fresh').innerHTML = '';

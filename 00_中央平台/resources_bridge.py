@@ -40,21 +40,49 @@ def _load_local():
         try:
             with open(LOCAL_DIR / name, "r", encoding="utf-8") as f:
                 out[name] = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError):
             out[name] = None
     return out
 
 
+def _validate_files(files):
+    """最小结构校验：index 为 dict，capabilities/instances 为 list。
+
+    返回 False 即回退，避免「JSON 合法但结构错」在后端 500 / 前端 .map() 才炸。
+    显式 isinstance 也保证了合法的空数组([])不会被误判为拉取失败。
+    """
+    return (
+        isinstance(files.get("index.json"), dict)
+        and isinstance(files.get("capabilities.json"), list)
+        and isinstance(files.get("instances.json"), list)
+    )
+
+
 async def _fetch_remote():
-    """并发拉取线上 3 个 JSON，失败项置 None。"""
+    """并发拉取线上 JSON，并保证三文件同属一个 build。
+
+    双读 index 防 GitHub Pages 发布切换瞬间的跨 build 混搭：
+      读 index A → 并发拉 capabilities/instances → 再读 index B，
+    A/B 的 build_id 一致才接受；任一环节失败/异常返回全 None（由调用方回退）。
+    """
     async with httpx.AsyncClient(timeout=httpx.Timeout(8.0), follow_redirects=True) as client:
-        async def _get(name):
+        async def _get_json(name):
             try:
                 r = await client.get(f"{REMOTE_BASE}/{name}")
-                return (name, r.json()) if r.status_code == 200 else (name, None)
+                return r.json() if r.status_code == 200 else None
             except Exception:  # noqa: BLE001 —— 网络/解析失败统一按缺失处理
-                return (name, None)
-        return dict(await asyncio.gather(*(_get(name) for name in FILES)))
+                return None
+
+        failed = {"index.json": None, "capabilities.json": None, "instances.json": None}
+        index_a = await _get_json("index.json")
+        if not isinstance(index_a, dict):
+            return failed
+        caps, insts = await asyncio.gather(
+            _get_json("capabilities.json"), _get_json("instances.json"))
+        index_b = await _get_json("index.json")
+        if not isinstance(index_b, dict) or index_a.get("build_id") != index_b.get("build_id"):
+            return failed
+        return {"index.json": index_a, "capabilities.json": caps, "instances.json": insts}
 
 
 def _is_fresh(index):
@@ -99,28 +127,28 @@ async def get_resources(source="auto"):
     """
     if source == "remote":
         files = await _fetch_remote()
-        if all(files.values()):
+        if _validate_files(files):
             return _aggregate(files["index.json"], files["capabilities.json"], files["instances.json"], "remote")
-        return {"ok": False, "error": "远程数据桥不可用", "source": "remote"}
+        return {"ok": False, "error": "远程数据桥不可用或结构异常", "source": "remote"}
 
     if source == "local":
         files = _load_local()
-        if all(files.values()):
+        if _validate_files(files):
             return _aggregate(files["index.json"], files["capabilities.json"], files["instances.json"], "local")
-        return {"ok": False, "error": "本地 public 产物缺失", "source": "local"}
+        return {"ok": False, "error": "本地 public 产物缺失或结构异常", "source": "local"}
 
     # auto
     if _CACHE["data"] and time.time() - _CACHE["ts"] < CACHE_TTL:
         return _CACHE["data"]
 
     files = await _fetch_remote()
-    if all(files.values()):
+    if _validate_files(files):
         data = _aggregate(files["index.json"], files["capabilities.json"], files["instances.json"], "remote")
         _CACHE["ts"], _CACHE["data"] = time.time(), data
         return data
 
     # 原子回退本地
     files = _load_local()
-    if all(files.values()):
+    if _validate_files(files):
         return _aggregate(files["index.json"], files["capabilities.json"], files["instances.json"], "local")
     return {"ok": False, "error": "远程与本地数据桥均不可用", "source": "auto"}
