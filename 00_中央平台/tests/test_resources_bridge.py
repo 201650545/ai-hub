@@ -6,9 +6,13 @@
 """
 
 import asyncio
+import hashlib
+import json
 import os
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import httpx
@@ -150,54 +154,166 @@ class TestGetResources(unittest.TestCase):
         self.assertFalse(first["cache_hit"])
 
 
-class TestFetchRemoteBuildConsistency(unittest.TestCase):
-    """用 httpx.MockTransport 直接测 _fetch_remote 的双读 index 一致性。"""
+class TestFetchRemoteManifest(unittest.TestCase):
+    """用 httpx.MockTransport 直接测 _fetch_remote 的 manifest 提交点校验（方案书 v2）。
 
-    def _remote(self, handler):
-        transport = httpx.MockTransport(handler)
+    场景：全匹配接受 / 单文件哈希不匹配回退 / 无 manifest fail-closed /
+          manifest 结构非法回退 / build_id 不一致拒绝。
+    """
+
+    def _transport(self, handler):
         return patch.object(
             resources_bridge.httpx, "AsyncClient",
-            return_value=httpx.AsyncClient(transport=transport, timeout=httpx.Timeout(8.0), follow_redirects=True),
+            return_value=httpx.AsyncClient(
+                transport=httpx.MockTransport(handler),
+                timeout=httpx.Timeout(8.0), follow_redirects=True),
         )
 
-    # 8. build_id 不一致（发布切换瞬间）→ 双读拒绝，返回全 None（触发回退）
-    def test_build_id_mismatch_rejected(self):
-        seen = {"index": 0}
-
+    def _route(self, files_bytes, manifest=None):
         def handler(request):
-            path = request.url.path
-            if path.endswith("index.json"):
-                seen["index"] += 1
-                return httpx.Response(200, json=make_index(build_id="build-A" if seen["index"] == 1 else "build-B"))
-            if path.endswith("capabilities.json"):
-                return httpx.Response(200, json=make_caps())
-            if path.endswith("instances.json"):
-                return httpx.Response(200, json=make_insts())
+            name = request.url.path.rsplit("/", 1)[-1]
+            if name == "manifest.json":
+                if manifest is None:
+                    return httpx.Response(404)  # 无 manifest
+                return httpx.Response(200, json=manifest)
+            if name in files_bytes:
+                return httpx.Response(200, content=files_bytes[name])  # 原始字节
             return httpx.Response(404)
+        return handler
 
-        with self._remote(handler):
+    def _real_files(self):
+        """返回 4 个真实字节文件 + 按字节算的 manifest（与 exporter 同口径）。"""
+        index = make_index()
+        schema = {"bridge_version": 1, "tables": {}}
+        files_bytes = {
+            "index.json": json.dumps(index, ensure_ascii=False, indent=2).encode("utf-8"),
+            "capabilities.json": json.dumps(make_caps(), ensure_ascii=False, indent=2).encode("utf-8"),
+            "instances.json": json.dumps(make_insts(), ensure_ascii=False, indent=2).encode("utf-8"),
+            "schema.json": json.dumps(schema, ensure_ascii=False, indent=2).encode("utf-8"),
+        }
+        manifest = {
+            "bridge_version": 1,
+            "build_id": index["build_id"],
+            "generated_at": index["generated_at"],
+            "files": {n: {"sha256": hashlib.sha256(b).hexdigest()} for n, b in files_bytes.items()},
+        }
+        return files_bytes, manifest, index
+
+    # 1. manifest 全匹配接受
+    def test_manifest_all_match_accepted(self):
+        files_bytes, manifest, index = self._real_files()
+        with self._transport(self._route(files_bytes, manifest)):
             files = run(resources_bridge._fetch_remote())
-        self.assertIsNone(files["index.json"])  # 双读不一致 → 整体拒绝
+        self.assertEqual(files["index.json"]["build_id"], index["build_id"])
+        self.assertEqual(len(files["capabilities.json"]), 2)
+        self.assertEqual(len(files["instances.json"]), 2)
+        self.assertIn("schema.json", files)
+
+    # 2. 单文件哈希不匹配（CDN 混搭）→ 整体回退，绝不接受
+    def test_single_file_hash_mismatch_fails_closed(self):
+        files_bytes, manifest, _ = self._real_files()
+        files_bytes["capabilities.json"] = b'[{"tampered": true}]'  # 篡改字节
+        with self._transport(self._route(files_bytes, manifest)):
+            files = run(resources_bridge._fetch_remote())
+        self.assertIsNone(files["index.json"])
         self.assertIsNone(files["capabilities.json"])
         self.assertIsNone(files["instances.json"])
 
-    # build_id 一致 → 接受，返回三个文件
-    def test_build_id_match_accepted(self):
-        def handler(request):
-            path = request.url.path
-            if path.endswith("index.json"):
-                return httpx.Response(200, json=make_index(build_id="build-A"))
-            if path.endswith("capabilities.json"):
-                return httpx.Response(200, json=make_caps())
-            if path.endswith("instances.json"):
-                return httpx.Response(200, json=make_insts())
-            return httpx.Response(404)
-
-        with self._remote(handler):
+    # 3. 无 manifest → fail-closed（硬切换，不降级双读）
+    def test_no_manifest_fails_closed(self):
+        files_bytes, _, _ = self._real_files()
+        with self._transport(self._route(files_bytes, None)):
             files = run(resources_bridge._fetch_remote())
-        self.assertEqual(files["index.json"]["build_id"], "build-A")
-        self.assertEqual(len(files["capabilities.json"]), 2)
-        self.assertEqual(len(files["instances.json"]), 2)
+        self.assertIsNone(files["index.json"])
+        self.assertIsNone(files["capabilities.json"])
+
+    # 4. manifest 结构非法 → 回退
+    def test_manifest_invalid_shape_fails_closed(self):
+        files_bytes, manifest, _ = self._real_files()
+        manifest.pop("files", None)  # 缺 files 声明
+        with self._transport(self._route(files_bytes, manifest)):
+            files = run(resources_bridge._fetch_remote())
+        self.assertIsNone(files["index.json"])
+
+    # 5. build_id 不一致（纵深断言）→ 拒绝
+    def test_build_id_mismatch_rejected(self):
+        files_bytes, manifest, _ = self._real_files()
+        manifest["build_id"] = "other-build"  # 与 index.build_id 不一致
+        with self._transport(self._route(files_bytes, manifest)):
+            files = run(resources_bridge._fetch_remote())
+        self.assertIsNone(files["index.json"])
+
+
+class TestLoadLocalManifest(unittest.TestCase):
+    """_load_local 的本地 manifest 校验（方案书 v2 §2.2）。"""
+
+    def _files_bytes(self):
+        index = make_index()
+        schema = {"bridge_version": 1, "tables": {}}
+        files_bytes = {
+            "index.json": json.dumps(index, ensure_ascii=False, indent=2).encode("utf-8"),
+            "capabilities.json": json.dumps(make_caps(), ensure_ascii=False, indent=2).encode("utf-8"),
+            "instances.json": json.dumps(make_insts(), ensure_ascii=False, indent=2).encode("utf-8"),
+            "schema.json": json.dumps(schema, ensure_ascii=False, indent=2).encode("utf-8"),
+        }
+        manifest = {
+            "bridge_version": 1,
+            "build_id": index["build_id"],
+            "files": {n: {"sha256": hashlib.sha256(b).hexdigest()} for n, b in files_bytes.items()},
+        }
+        return files_bytes, manifest
+
+    def _write_local(self, d, files_bytes, manifest):
+        for n, b in files_bytes.items():
+            with open(os.path.join(d, n), "wb") as f:
+                f.write(b)
+        with open(os.path.join(d, "manifest.json"), "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False)
+
+    # 本地 manifest + 文件字节匹配 → 接受
+    def test_local_manifest_match_accepted(self):
+        files_bytes, manifest = self._files_bytes()
+        with tempfile.TemporaryDirectory() as d:
+            self._write_local(d, files_bytes, manifest)
+            with patch.object(resources_bridge, "LOCAL_DIR", Path(d)):
+                out = resources_bridge._load_local()
+        self.assertEqual(out["index.json"]["build_id"], "build-A")
+        self.assertEqual(len(out["capabilities.json"]), 2)
+
+    # 本地文件被篡改 → 该校验文件置 None（全有或全无由调用方判断）
+    def test_local_manifest_tamper_detected(self):
+        files_bytes, manifest = self._files_bytes()
+        with tempfile.TemporaryDirectory() as d:
+            self._write_local(d, files_bytes, manifest)
+            open(os.path.join(d, "capabilities.json"), "wb").write(b'[{"tampered": true}]')
+            with patch.object(resources_bridge, "LOCAL_DIR", Path(d)):
+                out = resources_bridge._load_local()
+        self.assertIsNone(out["capabilities.json"])
+
+    # 本地无 manifest → 过渡期信任（三个月后删除该分支）
+    def test_local_without_manifest_trusts_build(self):
+        files_bytes, _ = self._files_bytes()
+        with tempfile.TemporaryDirectory() as d:
+            for n, b in files_bytes.items():
+                with open(os.path.join(d, n), "wb") as f:
+                    f.write(b)
+            with patch.object(resources_bridge, "LOCAL_DIR", Path(d)):
+                out = resources_bridge._load_local()
+        self.assertEqual(out["index.json"]["build_id"], "build-A")
+        self.assertEqual(len(out["capabilities.json"]), 2)
+
+    # 本地 manifest 存在但解析失败 → 整体不可信
+    def test_local_manifest_unparseable_fails_closed(self):
+        files_bytes, _ = self._files_bytes()
+        with tempfile.TemporaryDirectory() as d:
+            for n, b in files_bytes.items():
+                with open(os.path.join(d, n), "wb") as f:
+                    f.write(b)
+            with open(os.path.join(d, "manifest.json"), "w", encoding="utf-8") as f:
+                f.write("{broken json")
+            with patch.object(resources_bridge, "LOCAL_DIR", Path(d)):
+                out = resources_bridge._load_local()
+        self.assertIsNone(out["index.json"])
 
 
 if __name__ == "__main__":

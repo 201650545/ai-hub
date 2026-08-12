@@ -8,8 +8,12 @@ ai-resource-hub 公开数据桥代理（子项目①雏形）
   1. 线上 GitHub Pages（https://201650545.github.io/ai-resource-hub）
   2. 本地 public/ 产物原子回退（本地 D:/项目/ai-resource-hub/public）
 
-回退策略: 全有或全无——3 个文件（index/capabilities/instances）任一拉取失败，
-即整体回退本地，避免混搭不同 build_id 的 index 与 capabilities。
+协议（方案书 v2）: manifest.json 提交点。
+  - 数据桥发布顺序: 先写数据文件、最后写 manifest；manifest 声明各文件字节 sha256。
+  - 门户拉取: 读 manifest → 对每个文件「原始字节」算 sha256 逐项比对 → 全匹配 且
+    index.build_id == manifest.build_id 才接受；任一失败/缺失/结构非法 → 整体回退本地
+    （fail-closed，杜绝跨 build 混搭）。无 manifest 即失败（硬切换，不降级双读 index）。
+  - 本地回退: 本地有 manifest 则同样校验；本地无 manifest 时过渡期信任（三个月后删除该分支）。
 
 缓存: 进程内模块级 TTL（remote 成功 300s / local 回退 60s）+ single-flight 防击穿；
 命中缓存时 fresh 按当前时刻重算，不随缓存固化。Dashboard 反复切 Tab/点刷新不打爆 GitHub Pages。
@@ -19,6 +23,7 @@ ai-resource-hub 公开数据桥代理（子项目①雏形）
 """
 
 import asyncio
+import hashlib
 import json
 import time
 from datetime import datetime, timezone
@@ -27,7 +32,9 @@ from pathlib import Path
 import httpx
 
 REMOTE_BASE = "https://201650545.github.io/ai-resource-hub"
-FILES = ["index.json", "capabilities.json", "instances.json"]
+MANIFEST = "manifest.json"
+# 哈希校验目标：4 个产物全校验（含 schema），与 manifest.files 声明一致
+DATA_FILES = ["index.json", "capabilities.json", "instances.json", "schema.json"]
 LOCAL_DIR = Path(__file__).parent.parent / "ai-resource-hub" / "public"  # D:\项目\ai-resource-hub\public
 CACHE_TTL = 300  # 秒 —— 远程成功缓存
 CACHE_TTL_LOCAL = 60  # 秒 —— 本地回退短缓存（防故障期反复打远端）
@@ -37,13 +44,33 @@ _CACHE_LOCK = asyncio.Lock()  # single-flight：并发 auto 请求只拉一次�
 
 
 def _load_local():
-    """读取本地 public/ 产物，缺失或解析失败返回 None（全有或全无由调用方判断）。"""
+    """读取本地 public/ 产物（原始字节口径 + 本地 manifest 校验）。
+
+    本地有 manifest：按字节 sha256 逐文件比对，不一致置 None（全有或全无由调用方判断）。
+    本地无 manifest：过渡期信任（三个月后删除该宽容分支）。
+    """
     out = {}
-    for name in FILES:
+    manifest = None
+    m_path = LOCAL_DIR / MANIFEST
+    if m_path.exists():
         try:
-            with open(LOCAL_DIR / name, "r", encoding="utf-8") as f:
-                out[name] = json.load(f)
+            manifest = json.loads(m_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
+            return {n: None for n in DATA_FILES}  # manifest 存在但不可解析 → 不可信
+    for name in DATA_FILES:
+        try:
+            raw = (LOCAL_DIR / name).read_bytes()
+        except OSError:
+            out[name] = None
+            continue
+        if manifest is not None:
+            declared = (manifest.get("files") or {}).get(name, {}).get("sha256")
+            if not declared or hashlib.sha256(raw).hexdigest() != declared:
+                out[name] = None
+                continue
+        try:
+            out[name] = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
             out[name] = None
     return out
 
@@ -61,31 +88,58 @@ def _validate_files(files):
     )
 
 
-async def _fetch_remote():
-    """并发拉取线上 JSON，并保证三文件同属一个 build。
+def _failed_files():
+    """fail-closed 的返回：全部置 None，触发调用方回退。"""
+    return {name: None for name in DATA_FILES}
 
-    双读 index 防 GitHub Pages 发布切换瞬间的跨 build 混搭：
-      读 index A → 并发拉 capabilities/instances → 再读 index B，
-    A/B 的 build_id 一致才接受；任一环节失败/异常返回全 None（由调用方回退）。
+
+async def _fetch_remote():
+    """并发拉取线上产物，按 manifest 校验「四文件同属一个 build」（fail-closed）。
+
+    流程：拉 manifest → 并发拉 4 数据文件 → 对每个文件「原始字节」(r.content) 算 sha256
+    与 manifest.files 逐项比对 → 全部匹配 且 index.build_id == manifest.build_id 才接受。
+    任一失败/缺失/结构非法 → 返回全 None，由调用方回退本地。无 manifest 即失败
+    （硬切换，不降级双读 index）。哈希的是原始字节而非 r.json()，两端口径一致。
     """
     async with httpx.AsyncClient(timeout=httpx.Timeout(8.0), follow_redirects=True) as client:
-        async def _get_json(name):
+        async def _get(name):
             try:
                 r = await client.get(f"{REMOTE_BASE}/{name}")
-                return r.json() if r.status_code == 200 else None
-            except Exception:  # noqa: BLE001 —— 网络/解析失败统一按缺失处理
+                return r if r.status_code == 200 else None
+            except Exception:  # noqa: BLE001 —— 网络失败统一按缺失处理
                 return None
 
-        failed = {"index.json": None, "capabilities.json": None, "instances.json": None}
-        index_a = await _get_json("index.json")
-        if not isinstance(index_a, dict):
-            return failed
-        caps, insts = await asyncio.gather(
-            _get_json("capabilities.json"), _get_json("instances.json"))
-        index_b = await _get_json("index.json")
-        if not isinstance(index_b, dict) or index_a.get("build_id") != index_b.get("build_id"):
-            return failed
-        return {"index.json": index_a, "capabilities.json": caps, "instances.json": insts}
+        m_resp = await _get(MANIFEST)
+        if m_resp is None:
+            return _failed_files()  # 无 manifest → fail-closed
+        try:
+            manifest = m_resp.json()
+        except Exception:  # noqa: BLE001
+            return _failed_files()
+        if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), dict):
+            return _failed_files()  # manifest 结构非法 → fail-closed
+
+        resps = await asyncio.gather(*[_get(f) for f in DATA_FILES])
+        files = {}
+        for name, resp in zip(DATA_FILES, resps):
+            if resp is None:
+                return _failed_files()
+            body = resp.content  # 原始字节（勿用 r.json()——哈希口径必须同字节）
+            declared = (manifest["files"].get(name) or {}).get("sha256")
+            if not declared or hashlib.sha256(body).hexdigest() != declared:
+                return _failed_files()  # 哈希不匹配（混搭/篡改）→ fail-closed
+            try:
+                files[name] = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return _failed_files()
+
+        # 纵深防御：build_id 与 manifest 一致
+        if not isinstance(files["index.json"], dict) \
+                or files["index.json"].get("build_id") != manifest.get("build_id"):
+            return _failed_files()
+        if not _validate_files(files):
+            return _failed_files()
+        return files
 
 
 def _recompute_fresh(meta):
