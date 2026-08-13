@@ -126,9 +126,11 @@ body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="header">
     <h1>🌐 AI Hub</h1>
     <p>统一 AI 聚合管理平台 · 中央导航</p>
+    <a href="/dashboard/index.html" style="display:inline-block;margin-top:18px;padding:11px 26px;background:#c06a3f;color:#fff;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600;letter-spacing:.5px;">📊 进入管理面板</a>
+    <p style="margin-top:10px;font-size:12px;color:#666;">网关管理 · GitHub 项目 · 飞书同步 · 统计分析 · 资源清单</p>
 </div>
 <div class="grid">{cards_html}</div>
-<div class="footer">AI Hub v1.0 · 局域网模式 · <a href="/docs" style="color:#666">API 文档</a></div>
+<div class="footer">AI Hub v1.0 · 局域网模式 · <a href="/dashboard/index.html" style="color:#c06a3f">管理面板</a> · <a href="/docs" style="color:#666">API 文档</a></div>
 </body>
 </html>"""
 
