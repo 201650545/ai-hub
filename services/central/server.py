@@ -35,6 +35,14 @@ dashboard_dir = BASE_DIR / "dashboard"
 if dashboard_dir.exists():
     app.mount("/dashboard", StaticFiles(directory=str(dashboard_dir)), name="dashboard")
 
+# 挂载应用（AI 画布 / 词境挖空 等前端应用，静态单页）
+apps_dir = PROJECT_DIR / "apps"
+if apps_dir.exists():
+    for app_name in ("ai-canvas", "word-cloze"):
+        app_path = apps_dir / app_name
+        if app_path.exists():
+            app.mount(f"/{app_name}", StaticFiles(directory=str(app_path)), name=app_name)
+
 
 # ---------------------------------------------------------------- 配置读写
 
@@ -120,6 +128,10 @@ body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .card-desc {{ font-size:13px; color:#888; margin-bottom:12px; }}
 .card-status {{ font-size:12px; color:#666; }}
 .footer {{ text-align:center; margin-top:48px; color:#444; font-size:12px; }}
+.section-title {{ text-align:center; margin:34px auto 16px; color:#888; font-size:12px; letter-spacing:2px; }}
+.app-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px; max-width:1200px; margin:0 auto; }}
+.app-card {{ background:#14141f; border:1px solid #2a2a3a; border-radius:16px; padding:24px; cursor:pointer; transition:all .2s; border-top:3px solid #c06a3f; }}
+.app-card:hover {{ border-color:#c06a3f; transform:translateY(-2px); }}
 </style>
 </head>
 <body>
@@ -129,6 +141,23 @@ body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <a href="/dashboard/index.html" style="display:inline-block;margin-top:18px;padding:11px 26px;background:#c06a3f;color:#fff;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600;letter-spacing:.5px;">📊 进入管理面板</a>
     <p style="margin-top:10px;font-size:12px;color:#666;">网关管理 · GitHub 项目 · 飞书同步 · 统计分析 · 资源清单</p>
 </div>
+<div class="section-title">— 应用 · AI 工具 —</div>
+<div class="app-grid">
+    <div class="app-card" onclick="window.open('/ai-canvas/index.html','_blank')">
+        <div class="card-icon">🎨</div>
+        <div class="card-name">AI 画布</div>
+        <div class="card-desc">白板画图 → AI 识别 → 生成动态图解</div>
+        <div class="card-status">应用 · 接真实 AI</div>
+    </div>
+    <div class="app-card" onclick="window.open('/word-cloze/index.html','_blank')">
+        <div class="card-icon">✍️</div>
+        <div class="card-name">词境挖空</div>
+        <div class="card-desc">把喜欢的内容变成填空练习，主动写出来</div>
+        <div class="card-status">应用 · AI 内容供给</div>
+    </div>
+</div>
+
+<div class="section-title">— 网关 —</div>
 <div class="grid">{cards_html}</div>
 <div class="footer">AI Hub v1.0 · 局域网模式 · <a href="/dashboard/index.html" style="color:#c06a3f">管理面板</a> · <a href="/docs" style="color:#666">API 文档</a></div>
 </body>
