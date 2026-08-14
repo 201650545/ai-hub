@@ -12,6 +12,7 @@ import os
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -22,12 +23,14 @@ import resources_bridge
 
 
 def make_index(**kw):
+    # generated_at 默认取「当前时刻」，避免硬编码日期随时间推移滑出新鲜窗口
+    # （2026-08-11 的硬编码值导致 test_remote_ok 在 48h 后 fresh 恒为 False）。
     d = {
         "site": "test-site",
         "repo": "test/repo",
         "bridge_version": 1,
         "build_id": "build-A",
-        "generated_at": "2026-08-11T00:00:00+00:00",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "freshness": {"stale_after_hours": 48},
     }
     d.update(kw)
@@ -285,7 +288,8 @@ class TestLoadLocalManifest(unittest.TestCase):
         files_bytes, manifest = self._files_bytes()
         with tempfile.TemporaryDirectory() as d:
             self._write_local(d, files_bytes, manifest)
-            open(os.path.join(d, "capabilities.json"), "wb").write(b'[{"tampered": true}]')
+            with open(os.path.join(d, "capabilities.json"), "wb") as f:
+                f.write(b'[{"tampered": true}]')
             with patch.object(resources_bridge, "LOCAL_DIR", Path(d)):
                 out = resources_bridge._load_local()
         self.assertIsNone(out["capabilities.json"])
@@ -314,6 +318,41 @@ class TestLoadLocalManifest(unittest.TestCase):
             with patch.object(resources_bridge, "LOCAL_DIR", Path(d)):
                 out = resources_bridge._load_local()
         self.assertIsNone(out["index.json"])
+
+
+def run_all():
+    """供 tests/run_all.py 聚合调用：把本模块全部 unittest 用例转成 Result 列表。
+
+    注意：本模块在 00_中央平台/tests/ 下，run_all.py 位于 tests/ 下；
+    通过 importlib 加载时 sys.path 需包含本目录（见 run_all.py 注册处）。
+    这里不 import common（避免路径耦合），直接用 unittest 结果自造 Result 结构。
+    """
+    import io
+
+    # 惰性 import common（run_all.py 的 tests/ 在 sys.path 时可取；
+    # 独立 unittest 运行时不走本函数，不受影响）
+    try:
+        from common import Result
+    except ImportError:
+        Result = type("_Result", (), {"PASS": "PASS", "FAIL": "FAIL", "SKIP": "SKIP",
+                                      "__init__": lambda self, n, s, d="": (setattr(self, "name", n),
+                                                                              setattr(self, "status", s),
+                                                                              setattr(self, "detail", d))})
+
+    loader = unittest.defaultTestLoader
+    suite = loader.loadTestsFromModule(sys.modules[__name__])
+    buf = io.StringIO()
+    runner = unittest.TextTestRunner(stream=buf, verbosity=0)
+    res = runner.run(suite)
+
+    out = []
+    if res.failures or res.errors:
+        for test, tb in res.failures + res.errors:
+            out.append(Result(f"资源数据桥: {test}", Result.FAIL,
+                              tb.strip().splitlines()[-1] if tb.strip() else ""))
+    else:
+        out.append(Result("资源数据桥单测", Result.PASS, f"{res.testsRun} 用例全过"))
+    return out
 
 
 if __name__ == "__main__":

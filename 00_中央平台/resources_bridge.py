@@ -25,6 +25,7 @@ ai-resource-hub 公开数据桥代理（子项目①雏形）
 import asyncio
 import hashlib
 import json
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,7 +36,32 @@ REMOTE_BASE = "https://201650545.github.io/ai-resource-hub"
 MANIFEST = "manifest.json"
 # 哈希校验目标：4 个产物全校验（含 schema），与 manifest.files 声明一致
 DATA_FILES = ["index.json", "capabilities.json", "instances.json", "schema.json"]
-LOCAL_DIR = Path(__file__).parent.parent / "ai-resource-hub" / "public"  # D:\项目\ai-resource-hub\public
+
+
+def _resolve_local_dir():
+    """定位本地 ai-resource-hub/public 产物目录。
+
+    候选顺序（首个存在的目录即采用）：
+      1. 环境变量 AIHUB_RESOURCE_PUBLIC 显式指定（CI / 自定义布局覆盖）
+      2. 与 ai-hub 仓库同级的 ai-resource-hub/public
+      3. 旧布局（历史环境兼容）
+    兜底：全部不存在时返回候选 2（_load_local 按目录缺失整体回退，行为与缺文件一致）。
+    """
+    env = os.environ.get("AIHUB_RESOURCE_PUBLIC")
+    if env:
+        return Path(env)
+    hub_root = Path(__file__).resolve().parent.parent.parent  # ai-hub 仓库的上级
+    candidates = [
+        hub_root / "ai-resource-hub" / "public",
+        Path("D:/项目/ai-resource-hub/public"),
+    ]
+    for c in candidates:
+        if c.is_dir():
+            return c
+    return candidates[0]
+
+
+LOCAL_DIR = _resolve_local_dir()
 CACHE_TTL = 300  # 秒 —— 远程成功缓存
 CACHE_TTL_LOCAL = 60  # 秒 —— 本地回退短缓存（防故障期反复打远端）
 

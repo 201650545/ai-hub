@@ -47,6 +47,10 @@ def main() -> None:
     # 网关三件套（03_共享组件）已随 48eac65 删除，test_gateway/test_engines/
     # test_history/test_quota 依赖其 history/quota/engines 模块——缺失时整套 SKIP
     # （保留文件供参考，不删除），其余在测套件照常运行。
+    # 资源数据桥测试在 00_中央平台/tests/ 下（非本 tests/ 目录），先注入 sys.path
+    _bridge_tests = os.path.join(ROOT, "00_中央平台", "tests")
+    if os.path.isdir(_bridge_tests) and _bridge_tests not in sys.path:
+        sys.path.insert(0, _bridge_tests)
     SUITES = [
         ("test_central", "中央平台"),
         ("test_gateway", "网关"),
@@ -56,6 +60,8 @@ def main() -> None:
         ("test_orchestrator", "编排器"),
         ("test_video_embed", "视频组件"),
         ("test_lesson_framework", "课件骨架"),
+        # 资源数据桥（ai-resource-hub）：位于 00_中央平台/tests/，需先加 sys.path
+        ("test_resources_bridge", "资源数据桥"),
     ]
 
     all_results = []
