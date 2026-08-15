@@ -376,6 +376,26 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 "date": date,
                 "usage": _get_usage(gateway_id=GATEWAY_ID, date=date),
             })
+        elif path == "/api/search_aggregate":
+            # 多 AI 搜索内容聚合交付（2026-08-15）：并发问各引擎 → 内容池 → HTML 报告
+            import content_pool
+            q = query.get("q", [""])[0] or query.get("prompt", [""])[0]
+            if not q:
+                self._send_json(400, {"error": "q 必填（要搜索的问题）"})
+                return
+            req_e = query.get("engines", [""])[0]
+            eids = [e.strip() for e in req_e.split(",") if e.strip()] if req_e else None
+            try:
+                run_id, report_path, records = content_pool.run_search(q, engine_ids=eids)
+                self._send_json(200, {
+                    "status": "ok",
+                    "run_id": run_id,
+                    "report": report_path,
+                    "engines": [{ "provider": r["provider"], "status": r["status"],
+                                  "elapsed": round(r.get("elapsed", 0), 1) } for r in records],
+                })
+            except Exception as ex:  # noqa: BLE001
+                self._send_json(500, {"status": "err", "error": str(ex)[:200]})
         elif path == "/v1/models":
             self._send_json(200, {"object": "list", "data": aggregate_models()})
         elif path == "/api/unified_stream":
