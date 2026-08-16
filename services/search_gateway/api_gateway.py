@@ -191,6 +191,15 @@ if __name__ == "__main__":
     for cid, h in channels.cached_health_all().items():
         flag = "✅" if (h["key_set"] and h["reachable"]) else ("🟡" if h["key_set"] else "⚪")
         print("  " + flag + " " + cid + " " + channels.CHANNELS[cid]["name"] + " " + (h.get("error", "") or "")[:40])
+    try:
+        import heartbeat
+        heartbeat.start_heartbeat(
+            gateway_id="api_gateway", name="API 转发网关", icon="⚡",
+            description="多厂商 LLM 聚合转发（opencode 第一优先）OpenAI 兼容",
+            port=PORT)
+        print("❤️  心跳上报已启动 (central " + heartbeat.CENTRAL_URL + ")")
+    except Exception as e:  # noqa: BLE001
+        print("⚠️  心跳上报未启动: " + str(e)[:80])
     server = ThreadedServer(("0.0.0.0", PORT), GatewayHandler)
     try:
         server.serve_forever()

@@ -1,14 +1,34 @@
 {
   "gateways": {
-    "ds_v4_cli": {
-      "name": "智能聚合网关 DS V4 CLI",
-      "icon": "🤖",
-      "description": "AI 搜索 + LLM 聚合网关",
+    "search_gateway": {
+      "name": "AI 搜索网关",
+      "icon": "🔍",
+      "description": "4 大 AI 搜索聚合（元宝/豆包/Kimi/通义）→ 内容池 → HTML 报告",
       "port": 3000,
       "url": "http://localhost:3000",
-      "status": "offline",
-      "created_at": "2026-08-06T00:00:00",
-      "last_seen": "2026-08-06T00:00:00"
+      "status": "online",
+      "created_at": "2026-08-16T05:51:01",
+      "last_seen": "2026-08-16T05:51:01"
+    },
+    "api_gateway": {
+      "name": "API 转发网关",
+      "icon": "⚡",
+      "description": "多厂商 LLM 聚合转发（opencode 第一优先）OpenAI 兼容",
+      "port": 3100,
+      "url": "http://localhost:3100",
+      "status": "online",
+      "created_at": "2026-08-16T05:51:01",
+      "last_seen": "2026-08-16T05:51:01"
+    },
+    "canvas_orchestrator": {
+      "name": "组件编排器画布",
+      "icon": "🎬",
+      "description": "画布观察窗 SSE 直播 — 课件生成实时事件流",
+      "port": 8791,
+      "url": "http://localhost:8791",
+      "status": "online",
+      "created_at": "2026-08-12T04:49:41",
+      "last_seen": "2026-08-12T04:49:41"
     }
   }
 }

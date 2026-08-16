@@ -275,6 +275,15 @@ if __name__ == "__main__":
         h = engines.engine_health(eid)
         if h and isinstance(h, dict) and "connected" in h:
             print("  " + ("✅" if h["connected"] else "⚪") + " " + eid)
+    try:
+        import heartbeat
+        heartbeat.start_heartbeat(
+            gateway_id="search_gateway", name="AI 搜索网关", icon="🔍",
+            description="4 大 AI 搜索聚合（元宝/豆包/Kimi/通义）→ 内容池 → HTML 报告",
+            port=PORT)
+        print("❤️  心跳上报已启动 (central " + heartbeat.CENTRAL_URL + ")")
+    except Exception as e:  # noqa: BLE001
+        print("⚠️  心跳上报未启动: " + str(e)[:80])
     server = ThreadedServer(("0.0.0.0", PORT), GatewayHandler)
     try:
         server.serve_forever()
