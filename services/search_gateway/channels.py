@@ -155,6 +155,33 @@ CHANNELS = {
         "models": ["deepseek-v4-flash", "glm-5.2", "sensenova-6.8-flash-lite"],
         "note": "商汤日日新 SenseNova（Cherry Studio 已配置 key，2026-08-16 收录）。",
     },
+    "agnes": {
+        "name": "AGNES AI",
+        "provider": "AGNES (apihub.agnes-ai.com)",
+        "billing_type": "free_quota",
+        "billing_tag": "🟢 免费配额",
+        "icon": "🌀",
+        "base_url": "https://apihub.agnes-ai.com/v1",
+        "env_key": "",
+        "free": True,
+        "default_model": "agnes-2.5-flash",
+        "models": ["agnes-2.5-flash", "agnes-image-2.1-flash", "agnes-video-v2.0"],
+        "note": "AGNES AI（Cherry Studio 已配置 key，2026-08-16 收录）。",
+    },
+    "zscc": {
+        "name": "ZSCC",
+        "provider": "ZSCC (api.zscc.in)",
+        "billing_type": "free_quota",
+        "billing_tag": "🟢 免费配额",
+        "icon": "🔮",
+        "base_url": "https://api.zscc.in/v1",
+        "models_path": "/models",  # base_url 已含 /v1,/models 即 /v1/models
+        "env_key": "",
+        "free": True,
+        "default_model": "kimi-k3-cc",
+        "models": ["kimi-k3-cc", "claude-opus-4-8", "claude-sonnet-5", "deepseek-v4-flash-cc"],
+        "note": "ZSCC（Cherry Studio 已配置 key，2026-08-16 收录）。",
+    },
     "opencode": {
         "name": "OpenCode Go",
         "provider": "OpenCode Go (opencode.ai/zen/go)",
@@ -171,10 +198,10 @@ CHANNELS = {
     },
 }
 
-CHANNEL_ORDER = ["opencode", "modelscope", "sensetime", "deepseek", "gemini", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
+CHANNEL_ORDER = ["opencode", "modelscope", "sensetime", "agnes", "zscc", "deepseek", "gemini", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
 
 # fallback 链（前端模型未匹配时按此顺序路由）
-DEFAULT_CHAIN = ["opencode", "modelscope", "sensetime", "deepseek", "openrouter", "gemini", "groq", "siliconflow", "dashscope", "zhipu"]
+DEFAULT_CHAIN = ["opencode", "modelscope", "sensetime", "agnes", "zscc", "deepseek", "openrouter", "gemini", "groq", "siliconflow", "dashscope", "zhipu"]
 
 _config_cache = None
 
@@ -309,7 +336,8 @@ def channel_health(channel_id):
             return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": True, "models": models,
                     "error": "", "can_fill": can_fill, "provider": provider,
                     "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
-        data = _get_json(base + "/models", key, timeout=8, ua=ch.get("ua", "unified-ai-gateway/1.0"))
+        models_path = ch.get("models_path", "/models")
+        data = _get_json(base + models_path, key, timeout=8, ua=ch.get("ua", "unified-ai-gateway/1.0"))
         models = [m.get("id") for m in (data.get("data") or []) if m.get("id")]
         if channel_id == "deepseek":
             models = [m for m in models if m in ("deepseek-v4-flash", "deepseek-v4-pro", "deepseek-reasoner", "deepseek-chat")]
@@ -550,10 +578,18 @@ def model_to_chain(model):
         return ["gemini"]
     if model.startswith("sensenova-"):
         return ["sensetime"]
+    if model.startswith("claude-"):
+        return ["zscc", "opencode"]
+    if model.startswith("agnes-"):
+        return ["agnes", "zscc"]
+    if model == "kimi-k3-cc":
+        return ["zscc"]
     m = model.lower()
     # sensetime 渠道也有 deepseek-v4-flash / glm-5.2（无前缀模型名 → sensetime 优先）
     if m in ("deepseek-v4-flash", "glm-5.2"):
         return ["opencode", "sensetime", "deepseek"]
+    if m == "deepseek-v4-flash-cc":
+        return ["zscc", "opencode"]
     if "/" in model:  # 其他含命名空间的模型 → openrouter
         return ["openrouter"]
     for cid in ["groq", "siliconflow", "dashscope", "zhipu", "openrouter"]:
