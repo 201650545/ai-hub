@@ -172,21 +172,9 @@ ENGINES = {
         "probe_js": "!!document.querySelector('textarea, [contenteditable=true]')",
         "extract_js": GENERIC_EXTRACT_JS,
     },
-    "metaai": {
-        "name": "Meta AI",
-        "icon": "\U0001fa69",
-        "badge": "Llama 3 real-time search",
-        "session": "metaai",
-        "site_url": "https://www.meta.ai/",
-        "site_host": "meta.ai",
-        "fill_selector": "textarea, [contenteditable=true]",
-        "submit": {"enter": True},
-        "probe_js": "!!document.querySelector('textarea, [contenteditable=true]')",
-        "extract_js": GENERIC_EXTRACT_JS,
-    },
 }
 
-ENGINE_ORDER = ["yuanbao", "doubao", "kimi", "qianwen", "metaai"]
+ENGINE_ORDER = ["yuanbao", "doubao", "kimi", "qianwen"]
 
 # ---------------------------------------------------------------- 工具函数
 
