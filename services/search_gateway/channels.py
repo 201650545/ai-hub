@@ -129,6 +129,32 @@ CHANNELS = {
         "models": ["glm-4-flash", "glm-4.5-flash", "glm-4-air"],
         "note": "GLM-4-Flash 永久免费，0 欠费风险。",
     },
+    "modelscope": {
+        "name": "魔塔社区 ModelScope",
+        "provider": "魔塔社区 (api-inference.modelscope.cn)",
+        "billing_type": "free_quota",
+        "billing_tag": "🟢 免费配额 (注册赠送)",
+        "icon": "🗼",
+        "base_url": "https://api-inference.modelscope.cn/v1",
+        "env_key": "",
+        "free": True,
+        "default_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "models": ["deepseek-ai/DeepSeek-V4-Flash-0731", "deepseek-ai/DeepSeek-V4-Pro", "ZhipuAI/GLM-5.2"],
+        "note": "魔塔社区 ModelScope（Cherry Studio 已配置 key，2026-08-16 收录）。",
+    },
+    "sensetime": {
+        "name": "商汤日日新 SenseNova",
+        "provider": "商汤 (token.sensenova.cn)",
+        "billing_type": "free_quota",
+        "billing_tag": "🟢 免费配额",
+        "icon": "🀄",
+        "base_url": "https://token.sensenova.cn/v1",
+        "env_key": "",
+        "free": True,
+        "default_model": "deepseek-v4-flash",
+        "models": ["deepseek-v4-flash", "glm-5.2", "sensenova-6.8-flash-lite"],
+        "note": "商汤日日新 SenseNova（Cherry Studio 已配置 key，2026-08-16 收录）。",
+    },
     "opencode": {
         "name": "OpenCode Go",
         "provider": "OpenCode Go (opencode.ai/zen/go)",
@@ -145,10 +171,10 @@ CHANNELS = {
     },
 }
 
-CHANNEL_ORDER = ["opencode", "deepseek", "gemini", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
+CHANNEL_ORDER = ["opencode", "modelscope", "sensetime", "deepseek", "gemini", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
 
 # fallback 链（前端模型未匹配时按此顺序路由）
-DEFAULT_CHAIN = ["opencode", "deepseek", "openrouter", "gemini", "groq", "siliconflow", "dashscope", "zhipu"]
+DEFAULT_CHAIN = ["opencode", "modelscope", "sensetime", "deepseek", "openrouter", "gemini", "groq", "siliconflow", "dashscope", "zhipu"]
 
 _config_cache = None
 
@@ -513,13 +539,23 @@ def chat_completion(channel_id, payload):
 
 def model_to_chain(model):
     """模型名 → 渠道候选链（第一个命中优先）。"""
+    # modelscope 模型名带命名空间前缀（deepseek-ai/...、ZhipuAI/...）
+    if model.startswith("deepseek-ai/"):
+        return ["modelscope", "opencode"]
+    if model.startswith("ZhipuAI/") or model.lower().startswith("zhipuai/"):
+        return ["modelscope", "sensetime"]
     if model.startswith("deepseek-"):
         return ["opencode", "deepseek"]  # opencode 第一优先（用户 2026-08-15 指定）
     if model.startswith("gemini-"):
         return ["gemini"]
-    if "/" in model:  # openrouter 风格模型名
-        return ["openrouter"]
+    if model.startswith("sensenova-"):
+        return ["sensetime"]
     m = model.lower()
+    # sensetime 渠道也有 deepseek-v4-flash / glm-5.2（无前缀模型名 → sensetime 优先）
+    if m in ("deepseek-v4-flash", "glm-5.2"):
+        return ["opencode", "sensetime", "deepseek"]
+    if "/" in model:  # 其他含命名空间的模型 → openrouter
+        return ["openrouter"]
     for cid in ["groq", "siliconflow", "dashscope", "zhipu", "openrouter"]:
         if m in [x.lower() for x in CHANNELS[cid].get("models", [])]:
             return [cid]
