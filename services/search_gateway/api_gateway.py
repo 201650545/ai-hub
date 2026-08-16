@@ -57,19 +57,26 @@ def aggregate_models():
 
 
 def stream_openai_passthrough(handler, upstream):
-    """把上游 SSE 流原样转发给客户端。"""
+    """把上游 SSE 流原样转发给客户端。收到 [DONE] 即结束（防上游 keep-alive 挂起）。"""
     handler.send_response(200)
     handler.send_header("Content-Type", "text/event-stream")
     handler.send_header("Cache-Control", "no-cache")
-    handler.send_header("Connection", "keep-alive")
+    handler.send_header("Connection", "close")
     handler.send_header("Access-Control-Allow-Origin", "*")
     handler.end_headers()
+    tail = b""
     while True:
-        chunk = upstream.read(2048)
+        try:
+            chunk = upstream.read(2048)
+        except Exception:  # noqa: BLE001
+            break
         if not chunk:
             break
         handler.wfile.write(chunk)
         handler.wfile.flush()
+        tail = (tail + chunk)[-8192:]
+        if b"[DONE]" in tail:
+            break
 
 
 class ThreadedServer(socketserver.ThreadingMixIn, http.server.HTTPServer):

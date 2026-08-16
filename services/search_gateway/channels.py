@@ -141,6 +141,7 @@ CHANNELS = {
         "default_model": "deepseek-v4-flash",
         "models": ["deepseek-v4-flash", "deepseek-v4-pro"],
         "note": "OpenCode Go 渠道（用户 2026-08-15 提供），优先转发 DeepSeek V4 Flash。",
+        "ua": "openai-completions/pi-ai",  # Cloudflare 1010: 必须用该 UA 才放行
     },
 }
 
@@ -242,10 +243,10 @@ def get_balance(channel_id, key):
     return "免费额度/配额 (0 欠费风险)"
 
 
-def _get_json(url, key, timeout=8):
+def _get_json(url, key, timeout=8, ua="unified-ai-gateway/1.0"):
     req = urllib.request.Request(url, headers={
         "Authorization": f"Bearer {key}",
-        "User-Agent": "unified-ai-gateway/1.0",
+        "User-Agent": ua,
     })
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8", "ignore"))
@@ -275,14 +276,14 @@ def channel_health(channel_id):
     base = ch["base_url"].rstrip("/")
     try:
         if channel_id == "openrouter":
-            data = _get_json(base + "/models", key, timeout=8)
+            data = _get_json(base + "/models", key, timeout=8, ua=ch.get("ua", "unified-ai-gateway/1.0"))
             models = [m["id"] for m in data.get("data", [])
                       if m.get("id", "").endswith(":free") or m.get("is_free")]
             models = sorted(models)[:40]
             return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": True, "models": models,
                     "error": "", "can_fill": can_fill, "provider": provider,
                     "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
-        data = _get_json(base + "/models", key, timeout=8)
+        data = _get_json(base + "/models", key, timeout=8, ua=ch.get("ua", "unified-ai-gateway/1.0"))
         models = [m.get("id") for m in (data.get("data") or []) if m.get("id")]
         if channel_id == "deepseek":
             models = [m for m in models if m in ("deepseek-v4-flash", "deepseek-v4-pro", "deepseek-reasoner", "deepseek-chat")]
@@ -494,10 +495,11 @@ def chat_completion(channel_id, payload):
     for m in req_payload.get("messages", []):
         if m.get("role") == "developer":
             m["role"] = "system"
+    ua = ch.get("ua", "unified-ai-gateway/1.0")
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {key}",
-        "User-Agent": "unified-ai-gateway/1.0",
+        "User-Agent": ua,
     }
     if req_payload.get("stream"):
         headers["Accept"] = "text/event-stream"
@@ -512,7 +514,7 @@ def chat_completion(channel_id, payload):
 def model_to_chain(model):
     """模型名 → 渠道候选链（第一个命中优先）。"""
     if model.startswith("deepseek-"):
-        return ["deepseek"]
+        return ["opencode", "deepseek"]  # opencode 第一优先（用户 2026-08-15 指定）
     if model.startswith("gemini-"):
         return ["gemini"]
     if "/" in model:  # openrouter 风格模型名
