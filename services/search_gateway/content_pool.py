@@ -80,7 +80,7 @@ def run_search(question, engine_ids=None):
     run_dir=RUNS_DIR/run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir/"question.txt").write_text(question, encoding="utf-8")
-    engine_ids = engine_ids or ["yuanbao","doubao","kimi","qianwen","metaai"]
+    engine_ids = engine_ids or ["yuanbao","doubao","kimi","qianwen"]
     results={}
     def _one(eid):
         try: results[eid]=engines.ask_engine(eid, question)
