@@ -62,11 +62,16 @@ CHANNELS = {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
         "env_key": "GOOGLE_API_KEY",
         "free": True,
-        
+        "proxy": "http://127.0.0.1:7890",  # Google 被墙，走本机 mihomo 代理
         "speed": "fast",
-        "default_model": "gemini-2.5-flash",
-        "models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
-        "note": "谷歌官方免费配额，超限即停，0 欠费风险。",
+        "default_model": "gemini-3.5-flash",
+        "models": [
+            "gemini-3.5-flash", "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite", "gemini-3.6-flash", "gemini-3.7-flash",
+            "gemini-flash-latest", "gemini-flash-lite-latest",
+            "gemini-omni-flash-preview",
+        ],  # 多模态理解模型（支持图像输入）。image 生模型免费配额 429 已剔除
+        "note": "谷歌官方免费配额（key 来自 Cherry Studio）。支持多模态图像理解。走 7890 代理访问（Google 被墙）。",
     },
     "openrouter": {
         "name": "OpenRouter 免费模型池",
@@ -324,12 +329,36 @@ def get_balance(channel_id, key):
     return "免费额度/配额 (0 欠费风险)"
 
 
-def _get_json(url, key, timeout=8, ua="unified-ai-gateway/1.0"):
+
+
+
+def _build_opener(channel_id=None):
+    """根据渠道是否配置 proxy,返回 (opener 或 None)。渠道配 proxy 时走该代理(如本机 mihomo 7890 访问被墙的 Google)。"""
+    ch = CHANNELS.get(channel_id or "", {})
+    proxy = ch.get("proxy", "")
+    if proxy:
+        handler = urllib.request.ProxyHandler({"http": proxy, "https": proxy})
+        return urllib.request.build_opener(handler)
+    return None
+
+
+def _urlopen(req, timeout=120, channel_id=None):
+    """带可选代理的 urlopen。渠道配 proxy 且代理可用时走代理，否则直连。"""
+    opener = _build_opener(channel_id)
+    if opener:
+        try:
+            return opener.open(req, timeout=timeout)
+        except (urllib.error.URLError, OSError, TimeoutError, ConnectionError):
+            # 代理失败回退直连
+            return urllib.request.urlopen(req, timeout=timeout)
+    return urllib.request.urlopen(req, timeout=timeout)
+
+def _get_json(url, key, timeout=8, ua="unified-ai-gateway/1.0", channel_id=None):
     req = urllib.request.Request(url, headers={
         "Authorization": f"Bearer {key}",
         "User-Agent": ua,
     })
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with _urlopen(req, timeout=timeout, channel_id=channel_id) as resp:
         return json.loads(resp.read().decode("utf-8", "ignore"))
 
 
@@ -363,7 +392,7 @@ def channel_health(channel_id):
     base = ch["base_url"].rstrip("/")
     try:
         if channel_id == "openrouter":
-            data = _get_json(base + "/models", key, timeout=8, ua=ch.get("ua", "unified-ai-gateway/1.0"))
+            data = _get_json(base + "/models", key, timeout=8, ua=ch.get("ua", "unified-ai-gateway/1.0"), channel_id=channel_id)
             models = [m["id"] for m in data.get("data", [])
                       if m.get("id", "").endswith(":free") or m.get("is_free")]
             models = sorted(models)[:40]
@@ -371,12 +400,13 @@ def channel_health(channel_id):
                     "error": "", "can_fill": can_fill, "provider": provider,
                     "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
         models_path = ch.get("models_path", "/models")
-        data = _get_json(base + models_path, key, timeout=8, ua=ch.get("ua", "unified-ai-gateway/1.0"))
+        data = _get_json(base + models_path, key, timeout=8, ua=ch.get("ua", "unified-ai-gateway/1.0"), channel_id=channel_id)
         models = [m.get("id") for m in (data.get("data") or []) if m.get("id")]
         if channel_id == "deepseek":
             models = [m for m in models if m in ("deepseek-v4-flash", "deepseek-v4-pro", "deepseek-reasoner", "deepseek-chat")]
         elif channel_id == "gemini":
-            models = [m.split("/", 1)[-1] for m in models]  # 去掉 models/ 前缀
+            models = [m.split("/", 1)[-1] for m in models if m]  # 去掉 models/ 前缀
+            models = [m for m in models if "image" in m or "flash" in m or "omni" in m][:30]
         models = (models or ch.get("models", []))[:20]
         return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": True, "models": models,
                 "error": "", "can_fill": can_fill, "provider": provider,
@@ -594,7 +624,7 @@ def chat_completion(channel_id, payload):
     url = ch["base_url"].rstrip("/") + "/chat/completions"
     req = urllib.request.Request(url, data=json.dumps(req_payload).encode("utf-8"),
                                  headers=headers, method="POST")
-    resp = urllib.request.urlopen(req, timeout=120)
+    resp = _urlopen(req, timeout=120, channel_id=channel_id)
     model = req_payload.get("model") or ch.get("default_model", "")
     return _QuotaResponse(channel_id, model, req_payload.get("stream"), resp)
 
