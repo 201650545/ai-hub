@@ -109,7 +109,10 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         path, query = parsed.path, urllib.parse.parse_qs(parsed.query)
-        if path == "/api/health":
+        if path in ("/", "/index.html"):
+            self._send(200, "text/html; charset=utf-8", _read_page().encode("utf-8"),
+                       extra_headers={"Cache-Control": "no-cache"})
+        elif path == "/api/health":
             self._send_json(200, {"llm": channels.cached_health_all(), "time": time_str()})
         elif path == "/api/channels":
             self._send_json(200, {"channels": channels.cached_health_all()})
@@ -176,6 +179,14 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
 
     def log_message(self, *args):  # noqa: D401
         pass
+
+
+def _read_page(name="api_page.html"):
+    try:
+        with open(os.path.join(BASE_DIR, "web", name), "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:  # noqa: BLE001
+        return "<html><body><h2>" + name + " 缺失</h2></body></html>"
 
 
 def time_str():
