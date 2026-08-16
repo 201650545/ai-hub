@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 搜索聚合 · 内容交付</title>
+<style>
+:root{--bg:#f1f3f8;--card:#fff;--text:#0f172a;--muted:#64748b;--primary:#0052cc;--green:#16a34a;--red:#dc2626;--amber:#d97706;--border:#e2e8f0}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:24px}
+.wrap{max-width:680px;margin:0 auto}
+h1{font-size:22px;margin-bottom:4px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+.card{background:var(--card);border-radius:14px;padding:22px;box-shadow:0 4px 12px rgba(15,23,42,.06);margin-bottom:16px}
+textarea{width:100%;min-height:80px;border:1.5px solid var(--border);border-radius:10px;padding:12px;font-size:15px;font-family:inherit;resize:vertical}
+textarea:focus{outline:none;border-color:var(--primary)}
+.row{display:flex;gap:10px;margin-top:12px;align-items:center}
+.btn{background:var(--primary);color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:15px;cursor:pointer}
+.btn:hover{opacity:.9}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.status-tip{color:var(--muted);font-size:13px}
+.engines{margin-top:16px;display:none}
+.engine{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f1f5f9;font-size:14px}
+.engine:last-child{border-bottom:none}
+.dot{width:10px;height:10px;border-radius:50%;background:#cbd5e1;flex-shrink:0}
+.dot.spin{border:2px solid var(--primary);border-top-color:transparent;background:transparent;animation:rot 1s linear infinite}
+.dot.ok{background:var(--green)}
+.dot.err{background:var(--red)}
+.dot.wait{background:var(--amber)}
+@keyframes rot{to{transform:rotate(360deg)}}
+.result{margin-top:16px;display:none}
+.report-link{display:inline-block;margin-top:8px;background:var(--green);color:#fff;text-decoration:none;padding:12px 26px;border-radius:10px;font-size:15px}
+.report-link:hover{opacity:.9}
+.error-box{color:var(--red);margin-top:12px;font-size:14px;display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔍 AI 搜索聚合</h1>
+  <div class="sub">一个问题 → 多个 AI 搜索引擎同时搜索 → 汇总为一份 HTML 报告</div>
+  <div class="card">
+    <textarea id="q" placeholder="输入要搜索的问题，例如：2026 年中国 AI 发展一句话总结"></textarea>
+    <div class="row">
+      <button class="btn" id="go" onclick="runSearch()">开始聚合搜索</button>
+      <span class="status-tip" id="tip">最多 4-5 个引擎并发，约 1-2 分钟</span>
+    </div>
+    <div class="engines" id="engines"></div>
+    <div class="error-box" id="errbox"></div>
+    <div class="result" id="result">
+      <div>✅ 搜索完成，各引擎内容已汇入内容池并排版：</div>
+      <a class="report-link" id="reportLink" target="_blank">📄 查看完整报告</a>
+      <div class="status-tip" style="margin-top:10px" id="resultMeta"></div>
+    </div>
+  </div>
+</div>
+<script>
+const ENGINE_NAMES = {yuanbao:'腾讯元宝',doubao:'字节豆包',kimi:'Kimi',qianwen:'通义千问',metaai:'Meta AI'};
+const ENGINE_ICONS = {yuanbao:'🐧',doubao:'🟢',kimi:'🌙',qianwen:'🎈',metaai:'⚙️'};
+function el(id){return document.getElementById(id)}
+function showEngines(){
+  el('engines').style.display='block';
+  el('engines').innerHTML = Object.keys(ENGINE_NAMES).map(k=>
+    '<div class="engine" id="eng-'+k+'"><span class="dot wait" id="dot-'+k+'"></span>'+
+    ENGINE_ICONS[k]+' '+ENGINE_NAMES[k]+' <span style="color:var(--muted)" id="st-'+k+'">等待中…</span></div>'
+  ).join('');
+}
+function setEngine(k, state, msg){
+  const dot=el('dot-'+k), st=el('st-'+k);
+  dot.className='dot '+(state==='running'?'spin':state==='ok'?'ok':state==='err'?'err':'wait');
+  st.textContent=msg||'';
+}
+async function runSearch(){
+  const q=el('q').value.trim();
+  if(!q){el('errbox').textContent='请输入问题';el('errbox').style.display='block';return}
+  el('errbox').style.display='none';
+  el('result').style.display='none';
+  el('go').disabled=true; el('tip').textContent='正在搜索…请稍候';
+  showEngines();
+  Object.keys(ENGINE_NAMES).forEach(k=>setEngine(k,'running','搜索中…'));
+  try{
+    const resp=await fetch('/api/search_aggregate?q='+encodeURIComponent(q));
+    const data=await resp.json();
+    if(data.status!=='ok'){throw new Error(data.error||'搜索失败')}
+    (data.engines||[]).forEach(function(e){
+      if(e.status==='ok') setEngine(e.provider,'ok','✓ 完成 '+e.elapsed+'s');
+      else if(e.status==='timeout') setEngine(e.provider,'err','⏱ 超时');
+      else setEngine(e.provider,'err','✗ 失败 '+(e.status||''));
+    });
+    Object.keys(ENGINE_NAMES).forEach(k=>{
+      if(!(data.engines||[]).some(e=>e.provider===k)) setEngine(k,'err','未运行');
+    });
+    const runId=data.run_id;
+    el('reportLink').href='/reports/'+runId+'/report.html';
+    el('resultMeta').textContent='RUN '+runId+' · '+(data.engines||[]).filter(e=>e.status==='ok').length+' 个引擎成功';
+    el('result').style.display='block';
+    el('tip').textContent='完成';
+  }catch(e){
+    el('errbox').textContent='错误：'+e.message;
+    el('errbox').style.display='block';
+    el('tip').textContent='失败';
+  }finally{
+    el('go').disabled=false;
+  }
+}
+</script>
+</body>
+</html>

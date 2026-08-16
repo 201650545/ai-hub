@@ -338,6 +338,24 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
 
         if path in ("/", "/index.html"):
             self._send(200, "text/html; charset=utf-8", _read_page().encode("utf-8"), extra_headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+        elif path == "/aggregate":
+            # 多 AI 搜索聚合交付页面（2026-08-15）
+            import content_pool
+            p = os.path.join(BASE_DIR, "web", "aggregate.html")
+            if os.path.exists(p):
+                with open(p, "r", encoding="utf-8") as _f:
+                    self._send(200, "text/html; charset=utf-8", _f.read().encode("utf-8"))
+            else:
+                self._send(404, "text/plain; charset=utf-8", b"aggregate.html missing")
+        elif path.startswith("/reports/"):
+            # 报告文件服务：/reports/<run_id>/report.html
+            rel = path[len("/reports/"):]
+            rp = os.path.normpath(os.path.join(BASE_DIR, "runs", rel))
+            if rp.startswith(os.path.normpath(os.path.join(BASE_DIR, "runs"))) and os.path.exists(rp):
+                with open(rp, "r", encoding="utf-8") as _f:
+                    self._send(200, "text/html; charset=utf-8", _f.read().encode("utf-8"))
+            else:
+                self._send(404, "text/plain; charset=utf-8", b"report not found")
         elif path == "/health":
             # 统一健康检查（Monorepo runtime 约定）
             self._send_json(200, {"status": "ok", "service": "search_gateway", "version": "1.0"})
