@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """content_pool.py - 多 AI 搜索内容聚合交付"""
 import json, threading, datetime
+import urllib.request
 from pathlib import Path
 import engines
 
@@ -43,8 +44,42 @@ CSS = "".join([
     "footer{color:#999;font-size:12px;text-align:center;margin:24px 0}",
 ])
 
-def _build_report(run_id, question, merged):
+def _llm_summarize(question, merged):
+    """调网关 LLM 转发 API，把各引擎内容整理成一段综合结论（2026-08-15）。
+    用本机 :3000 的 /v1/chat/completions（DeepSeek 等渠道）；失败返回空串（不阻塞报告）。"""
+    ok = [r for r in merged if r.get("status") == "ok" and (r.get("answer") or r.get("thinking"))]
+    if not ok:
+        return ""
+    parts = []
+    for r in ok:
+        txt = (r.get("answer") or r.get("thinking") or "")[:1500]
+        parts.append("【" + (r.get("name") or r.get("provider") or "") + "】\n" + txt)
+    contents = "\n\n".join(parts)
+    prompt = ("以下是多个 AI 搜索引擎对同一个问题的回答。请综合它们，输出一段有条理的中文总结"
+              "（先给结论，再列各来源要点，标注共识与差异；300 字以内）：\n\n问题：" + question + "\n\n" + contents)
+    payload = {
+        "model": "deepseek-v4-flash",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 800,
+    }
+    req = urllib.request.Request(
+        "http://127.0.0.1:3000/v1/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read().decode("utf-8", "ignore"))
+        return (data.get("choices") or [{}])[0].get("message", {}).get("content", "") or ""
+    except Exception as e:
+        print("[content_pool] LLM summarize failed: " + str(e)[:200])
+        return ""
+
+
+def _build_report(run_id, question, merged, summary=None):
     cards=[]
+    if summary:
+        cards.append("<section class=card style='border-left:4px solid #16a34a'><h2>📌 综合整理</h2><div class=answer>"+_md(summary)+"</div></section>")
     for r in merged:
         if r.get("status")=="ok":
             body=_md(r.get("answer") or r.get("thinking") or "") or "<p style=color:#999>（无有效内容）</p>"
@@ -103,8 +138,10 @@ def run_search(question, engine_ids=None):
         merged[r["provider"]]=r
     merged_list=list(merged.values())
     (run_dir/"merged.json").write_text(json.dumps(merged_list,ensure_ascii=False,indent=2),encoding="utf-8")
+    summary=_llm_summarize(question, merged_list)
+    (run_dir/"summary.md").write_text(summary or "（无综合结论）",encoding="utf-8")
     report_path=run_dir/"report.html"
-    report_path.write_text(_build_report(run_id, question, merged_list),encoding="utf-8")
+    report_path.write_text(_build_report(run_id, question, merged_list, summary),encoding="utf-8")
     return run_id, str(report_path), records
 
 if __name__=="__main__":
