@@ -600,35 +600,16 @@ def chat_completion(channel_id, payload):
 
 
 def model_to_chain(model):
-    """模型名 → 渠道候选链（第一个命中优先）。"""
-    # modelscope 模型名带命名空间前缀（deepseek-ai/...、ZhipuAI/...）
-    if model.startswith("deepseek-ai/"):
-        return ["modelscope", "opencode"]
-    if model.startswith("ZhipuAI/") or model.lower().startswith("zhipuai/"):
-        return ["modelscope", "sensetime"]
-    if model.startswith("deepseek-"):
-        return ["opencode", "deepseek"]  # opencode 第一优先（用户 2026-08-15 指定）
-    if model.startswith("gemini-"):
-        return ["gemini"]
-    if model.startswith("sensenova-"):
-        return ["sensetime"]
-    if model.startswith("claude-"):
-        return ["zscc", "opencode"]
-    if model.startswith("agnes-"):
-        return ["agnes", "zscc"]
-    if model == "kimi-k3-cc":
-        return ["zscc"]
-    m = model.lower()
-    # sensetime 渠道也有 deepseek-v4-flash / glm-5.2（无前缀模型名 → sensetime 优先）
-    if m in ("deepseek-v4-flash", "glm-5.2"):
-        return ["opencode", "sensetime", "deepseek"]
-    if m == "deepseek-v4-flash-cc":
-        return ["zscc", "opencode"]
-    if "/" in model:  # 其他含命名空间的模型 → openrouter
-        return ["openrouter"]
-    for cid in ["groq", "siliconflow", "dashscope", "zhipu", "openrouter"]:
-        if m in [x.lower() for x in CHANNELS[cid].get("models", [])]:
-            return [cid]
+    """模型名 → 渠道候选链。
+    统一用包含搜索 + 智能排序（免费优先 → 速度快优先）。
+    这样 deepseek-v4-flash 会自动映射到 modelscope 的 deepseek-ai/DeepSeek-V4-Flash-0731、
+    zscc 的 deepseek-v4-flash-cc 等（后缀不同但本质同一模型）。
+    与前端 /api/model_providers 反查逻辑完全一致。"""
+    providers = model_providers(model)
+    if providers:
+        # 已按 _channel_sort_key 排序：免费优先 → 速度快优先 → 渠道顺序
+        return [p["id"] for p in providers if p.get("reachable")]
+    # 无匹配：用 DEFAULT_CHAIN 兜底
     return DEFAULT_CHAIN
 
 

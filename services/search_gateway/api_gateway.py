@@ -28,16 +28,25 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def route_completion(payload):
-    """按模型路由到渠道候选链，逐个尝试，返回 (渠道id, response) 或 (None, errors)。"""
+    """按模型路由到渠道候选链，逐个尝试，返回 (渠道id, response) 或 (None, errors)。
+    模型名自动映射：用户请求 deepseek-v4-flash，转发到 modelscope 时改为
+    deepseek-ai/DeepSeek-V4-Flash-0731（该渠道实际模型名），保证上游能识别。"""
     model = payload.get("model", "")
-    chain = channels.model_to_chain(model)
+    # 候选链 + 每个渠道对应的实际模型名
+    providers = channels.model_providers(model)
+    if providers:
+        chain = [(p["id"], (p.get("matched_models") or [model])[0]) for p in providers if p.get("reachable")]
+    else:
+        chain = [(cid, model) for cid in channels.model_to_chain(model)]
     errors = []
-    for cid in chain:
+    for cid, real_model in chain:
         if not channels.key_is_set(cid):
             errors.append(cid + ": 未配置 key")
             continue
         try:
-            return cid, channels.chat_completion(cid, payload)
+            p2 = dict(payload)
+            p2["model"] = real_model  # 映射为该渠道实际模型名
+            return cid, channels.chat_completion(cid, p2)
         except urllib.error.HTTPError as he:
             detail = he.read().decode("utf-8", "ignore")[:200]
             errors.append(cid + ": HTTP " + str(he.code) + " " + detail)
