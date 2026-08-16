@@ -47,6 +47,8 @@ CHANNELS = {
         "base_url": "https://api.deepseek.com/v1",
         "env_key": "DEEPSEEK_API_KEY",
         "free": False,
+        
+        "speed": "fast",
         "default_model": "deepseek-v4-flash",
         "models": ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-reasoner"],
         "note": "使用官方 Key 扣除充值余额，请关注余额。",
@@ -60,6 +62,8 @@ CHANNELS = {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
         "env_key": "GOOGLE_API_KEY",
         "free": True,
+        
+        "speed": "fast",
         "default_model": "gemini-2.5-flash",
         "models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
         "note": "谷歌官方免费配额，超限即停，0 欠费风险。",
@@ -73,6 +77,8 @@ CHANNELS = {
         "base_url": "https://openrouter.ai/api/v1",
         "env_key": "OPENROUTER_API_KEY",
         "free": True,
+        
+        "speed": "medium",
         "default_model": "meta-llama/llama-3.3-70b-instruct:free",
         "models": [],  # 启动/健康检查时动态拉取免费模型
         "note": "自动筛选 :free 节点，0 扣费风险。",
@@ -86,6 +92,8 @@ CHANNELS = {
         "base_url": "https://api.groq.com/openai/v1",
         "env_key": "",
         "free": True,
+        
+        "speed": "fast",
         "default_model": "gpt-oss-120b",
         "models": ["gpt-oss-120b", "gpt-oss-20b", "qwen3.6-27b", "compound-mini"],
         "note": "LPU 硬件加速，免费配额，0 欠费风险。",
@@ -99,6 +107,8 @@ CHANNELS = {
         "base_url": "https://api.siliconflow.cn/v1",
         "env_key": "",
         "free": True,
+        
+        "speed": "fast",
         "default_model": "deepseek-ai/DeepSeek-V3",
         "models": ["deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-7B-Instruct", "THUDM/glm-4-9b-chat"],
         "note": "注册赠送 ￥14 额度，含免费开箱模型。",
@@ -112,6 +122,8 @@ CHANNELS = {
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
         "env_key": "",
         "free": True,
+        
+        "speed": "medium",
         "default_model": "qwen-plus",
         "models": ["qwen-plus", "qwen-turbo", "qwen-max"],
         "note": "注册赠送数千万 Tokens 试用。",
@@ -125,6 +137,8 @@ CHANNELS = {
         "base_url": "https://open.bigmodel.cn/api/paas/v4",
         "env_key": "",
         "free": True,
+        
+        "speed": "medium",
         "default_model": "glm-4-flash",
         "models": ["glm-4-flash", "glm-4.5-flash", "glm-4-air"],
         "note": "GLM-4-Flash 永久免费，0 欠费风险。",
@@ -138,6 +152,8 @@ CHANNELS = {
         "base_url": "https://api-inference.modelscope.cn/v1",
         "env_key": "",
         "free": True,
+        
+        "speed": "medium",
         "default_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
         "models": ["deepseek-ai/DeepSeek-V4-Flash-0731", "deepseek-ai/DeepSeek-V4-Pro", "ZhipuAI/GLM-5.2"],
         "note": "魔塔社区 ModelScope（Cherry Studio 已配置 key，2026-08-16 收录）。",
@@ -151,6 +167,8 @@ CHANNELS = {
         "base_url": "https://token.sensenova.cn/v1",
         "env_key": "",
         "free": True,
+        
+        "speed": "medium",
         "default_model": "deepseek-v4-flash",
         "models": ["deepseek-v4-flash", "glm-5.2", "sensenova-6.8-flash-lite"],
         "note": "商汤日日新 SenseNova（Cherry Studio 已配置 key，2026-08-16 收录）。",
@@ -164,6 +182,8 @@ CHANNELS = {
         "base_url": "https://apihub.agnes-ai.com/v1",
         "env_key": "",
         "free": True,
+        
+        "speed": "medium",
         "default_model": "agnes-2.5-flash",
         "models": ["agnes-2.5-flash", "agnes-image-2.1-flash", "agnes-video-v2.0"],
         "note": "AGNES AI（Cherry Studio 已配置 key，2026-08-16 收录）。",
@@ -178,6 +198,8 @@ CHANNELS = {
         "models_path": "/models",  # base_url 已含 /v1,/models 即 /v1/models
         "env_key": "",
         "free": True,
+        
+        "speed": "medium",
         "default_model": "kimi-k3-cc",
         "models": ["kimi-k3-cc", "claude-opus-4-8", "claude-sonnet-5", "deepseek-v4-flash-cc"],
         "note": "ZSCC（Cherry Studio 已配置 key，2026-08-16 收录）。",
@@ -191,6 +213,8 @@ CHANNELS = {
         "base_url": "https://opencode.ai/zen/go/v1",
         "env_key": "OPENCODE_API_KEY",
         "free": False,
+        
+        "speed": "fast",
         "default_model": "deepseek-v4-flash",
         "models": ["deepseek-v4-flash", "deepseek-v4-pro"],
         "note": "OpenCode Go 渠道（用户 2026-08-15 提供），优先转发 DeepSeek V4 Flash。",
@@ -606,3 +630,90 @@ def model_to_chain(model):
         if m in [x.lower() for x in CHANNELS[cid].get("models", [])]:
             return [cid]
     return DEFAULT_CHAIN
+
+
+# ---------------------------------------------------------------- 模型反查 & 智能排序
+
+def _channel_sort_key(cid, st):
+    """渠道排序键：(免费优先, 速度快优先, 渠道顺序)。
+    返回元组，越小越靠前。"""
+    ch = CHANNELS.get(cid, {})
+    billing = ch.get("billing_type", "free")
+    speed = ch.get("speed", "medium")
+    speed_rank = {"fast": 0, "medium": 1, "slow": 2}.get(speed, 1)
+    free_rank = 0 if billing in ("free", "free_quota") else 1  # 免费在前
+    order_rank = CHANNEL_ORDER.index(cid) if cid in CHANNEL_ORDER else 99
+    return (free_rank, speed_rank, order_rank)
+
+
+def all_models():
+    """聚合所有在线渠道的全部模型（去重），返回 [{name, providers:[cid,...]}]。
+    每个 provider 含 {id, name, icon, billing_type, billing_tag, speed, reachable}。"""
+    h = cached_health_all()
+    model_map = {}  # model_name -> {providers: []}
+    for cid in CHANNEL_ORDER:
+        st = h.get(cid, {})
+        if not st.get("key_set") or not st.get("reachable"):
+            continue
+        ch = CHANNELS.get(cid, {})
+        for m in st.get("models", []) or []:
+            if m not in model_map:
+                model_map[m] = {"name": m, "providers": []}
+            model_map[m]["providers"].append({
+                "id": cid,
+                "name": ch.get("name", cid),
+                "icon": ch.get("icon", "🤖"),
+                "billing_type": ch.get("billing_type", "free"),
+                "billing_tag": ch.get("billing_tag", ""),
+                "speed": ch.get("speed", "medium"),
+                "speed_label": {"fast": "快", "medium": "中", "slow": "慢"}.get(ch.get("speed", "medium"), "中"),
+                "reachable": st.get("reachable", False),
+                "no_test": cid in NO_TEST_CHANNELS,
+            })
+    # 每个 model 的 providers 按智能排序
+    for m in model_map:
+        model_map[m]["providers"].sort(key=lambda x: _channel_sort_key(x["id"], {}))
+    # 模型按 providers 数量降序、名字升序
+    out = sorted(model_map.values(), key=lambda x: (-len(x["providers"]), x["name"].lower()))
+    return out
+
+
+def model_providers(model_name):
+    """反查支持某模型的所有渠道（包含搜索），返回按智能排序的 provider 列表。
+    包含搜索：渠道模型名包含 query 即算支持（不区分大小写）。"""
+    q = (model_name or "").strip().lower()
+    if not q:
+        return []
+    h = cached_health_all()
+    matched = []
+    for cid in CHANNEL_ORDER:
+        st = h.get(cid, {})
+        if not st.get("key_set"):
+            continue
+        ch = CHANNELS.get(cid, {})
+        models = st.get("models", []) or []
+        # 包含搜索：任一模型名包含 query
+        hits = [m for m in models if q in m.lower()]
+        if not hits:
+            continue
+        matched.append({
+            "id": cid,
+            "name": ch.get("name", cid),
+            "icon": ch.get("icon", "🤖"),
+            "provider": ch.get("provider", ""),
+            "base_url": ch.get("base_url", ""),
+            "billing_type": ch.get("billing_type", "free"),
+            "billing_tag": ch.get("billing_tag", ""),
+            "billing_label": "免费" if ch.get("billing_type") in ("free", "free_quota") else "付费",
+            "speed": ch.get("speed", "medium"),
+            "speed_label": {"fast": "快", "medium": "中", "slow": "慢"}.get(ch.get("speed", "medium"), "中"),
+            "reachable": st.get("reachable", False),
+            "key_set": st.get("key_set", False),
+            "matched_models": hits,
+            "no_test": cid in NO_TEST_CHANNELS,
+            "balance": st.get("balance", ""),
+        })
+    # 智能排序：免费优先 → 速度快优先 → 渠道顺序
+    matched.sort(key=lambda x: _channel_sort_key(x["id"], {}))
+    return matched
+

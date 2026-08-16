@@ -3,204 +3,232 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>API Gateway · 控制台</title>
+<title>API 转发网关</title>
 <style>
 :root{
-  --bg:#080b10; --bg-1:#0d1117; --bg-2:#131a24; --bg-3:#1a2330;
-  --line:#1e2a3b; --line-2:#2a3a52;
-  --t:#d6e2f0; --t-2:#8fa3bd; --t-3:#56657d; --t-4:#3a4659;
-  --acc:#22d3ee; --acc-2:#34d399; --acc-d:rgba(34,211,238,.14);
-  --g:#34d399; --g-d:rgba(52,211,153,.13); --a:#fbbf24; --a-d:rgba(251,191,36,.13); --r:#f87171; --r-d:rgba(248,113,113,.13);
-  --r-1:10px; --r-2:14px;
-  --sh:0 6px 20px rgba(0,0,0,.4);
-  --mono:ui-monospace,"JetBrains Mono","Cascadia Code",Consolas,monospace;
-  --sans:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --bg:#fbfbfd; --bg2:#f5f5f7; --card:#fff;
+  --t:#1d1d1f; --t2:#6e6e73; --t3:#86868b; --t4:#aeaeb2;
+  --line:#d2d2d7; --line2:#e8e8ed;
+  --blue:#0071e3; --blue2:#0077ed; --blue-bg:#e8f1ff;
+  --green:#34c759; --green-bg:#e3f9e9;
+  --orange:#ff9500; --orange-bg:#fff3e0;
+  --red:#ff3b30; --red-bg:#ffeaea;
+  --purple:#af52de; --purple-bg:#f5edff;
+  --radius:18px; --radius-s:12px;
+  --shadow:0 4px 20px rgba(0,0,0,.06); --shadow-h:0 8px 30px rgba(0,0,0,.1);
+  --sf:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
-body{
-  font-family:var(--sans); background:var(--bg); color:var(--t);
-  background-image:
-    radial-gradient(ellipse 70% 40% at 50% -10%, rgba(34,211,238,.07), transparent 70%),
-    radial-gradient(ellipse 50% 30% at 90% 100%, rgba(52,211,153,.05), transparent 70%);
-  background-attachment:fixed; -webkit-font-smoothing:antialiased;
-}
-a{color:var(--acc);text-decoration:none} a:hover{text-decoration:underline}
-::selection{background:var(--acc-d);color:var(--acc)}
-::-webkit-scrollbar{width:8px;height:8px} ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:8px} ::-webkit-scrollbar-thumb:hover{background:var(--t-4)}
+body{font-family:var(--sf);background:var(--bg);color:var(--t);-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+::selection{background:var(--blue-bg)}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px;border:3px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:var(--t4)}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 
-/* ===== 顶栏 ===== */
-.top{position:sticky;top:0;z-index:60;background:rgba(8,11,16,.86);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
-.top-in{max-width:1080px;margin:0 auto;padding:13px 22px;display:flex;align-items:center;gap:14px}
-.logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--acc),var(--acc-2));display:flex;align-items:center;justify-content:center;font-size:16px;flex:none;box-shadow:0 0 16px rgba(34,211,238,.3)}
-.brand{font-weight:700;font-size:15px;letter-spacing:-.01em;line-height:1.1}
-.brand small{display:block;font-family:var(--mono);font-size:10px;font-weight:400;color:var(--t-4);margin-top:2px}
-.sp{flex:1}
-.pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:99px;font-family:var(--mono)}
-.pill .d{width:7px;height:7px;border-radius:50%}
-.pill.ok{background:var(--g-d);color:var(--g)} .pill.ok .d{background:var(--g);box-shadow:0 0 10px var(--g);animation:pulse 2s infinite}
-.pill.bad{background:var(--r-d);color:var(--r)} .pill.bad .d{background:var(--r)}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.btn-link{font-size:12px;color:var(--t-2);padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:transparent;cursor:pointer;transition:.15s;font-family:var(--sans)}
-.btn-link:hover{color:var(--t);border-color:var(--line-2);background:var(--bg-2)}
+/* 导航 */
+.nav{position:sticky;top:0;z-index:100;background:rgba(251,251,253,.8);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line2)}
+.nav-in{max-width:1024px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;gap:12px}
+.nav-logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:15px}
+.nav-title{font-size:16px;font-weight:600}
+.nav-title small{display:block;font-size:11px;font-weight:400;color:var(--t3)}
+.nav-sp{flex:1}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;padding:6px 14px;border-radius:990px}
+.status .dot{width:8px;height:8px;border-radius:50%}
+.status.on{background:var(--green-bg);color:var(--green)}.status.on .dot{background:var(--green)}
+.status.off{background:var(--red-bg);color:var(--red)}.status.off .dot{background:var(--red)}
+.nav-btn{font-size:13px;color:var(--t2);padding:7px 14px;border-radius:990px;transition:.2s;cursor:pointer;background:transparent;border:none;font-family:var(--sf)}
+.nav-btn:hover{background:var(--bg2);color:var(--t)}
 
-/* ===== 主区 ===== */
-.wrap{max-width:1080px;margin:0 auto;padding:30px 22px 60px}
-.hero{margin-bottom:28px}
-.hero .tag{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--acc);background:var(--acc-d);padding:3px 9px;border-radius:5px;margin-bottom:11px;letter-spacing:.04em}
-.hero h1{font-size:27px;font-weight:800;letter-spacing:-.025em;margin-bottom:7px}
-.hero h1 .glow{background:linear-gradient(90deg,var(--acc),var(--acc-2));-webkit-background-clip:text;background-clip:text;color:transparent}
-.hero p{color:var(--t-2);font-size:13.5px;max-width:600px;line-height:1.65}
+/* hero */
+.hero{max-width:1024px;margin:0 auto;padding:56px 24px 36px;text-align:center}
+.hero h1{font-size:48px;font-weight:700;letter-spacing:-.03em;margin-bottom:14px;line-height:1.1}
+.hero h1 .grad{background:linear-gradient(90deg,var(--blue),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{font-size:19px;color:var(--t2);max-width:580px;margin:0 auto;line-height:1.5}
 
-/* ===== 统计 ===== */
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:32px}
-.stat{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r-2);padding:16px 18px;position:relative;overflow:hidden;transition:.18s}
-.stat:hover{border-color:var(--line-2);transform:translateY(-1px)}
-.stat::after{content:"";position:absolute;right:-10px;top:-10px;width:50px;height:50px;border-radius:50%;background:radial-gradient(circle,currentColor,transparent 70%);opacity:.06}
-.stat .lbl{font-family:var(--mono);font-size:10px;color:var(--t-4);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:9px}
-.stat .val{font-size:28px;font-weight:800;letter-spacing:-.03em;font-family:var(--mono)}
-.stat .sub{font-size:11px;color:var(--t-3);margin-top:3px}
+/* 统计 */
+.stats{max-width:1024px;margin:0 auto 40px;padding:0 24px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.stat{background:var(--card);border-radius:var(--radius);padding:22px 24px;border:1px solid var(--line2);transition:.2s}
+.stat:hover{box-shadow:var(--shadow);transform:translateY(-2px)}
+.stat .ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:14px}
+.stat .v{font-size:32px;font-weight:700;letter-spacing:-.02em;line-height:1}
+.stat .l{font-size:13px;color:var(--t3);margin-top:5px}
 
-/* ===== 区块 ===== */
-.sec{margin-bottom:34px}
-.sec-h{display:flex;align-items:baseline;gap:10px;margin-bottom:15px;padding-bottom:0}
-.sec-h .n{font-family:var(--mono);font-size:11px;color:var(--t-4)}
-.sec-h h2{font-size:15px;font-weight:700}
-.sec-h .hint{font-size:11.5px;color:var(--t-4);margin-left:auto}
+/* 主容器 */
+.main{max-width:1024px;margin:0 auto;padding:0 24px 60px}
+.sect{margin-bottom:48px}
+.sect-h{display:flex;align-items:baseline;gap:8px;margin-bottom:20px}
+.sect-h h2{font-size:28px;font-weight:700;letter-spacing:-.02em}
+.sect-h .sub{font-size:15px;color:var(--t3)}
 
-/* ===== 渠道网格 ===== */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:11px}
-.ch{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r-2);padding:15px;display:flex;flex-direction:column;gap:11px;transition:.18s;position:relative;overflow:hidden}
-.ch:hover{border-color:var(--line-2);transform:translateY(-2px);box-shadow:var(--sh)}
-.ch::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px}
-.ch.ok::before{background:var(--g);box-shadow:0 0 12px var(--g)} .ch.mid::before{background:var(--a)} .ch.bad::before{background:var(--t-4)}
-.ch-top{display:flex;align-items:center;gap:10px}
-.ch-ic{width:34px;height:34px;border-radius:9px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-size:17px;flex:none}
-.ch-nm{font-size:13.5px;font-weight:700;flex:1;line-height:1.2}
-.ch-st{font-family:var(--mono);font-size:10px;font-weight:700;padding:4px 8px;border-radius:5px;white-space:nowrap;letter-spacing:.03em}
-.ch-st.ok{background:var(--g-d);color:var(--g)} .ch-st.mid{background:var(--a-d);color:var(--a)} .ch-st.bad{background:rgba(86,101,125,.15);color:var(--t-3)}
-.ch-md{font-size:11.5px;color:var(--t-2);line-height:1.7;min-height:20px}
-.ch-md code{font-family:var(--mono);font-size:10.5px;background:var(--bg-3);padding:2px 6px;border-radius:5px;color:var(--acc);margin:0 3px 3px 0;display:inline-block}
-.ch-md .more{color:var(--t-4);font-family:var(--mono);font-size:10.5px}
-.ch-ft{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:var(--t-3);border-top:1px dashed var(--line);padding-top:10px;font-family:var(--mono)}
-.ch-ft .price.ok{color:var(--g)} .ch-ft .price.no{color:var(--a)}
-.ch-ft .ep{color:var(--t-4);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 模型选择器(核心) */
+.model-search{background:var(--card);border:1px solid var(--line2);border-radius:var(--radius);overflow:hidden}
+.ms-head{padding:20px 24px;border-bottom:1px solid var(--line2);background:var(--bg2)}
+.ms-head .tip{font-size:13px;color:var(--t3);margin-bottom:12px}
+.search-box{position:relative}
+.search-box input{width:100%;font-size:17px;padding:14px 18px 14px 46px;border:1.5px solid var(--line);border-radius:var(--radius-s);background:var(--card);color:var(--t);outline:none;transition:.2s;font-family:var(--sf)}
+.search-box input:focus{border-color:var(--blue);box-shadow:0 0 0 4px var(--blue-bg)}
+.search-box .ico{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--t3)}
+.ms-list{max-height:340px;overflow-y:auto;padding:8px}
+.ms-empty{padding:32px;text-align:center;color:var(--t3);font-size:15px}
+.m-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius-s);cursor:pointer;transition:.15s;border:1px solid transparent}
+.m-item:hover{background:var(--bg2)}
+.m-item.sel{background:var(--blue-bg);border-color:var(--blue)}
+.m-item .nm{flex:1;font-size:15px;font-weight:500;font-family:ui-monospace,"SF Mono",Consolas,monospace}
+.m-item .cnt{font-size:12px;color:var(--t3);background:var(--bg2);padding:3px 10px;border-radius:990px}
+.m-item.sel .cnt{background:#fff;color:var(--blue)}
 
-/* ===== 端点文档 ===== */
-.tbl-wrap{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r-2);overflow:hidden}
-table{width:100%;border-collapse:collapse;font-size:13px}
-thead{background:var(--bg-2)}
-th{text-align:left;padding:11px 16px;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--t-4);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--line)}
-td{padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
-tr:last-child td{border-bottom:none}
-td code{font-family:var(--mono);font-size:11.5px;color:var(--acc);background:var(--acc-d);padding:2px 8px;border-radius:6px;white-space:nowrap}
-td .m{color:var(--t-2)}
-tr:hover td{background:rgba(255,255,255,.012)}
+/* 提供商结果 */
+.prov-result{margin-top:24px}
+.pr-head{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.pr-head .chip{font-size:13px;font-weight:600;padding:5px 12px;border-radius:990px;background:var(--blue-bg);color:var(--blue);font-family:ui-monospace,Consolas,monospace}
+.pr-head h3{font-size:20px;font-weight:700}
+.pr-head .meta{font-size:13px;color:var(--t3)}
+.prov-list{display:flex;flex-direction:column;gap:12px}
+.prov{display:flex;align-items:center;gap:16px;padding:18px 22px;background:var(--card);border:1px solid var(--line2);border-radius:var(--radius);transition:.2s}
+.prov:hover{box-shadow:var(--shadow)}
+.prov .rank{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex:none}
+.prov .rank.r1{background:var(--green-bg);color:var(--green)}.prov .rank.r2{background:var(--blue-bg);color:var(--blue)}.prov .rank.r3{background:var(--orange-bg);color:var(--orange)}.prov .rank.r4{background:var(--bg2);color:var(--t3)}
+.prov .pic{width:44px;height:44px;border-radius:12px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:22px;flex:none}
+.prov .info{flex:1;min-width:0}
+.prov .info .pn{font-size:16px;font-weight:600;margin-bottom:4px}
+.prov .info .pm{font-size:12px;color:var(--t3);font-family:ui-monospace,Consolas,monospace}
+.prov .info .pm code{background:var(--bg2);padding:2px 6px;border-radius:5px;margin-right:4px}
+.prov .tags{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.tag{font-size:12px;font-weight:600;padding:5px 11px;border-radius:990px;white-space:nowrap}
+.tag.free{background:var(--green-bg);color:var(--green)}
+.tag.paid{background:var(--red-bg);color:var(--red)}
+.tag.fast{background:var(--blue-bg);color:var(--blue)}
+.tag.med{background:var(--orange-bg);color:var(--orange)}
+.tag.notest{background:var(--purple-bg);color:var(--purple)}
+.tag.down{background:var(--bg2);color:var(--t3)}
 
-/* ===== 测试面板 ===== */
-.test{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r-2);padding:18px}
-.test-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:13px}
-.test-row select,.test-row input{
-  background:var(--bg-2);border:1px solid var(--line);color:var(--t);border-radius:var(--r-1);
-  padding:10px 13px;font-size:13px;outline:none;flex:1;min-width:180px;transition:.15s;font-family:var(--sans)}
-.test-row select:focus,.test-row input:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-d)}
-.test-row .go{background:linear-gradient(135deg,var(--acc),var(--acc-2));color:#04121a;border:none;border-radius:var(--r-1);padding:10px 22px;font-size:13px;font-weight:800;cursor:pointer;transition:.15s;white-space:nowrap;font-family:var(--sans)}
-.test-row .go:hover{opacity:.9;transform:translateY(-1px)} .test-row .go:disabled{opacity:.4;cursor:not-allowed;transform:none}
-.out{background:var(--bg);border:1px solid var(--line);border-radius:var(--r-1);padding:15px;font-family:var(--mono);font-size:12px;line-height:1.75;white-space:pre-wrap;word-break:break-word;min-height:96px;max-height:340px;overflow:auto;color:var(--t-2)}
-.out .ok{color:var(--g);font-weight:700} .out .err{color:var(--r);font-weight:700} .out .think{color:var(--a)} .out .ans{color:var(--t)}
-.test-note{font-size:11px;color:var(--t-3);margin-top:11px;display:flex;align-items:center;gap:6px}
-.test-note::before{content:"⛔";font-size:13px}
+/* 端点 */
+.ep-tbl{background:var(--card);border:1px solid var(--line2);border-radius:var(--radius);overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead{background:var(--bg2)}
+th{text-align:left;padding:14px 20px;font-size:12px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.04em}
+td{padding:14px 20px;border-top:1px solid var(--line2);font-size:14px}
+td code{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:13px;color:var(--blue);background:var(--blue-bg);padding:3px 9px;border-radius:7px;white-space:nowrap}
+td .d{color:var(--t2)}
 
-/* ===== 页脚 ===== */
-.foot{text-align:center;font-size:11.5px;color:var(--t-4);margin-top:40px;font-family:var(--mono)}
-.foot a{margin:0 8px}
-@media(max-width:720px){.stats{grid-template-columns:repeat(2,1fr)}.hero h1{font-size:23px}}
+/* 测试 */
+.test{background:var(--card);border:1px solid var(--line2);border-radius:var(--radius);padding:22px}
+.test-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.test-row select,.test-row input{font-size:15px;padding:12px 16px;border:1.5px solid var(--line);border-radius:var(--radius-s);background:var(--card);color:var(--t);outline:none;flex:1;min-width:200px;transition:.2s;font-family:var(--sf)}
+.test-row select:focus,.test-row input:focus{border-color:var(--blue);box-shadow:0 0 0 4px var(--blue-bg)}
+.test-row .go{background:var(--blue);color:#fff;border:none;border-radius:var(--radius-s);padding:12px 26px;font-size:15px;font-weight:600;cursor:pointer;transition:.2s;white-space:nowrap;font-family:var(--sf)}
+.test-row .go:hover{background:var(--blue2)}.test-row .go:disabled{opacity:.4;cursor:not-allowed}
+.test-out{background:#1d1d1f;border-radius:var(--radius-s);padding:18px;font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-word;min-height:100px;max-height:360px;overflow:auto;color:#e5e5ea}
+.test-out .ok{color:#30d158;font-weight:600}.test-out .err{color:#ff453a;font-weight:600}.test-out .th{color:#ffd60a}.test-out .an{color:#fff}
+.test-note{font-size:13px;color:var(--t3);margin-top:12px}
+
+.foot{text-align:center;padding:40px 0 20px;font-size:13px;color:var(--t4)}
+.foot a{margin:0 10px}
+@media(max-width:760px){.hero h1{font-size:34px}.hero p{font-size:16px}.stats{grid-template-columns:repeat(2,1fr)}.sect-h h2{font-size:22px}.prov{flex-wrap:wrap}.prov .tags{width:100%;justify-content:flex-start}}
 </style>
 </head>
 <body>
 
-<div class="top"><div class="top-in">
-  <div class="logo">⚡</div>
-  <div class="brand">API 转发网关<small>:3100 · multi-vendor router</small></div>
-  <div class="sp"></div>
-  <span class="pill ok" id="pill"><span class="d"></span><span id="pill-t">connecting…</span></span>
-  <a class="btn-link" href="http://localhost:8000/dashboard/index.html" target="_blank">← 控制台</a>
-</div></div>
+<nav class="nav"><div class="nav-in">
+  <div class="nav-logo">⚡</div>
+  <div class="nav-title">API 转发网关<small>multi-vendor LLM router · :3100</small></div>
+  <div class="nav-sp"></div>
+  <span class="status on" id="pill"><span class="dot"></span><span id="pill-t">连接中…</span></span>
+  <button class="nav-btn" onclick="location.href='http://localhost:8000/dashboard/index.html'">← 控制台</button>
+</div></nav>
 
-<div class="wrap">
-  <div class="hero">
-    <span class="tag">// LLM ROUTER</span>
-    <h1><span class="glow">API 转发网关</span></h1>
-    <p>多厂商 LLM 聚合转发,OpenAI 兼容。智能路由 + 故障自动回退,任一渠道宕机即切下一个,服务不中断。</p>
+<div class="hero">
+  <h1><span class="grad">API 转发网关</span></h1>
+  <p>多厂商 LLM 聚合转发,OpenAI 兼容。选一个模型,自动找出所有支持它的 API 提供商,按免费优先、速度快优先智能排序。</p>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="ic" style="background:var(--blue-bg)">📡</div><div class="v" id="s-total">–</div><div class="l">注册渠道</div></div>
+  <div class="stat"><div class="ic" style="background:var(--green-bg)">✅</div><div class="v" id="s-online">–</div><div class="l">在线渠道</div></div>
+  <div class="stat"><div class="ic" style="background:var(--purple-bg)">🧩</div><div class="v" id="s-models">–</div><div class="l">可用模型</div></div>
+  <div class="stat"><div class="ic" style="background:var(--orange-bg)">🎁</div><div class="v" id="s-free">–</div><div class="l">免费渠道</div></div>
+</div>
+
+<div class="main">
+  <!-- 核心功能:模型反查 -->
+  <div class="sect">
+    <div class="sect-h"><h2>查找模型</h2><span class="sub">选择模型,自动反查所有支持的 API 提供商</span></div>
+    <div class="model-search">
+      <div class="ms-head">
+        <div class="tip">输入模型名(如 deepseek-v4-flash),系统会用包含搜索匹配各家 API,按「免费优先 → 速度快优先」排序</div>
+        <div class="search-box">
+          <span class="ico">🔍</span>
+          <input id="m-search" placeholder="搜索模型,如 deepseek-v4-flash、glm-5.2、claude…" autocomplete="off">
+        </div>
+      </div>
+      <div class="ms-list" id="m-list"><div class="ms-empty">输入关键词搜索,或点击下方推荐</div></div>
+    </div>
+    <div class="prov-result" id="prov-result" style="display:none">
+      <div class="pr-head">
+        <span class="chip" id="pr-chip">model</span>
+        <h3>支持的 API 提供商</h3>
+        <span class="meta" id="pr-meta"></span>
+      </div>
+      <div class="prov-list" id="prov-list"></div>
+    </div>
   </div>
 
-  <div class="stats">
-    <div class="stat" style="color:var(--acc)"><div class="lbl">channels</div><div class="val" id="s-total">–</div><div class="sub">注册渠道</div></div>
-    <div class="stat" style="color:var(--g)"><div class="lbl">online</div><div class="val" id="s-online">–</div><div class="sub">key + 可达</div></div>
-    <div class="stat" style="color:var(--a)"><div class="lbl">models</div><div class="val" id="s-models">–</div><div class="sub">聚合模型</div></div>
-    <div class="stat" style="color:var(--t)"><div class="lbl">free</div><div class="val" id="s-free">–</div><div class="sub">免费渠道</div></div>
-  </div>
-
-  <div class="sec">
-    <div class="sec-h"><span class="n">01</span><h2>渠道状态</h2><span class="hint" id="hint">auto-refresh 15s</span></div>
-    <div class="grid" id="grid"></div>
-  </div>
-
-  <div class="sec">
-    <div class="sec-h"><span class="n">02</span><h2>快速测试</h2><span class="hint">real request · zscc 已排除</span></div>
+  <!-- 快速测试 -->
+  <div class="sect">
+    <div class="sect-h"><h2>快速测试</h2><span class="sub">发起真实请求验证模型可用性(ZSCC 已排除)</span></div>
     <div class="test">
       <div class="test-row">
         <select id="t-model"></select>
         <input id="t-prompt" placeholder="输入测试问题…" value="用一句话回答:1+1等于几?">
-        <button class="go" id="t-btn">运行 ▸</button>
+        <button class="go" id="t-btn">发送</button>
       </div>
-      <div class="out" id="t-out">// 选择模型后点击「运行」,响应将显示在这里</div>
-      <div class="test-note">ZSCC 渠道很贵,已从测试候选中永久排除,不会触达上游</div>
+      <div class="test-out" id="t-out">// 选择模型后点击发送</div>
+      <div class="test-note">⚠️ 测试会消耗额度;ZSCC(贵)已永久排除,不会触达。响应含思考过程时会单独标注。</div>
     </div>
   </div>
 
-  <div class="sec">
-    <div class="sec-h"><span class="n">03</span><h2>API 端点</h2><span class="hint">OpenAI compatible</span></div>
-    <div class="tbl-wrap"><table>
-      <thead><tr><th>endpoint</th><th>说明</th></tr></thead>
+  <!-- 端点 -->
+  <div class="sect">
+    <div class="sect-h"><h2>API 端点</h2><span class="sub">OpenAI 兼容</span></div>
+    <div class="ep-tbl"><table>
+      <thead><tr><th>端点</th><th>说明</th></tr></thead>
       <tbody>
-        <tr><td><code>GET /api/health</code></td><td class="m">全部渠道健康状态</td></tr>
-        <tr><td><code>GET /api/channels</code></td><td class="m">渠道列表 + key 状态</td></tr>
-        <tr><td><code>GET /v1/models</code></td><td class="m">聚合可用模型</td></tr>
-        <tr><td><code>POST /v1/chat/completions</code></td><td class="m">对话 · 多渠道 fallback · 支持 stream</td></tr>
-        <tr><td><code>POST /api/channels/&lt;id&gt;/key</code></td><td class="m">保存渠道 key(本地)</td></tr>
-        <tr><td><code>POST /api/channels/&lt;id&gt;/test</code></td><td class="m">单渠道健康探测</td></tr>
+        <tr><td><code>GET /api/health</code></td><td class="d">全部渠道健康状态</td></tr>
+        <tr><td><code>GET /api/models</code></td><td class="d">所有模型 + 每个模型的支持渠道</td></tr>
+        <tr><td><code>GET /api/model_providers?model=xxx</code></td><td class="d">反查支持某模型的渠道(已排序)</td></tr>
+        <tr><td><code>GET /api/channels</code></td><td class="d">渠道列表 + key 状态</td></tr>
+        <tr><td><code>POST /v1/chat/completions</code></td><td class="d">对话 · 多渠道 fallback · 支持 stream</td></tr>
       </tbody>
     </table></div>
   </div>
 
-  <div class="foot">// ai-hub · <a href="http://localhost:3000/" target="_blank">search gateway</a> · <a href="http://localhost:8000/" target="_blank">central</a></div>
+  <div class="foot">AI Hub · <a href="http://localhost:3000/" target="_blank">AI 搜索网关</a> · <a href="http://localhost:8000/" target="_blank">中央导航</a></div>
 </div>
 
 <script>
-const ICONS={opencode:'💻',modelscope:'🗼',sensetime:'🀄',agnes:'🌀',zscc:'🔮',deepseek:'🧠',gemini:'✨',openrouter:'🛰️',groq:'⚡',siliconflow:'💎',dashscope:'🎈',zhipu:'🔮'};
-const ORDER=['opencode','modelscope','sensetime','agnes','zscc','deepseek','gemini','openrouter','groq','siliconflow','dashscope','zhipu'];
+let ALL_MODELS=[], CH={}, selModel='';
 const NO_TEST=new Set(['zscc']);
-let CH={};
 
 async function load(){
   try{
-    const r=await fetch('/api/health',{cache:'no-store'});
-    const d=await r.json();
-    CH=d.llm||{};
-    stats();channels();models();
-    const p=document.getElementById('pill');p.className='pill ok';
-    document.getElementById('pill-t').textContent='online · '+(d.time||'');
+    const [h1,h2]=await Promise.all([
+      fetch('/api/health',{cache:'no-store'}).then(r=>r.json()),
+      fetch('/api/models',{cache:'no-store'}).then(r=>r.json())
+    ]);
+    CH=h1.llm||{}; ALL_MODELS=h2.models||[];
+    stats(); renderModels(); renderTestModels();
+    const p=document.getElementById('pill');p.className='status on';
+    document.getElementById('pill-t').textContent='在线 · '+(h1.time||'');
   }catch(e){
-    const p=document.getElementById('pill');p.className='pill bad';
-    document.getElementById('pill-t').textContent='offline';
+    const p=document.getElementById('pill');p.className='status off';
+    document.getElementById('pill-t').textContent='离线';
   }
 }
 function stats(){
   const L=Object.values(CH);
   const on=L.filter(c=>c.key_set&&c.reachable).length;
-  const m=L.reduce((s,c)=>s+(c.models||[]).length,0);
+  const m=ALL_MODELS.length;
   const f=L.filter(c=>c.billing_type!=='paid').length;
   document.getElementById('s-total').textContent=L.length;
   document.getElementById('s-online').textContent=on;
@@ -208,34 +236,74 @@ function stats(){
   document.getElementById('s-free').textContent=f;
 }
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
-function channels(){
-  let h='';
-  for(const id of ORDER){
-    const c=CH[id];if(!c)continue;
-    const ok=c.key_set&&c.reachable,mid=c.key_set&&!c.reachable;
-    const cls=ok?'ok':(mid?'mid':'bad'),st=ok?'ONLINE':(mid?'DOWN':'NO KEY');
-    const md=(c.models||[]).slice(0,4),more=(c.models||[]).length-md.length;
-    const price=c.billing_type==='paid'?'<span class="price no">$ paid</span>':'<span class="price ok">free</span>';
-    let ep='';try{ep=new URL(c.base_url||'').host;}catch(e){ep='—';}
-    h+='<div class="ch '+cls+'"><div class="ch-top"><div class="ch-ic">'+(ICONS[id]||'🔗')+'</div>'+
-       '<div class="ch-nm">'+esc(c.name||id)+'</div><span class="ch-st '+cls+'">'+st+'</span></div>'+
-       '<div class="ch-md">'+md.map(m=>'<code>'+esc(m)+'</code>').join('')+(more>0?'<span class="more">+'+more+'</span>':'')+'</div>'+
-       '<div class="ch-ft">'+price+'<span class="ep">'+ep+'</span></div></div>';
-  }
-  document.getElementById('grid').innerHTML=h||'<div style="color:var(--t-3);padding:24px;font-family:var(--mono);font-size:13px">// no data</div>';
+function renderModels(){
+  const q=(document.getElementById('m-search').value||'').trim().toLowerCase();
+  let list=ALL_MODELS;
+  if(q) list=ALL_MODELS.filter(m=>m.name.toLowerCase().includes(q));
+  list=list.slice(0,30);
+  const el=document.getElementById('m-list');
+  if(!list.length){el.innerHTML='<div class="ms-empty">没有匹配的模型</div>';return;}
+  el.innerHTML=list.map(m=>{
+    const sel=m.name===selModel?' sel':'';
+    const free=m.providers.filter(p=>p.billing_type!=='paid').length;
+    return '<div class="m-item'+sel+'" onclick="pickModel(\''+esc(m.name).replace(/'/g,"\\'")+'\')">'+
+      '<span class="nm">'+esc(m.name)+'</span>'+
+      '<span class="cnt">'+m.providers.length+' 家 · '+free+' 免费</span></div>';
+  }).join('');
 }
-function models(){
+function pickModel(name){
+  selModel=name;
+  document.getElementById('m-search').value=name;
+  renderModels();
+  fetchProviders(name);
+}
+async function fetchProviders(name){
+  try{
+    const r=await fetch('/api/model_providers?model='+encodeURIComponent(name),{cache:'no-store'});
+    const d=await r.json();
+    renderProviders(name,d.providers||[]);
+  }catch(e){renderProviders(name,[]);}
+}
+function renderProviders(name,providers){
+  const box=document.getElementById('prov-result');
+  if(!providers.length){box.style.display='none';return;}
+  box.style.display='block';
+  document.getElementById('pr-chip').textContent=name;
+  const free=providers.filter(p=>p.billing_type!=='paid').length;
+  document.getElementById('pr-meta').textContent='共 '+providers.length+' 家 · '+free+' 免费 · 已按免费优先排序';
+  const list=document.getElementById('prov-list');
+  list.innerHTML=providers.map((p,i)=>{
+    const isFree=p.billing_type!=='paid';
+    const sp=p.speed; const st=p.speed_label;
+    const tags=[];
+    tags.push(isFree?'<span class="tag free">免费</span>':'<span class="tag paid">付费</span>');
+    if(sp==='fast')tags.push('<span class="tag fast">速度 快</span>');
+    else if(sp==='medium')tags.push('<span class="tag med">速度 中</span>');
+    if(p.no_test)tags.push('<span class="tag notest">禁测</span>');
+    if(!p.reachable)tags.push('<span class="tag down">不可达</span>');
+    const rankCls=i===0?'r1':(i===1?'r2':(i===2?'r3':'r4'));
+    const rankNum=i+1;
+    const hits=(p.matched_models||[]).slice(0,3).map(m=>'<code>'+esc(m)+'</code>').join('');
+    return '<div class="prov"><div class="rank '+rankCls+'">'+rankNum+'</div>'+
+      '<div class="pic">'+(p.icon||'🔗')+'</div>'+
+      '<div class="info"><div class="pn">'+esc(p.name)+'</div>'+
+      '<div class="pm">'+hits+(p.matched_models&&p.matched_models.length>3?' +'+(p.matched_models.length-3):'')+'</div></div>'+
+      '<div class="tags">'+tags.join('')+'</div></div>';
+  }).join('');
+}
+function renderTestModels(){
   const sel=document.getElementById('t-model');const o=[];
-  for(const id of ORDER){
+  for(const id of Object.keys(CH)){
     const c=CH[id];if(!c||!c.key_set||!c.reachable||NO_TEST.has(id))continue;
-    for(const m of (c.models||[]).slice(0,5))o.push({l:(c.name||id)+' / '+m,v:m});
+    for(const m of(c.models||[]).slice(0,5))o.push({l:(c.name||id)+' / '+m,v:m});
   }
-  sel.innerHTML=o.length?o.map(x=>'<option value="'+esc(x.v)+'">'+esc(x.l)+'</option>').join(''):'<option value="">— no model —</option>';
+  sel.innerHTML=o.length?o.map(x=>'<option value="'+esc(x.v)+'">'+esc(x.l)+'</option>').join(''):'<option value="">— 无 —</option>';
 }
+document.getElementById('m-search').addEventListener('input',renderModels);
 document.getElementById('t-btn').addEventListener('click',async()=>{
   const model=document.getElementById('t-model').value,prompt=document.getElementById('t-prompt').value.trim();
   const o=document.getElementById('t-out');
-  if(!model||!prompt){o.innerHTML='<span class="err">[error]</span> select model & input prompt';return;}
+  if(!model||!prompt){o.innerHTML='<span class="err">[error]</span> 请选择模型并输入问题';return;}
   const b=document.getElementById('t-btn');b.disabled=true;o.textContent='// requesting…';
   try{
     const r=await fetch('/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -243,14 +311,21 @@ document.getElementById('t-btn').addEventListener('click',async()=>{
     const tx=await r.text();let d;try{d=JSON.parse(tx);}catch(e){d=null;}
     if(!r.ok){o.innerHTML='<span class="err">[HTTP '+r.status+']</span>\n'+esc(tx);return;}
     const msg=(d&&d.choices&&d.choices[0]&&d.choices[0].message)||{};
-    const ct=msg.content||'(empty)',rs=msg.reasoning_content||msg.reasoning||'';
+    const ct=msg.content||'(空)',rs=msg.reasoning_content||msg.reasoning||'';
     o.innerHTML='<span class="ok">[ok]</span> model: '+esc(d.model||model)+'\n'+
-      (rs?'\n<span class="think">// thinking ('+rs.length+' chars)</span>\n'+esc(rs.slice(0,400))+(rs.length>400?'…':'')+'\n':'')+
-      '\n<span class="ans">// answer</span>\n'+esc(ct);
+      (rs?'\n<span class="th">// thinking ('+rs.length+' chars)</span>\n'+esc(rs.slice(0,400))+(rs.length>400?'…':'')+'\n':'')+
+      '\n<span class="an">// answer</span>\n'+esc(ct);
   }catch(e){o.innerHTML='<span class="err">[error]</span> '+esc(e.message);}
   finally{b.disabled=false;}
 });
-load();setInterval(load,15000);
+// 推荐模型
+const HOT=['deepseek-v4-flash','glm-5.2','deepseek-ai/DeepSeek-V4-Flash-0731','claude-sonnet-5','sensenova-6.8-flash-lite'];
+load().then(()=>{
+  // 自动选第一个热门且存在的模型
+  const exist=ALL_MODELS.map(m=>m.name);
+  for(const h of HOT){if(exist.includes(h)){pickModel(h);break;}}
+});
+setInterval(load,20000);
 </script>
 </body>
 </html>

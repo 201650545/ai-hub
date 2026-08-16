@@ -118,6 +118,11 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(200, {"channels": channels.cached_health_all()})
         elif path == "/v1/models":
             self._send_json(200, {"object": "list", "data": aggregate_models()})
+        elif path == "/api/models":
+            self._send_json(200, {"models": channels.all_models()})
+        elif path == "/api/model_providers":
+            model = query.get("model", [""])[0]
+            self._send_json(200, {"model": model, "providers": channels.model_providers(model)})
         elif path == "/v1/sse":
             model = query.get("model", [""])[0]
             prompt = query.get("prompt", [""])[0]
