@@ -3,78 +3,309 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>API 转发网关 — 状态</title>
+<title>API 转发网关 · 控制台</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif; background:#0f1115; color:#e6e6e6; padding:32px 20px 60px; min-height:100vh; }
-  .wrap { max-width:900px; margin:0 auto; }
-  h1 { font-size:26px; font-weight:700; margin-bottom:6px; }
-  .sub { color:#8b93a1; font-size:14px; margin-bottom:28px; }
-  .card { background:#171a21; border:1px solid #262b36; border-radius:12px; padding:20px 22px; margin-bottom:16px; }
-  .card h2 { font-size:15px; font-weight:600; margin-bottom:14px; color:#c9d1e0; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
-  .chan { background:#1c2029; border:1px solid #2a303c; border-radius:8px; padding:10px 12px; display:flex; align-items:center; gap:10px; }
-  .chan .dot { width:8px; height:8px; border-radius:50%; flex:none; }
-  .dot.ok { background:#3fb950; } .dot.bad { background:#f85149; } .dot.mid { background:#d29922; }
-  .chan .nm { font-size:13px; font-weight:600; flex:1; }
-  .chan .st { font-size:11px; color:#8b93a1; }
-  code { background:#262b36; padding:2px 6px; border-radius:4px; font-size:12px; font-family:ui-monospace,Consolas,monospace; color:#79c0ff; }
-  table { width:100%; border-collapse:collapse; font-size:13px; }
-  td { padding:8px 6px; border-bottom:1px solid #262b36; vertical-align:top; }
-  td:first-child { width:38%; color:#79c0ff; font-family:ui-monospace,Consolas,monospace; font-size:12px; }
-  .status-line { display:flex; align-items:center; gap:8px; font-size:13px; color:#8b93a1; margin-top:6px; }
-  .big-dot { width:10px; height:10px; border-radius:50%; background:#3fb950; }
-  .footer { margin-top:24px; text-align:center; font-size:12px; color:#5b6270; }
-  a { color:#79c0ff; text-decoration:none; }
+:root {
+  --bg: #0b0e14;
+  --bg-elev: #131824;
+  --bg-card: #171d2b;
+  --border: #232c3d;
+  --border-hover: #33405a;
+  --text: #e8ecf4;
+  --text-muted: #8a94a8;
+  --text-dim: #5c667a;
+  --accent: #4f8cff;
+  --accent-soft: rgba(79,140,255,0.12);
+  --green: #34d399;
+  --green-soft: rgba(52,211,153,0.12);
+  --amber: #fbbf24;
+  --amber-soft: rgba(251,191,36,0.12);
+  --red: #f87171;
+  --red-soft: rgba(248,113,113,0.12);
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 8px 24px rgba(0,0,0,0.35);
+  --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif;
+  background: var(--bg); color: var(--text); min-height:100vh; padding-bottom:64px;
+  background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(79,140,255,0.08), transparent);
+}
+a { color: var(--accent); text-decoration:none; }
+a:hover { text-decoration:underline; }
+
+/* 顶栏 */
+.topbar {
+  position: sticky; top:0; z-index:50; backdrop-filter: blur(14px);
+  background: rgba(11,14,20,0.82); border-bottom:1px solid var(--border);
+}
+.topbar-inner {
+  max-width:1100px; margin:0 auto; padding:14px 22px; display:flex; align-items:center; gap:14px;
+}
+.brand { display:flex; align-items:center; gap:10px; font-size:17px; font-weight:700; letter-spacing:-0.01em; }
+.brand .logo { width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,var(--accent),#7c5cff); display:flex; align-items:center; justify-content:center; font-size:17px; }
+.brand small { display:block; font-size:11px; font-weight:500; color:var(--text-dim); }
+.topbar .spacer { flex:1; }
+.pill { display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600; padding:7px 13px; border-radius:99px; }
+.pill .dot { width:8px; height:8px; border-radius:50%; }
+.pill.ok { background:var(--green-soft); color:var(--green); } .pill.ok .dot { background:var(--green); box-shadow:0 0 8px var(--green); }
+.pill.bad { background:var(--red-soft); color:var(--red); } .pill.bad .dot { background:var(--red); }
+.link-btn { font-size:13px; color:var(--text-muted); padding:8px 12px; border-radius:9px; border:1px solid var(--border); background:transparent; cursor:pointer; transition:all .15s; }
+.link-btn:hover { color:var(--text); border-color:var(--border-hover); background:var(--bg-elev); }
+
+/* 主区 */
+.wrap { max-width:1100px; margin:0 auto; padding:28px 22px 0; }
+.hero { margin-bottom:26px; }
+.hero h1 { font-size:26px; font-weight:800; letter-spacing:-0.02em; margin-bottom:6px; }
+.hero p { color:var(--text-muted); font-size:14px; line-height:1.6; max-width:640px; }
+
+/* 统计行 */
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:26px; }
+.stat-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; transition:border-color .15s; }
+.stat-card:hover { border-color:var(--border-hover); }
+.stat-card .label { font-size:12px; color:var(--text-dim); font-weight:600; margin-bottom:8px; }
+.stat-card .value { font-size:26px; font-weight:800; letter-spacing:-0.02em; }
+.stat-card .value.green { color:var(--green); } .stat-card .value.amber { color:var(--amber); } .stat-card .value.accent { color:var(--accent); }
+.stat-card .sub { font-size:11px; color:var(--text-dim); margin-top:4px; }
+
+/* 区块标题 */
+.section { margin-bottom:30px; }
+.section-head { display:flex; align-items:baseline; gap:10px; margin-bottom:14px; }
+.section-head h2 { font-size:16px; font-weight:700; }
+.section-head .hint { font-size:12px; color:var(--text-dim); }
+
+/* 渠道网格 */
+.ch-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+.ch-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:16px; display:flex; flex-direction:column; gap:10px; transition:all .15s; position:relative; overflow:hidden;
+}
+.ch-card:hover { border-color:var(--border-hover); transform:translateY(-1px); }
+.ch-card::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; }
+.ch-card.ok::before { background:var(--green); } .ch-card.mid::before { background:var(--amber); } .ch-card.bad::before { background:var(--red); }
+.ch-top { display:flex; align-items:center; gap:10px; }
+.ch-ico { width:36px; height:36px; border-radius:10px; background:var(--bg-elev); display:flex; align-items:center; justify-content:center; font-size:18px; flex:none; }
+.ch-name { font-size:14px; font-weight:700; flex:1; line-height:1.25; }
+.ch-status { font-size:11px; font-weight:600; padding:4px 9px; border-radius:99px; white-space:nowrap; }
+.ch-status.ok { background:var(--green-soft); color:var(--green); }
+.ch-status.mid { background:var(--amber-soft); color:var(--amber); }
+.ch-status.bad { background:var(--red-soft); color:var(--red); }
+.ch-models { font-size:12px; color:var(--text-muted); }
+.ch-models code { font-family:var(--mono); font-size:11px; background:var(--bg-elev); padding:1px 5px; border-radius:5px; color:var(--text); }
+.ch-foot { display:flex; justify-content:space-between; font-size:11px; color:var(--text-dim); border-top:1px dashed var(--border); padding-top:9px; }
+.ch-price { font-size:11px; color:var(--text-dim); }
+
+/* 端点文档 */
+table { width:100%; border-collapse:collapse; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; font-size:13px; }
+thead { background:var(--bg-elev); }
+th { text-align:left; padding:11px 14px; font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.06em; }
+td { padding:11px 14px; border-top:1px solid var(--border); vertical-align:top; }
+td code { font-family:var(--mono); font-size:12px; color:var(--accent); background:var(--accent-soft); padding:2px 7px; border-radius:6px; white-space:nowrap; }
+tr:hover td { background:rgba(255,255,255,0.015); }
+
+/* 快速测试 */
+.test-panel { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:18px; }
+.test-row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+.test-row select, .test-row input {
+  background:var(--bg-elev); border:1px solid var(--border); color:var(--text);
+  border-radius:var(--radius-sm); padding:9px 12px; font-size:13px; outline:none; flex:1; min-width:180px;
+}
+.test-row select:focus, .test-row input:focus { border-color:var(--accent); }
+.test-row .btn {
+  background:var(--accent); color:#fff; border:none; border-radius:var(--radius-sm);
+  padding:9px 20px; font-size:13px; font-weight:700; cursor:pointer; transition:opacity .15s; white-space:nowrap;
+}
+.test-row .btn:hover { opacity:0.88; } .test-row .btn:disabled { opacity:0.5; cursor:not-allowed; }
+.test-out {
+  background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:14px; font-family:var(--mono); font-size:12px; line-height:1.7; white-space:pre-wrap; word-break:break-all;
+  min-height:90px; max-height:320px; overflow:auto; color:var(--text-muted);
+}
+.test-out .ok { color:var(--green); font-weight:700; }
+.test-out .err { color:var(--red); font-weight:700; }
+.test-note { font-size:11px; color:var(--text-dim); margin-top:10px; }
+
+/* 页脚 */
+.footer { text-align:center; font-size:12px; color:var(--text-dim); margin-top:36px; }
+@media (max-width:640px){ .hero h1{font-size:22px;} .stats{grid-template-columns:repeat(2,1fr);} }
 </style>
 </head>
 <body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand"><div class="logo">⚡</div><div>API 转发网关<small>Multi-Vendor LLM Router · :3100</small></div></div>
+    <div class="spacer"></div>
+    <span class="pill ok" id="svc-pill"><span class="dot"></span><span id="svc-text">加载中…</span></span>
+    <a class="link-btn" href="http://localhost:8000/dashboard/index.html" target="_blank">← 返回控制台</a>
+  </div>
+</div>
+
 <div class="wrap">
-  <h1>⚡ API 转发网关</h1>
-  <div class="sub">多厂商 LLM 聚合转发 · OpenAI 兼容 · 端口 3100</div>
-  <div class="card">
-    <div class="status-line" id="svc-status"><span class="big-dot" id="svc-dot"></span><span id="svc-text">加载中…</span></div>
+  <div class="hero">
+    <h1>⚡ API 转发网关</h1>
+    <p>多厂商 LLM 聚合转发 · OpenAI 兼容 · 智能路由 + 故障回退。任一渠道不可用时自动切换下一个可用渠道,保证服务不中断。</p>
   </div>
-  <div class="card">
-    <h2>渠道状态</h2>
-    <div class="grid" id="channels"></div>
+
+  <div class="stats">
+    <div class="stat-card"><div class="label">渠道总数</div><div class="value accent" id="st-total">–</div><div class="sub">已注册渠道</div></div>
+    <div class="stat-card"><div class="label">在线渠道</div><div class="value green" id="st-online">–</div><div class="sub">key 已配置且可达</div></div>
+    <div class="stat-card"><div class="label">可用模型</div><div class="value" id="st-models">–</div><div class="sub">聚合模型总数</div></div>
+    <div class="stat-card"><div class="label">免费渠道</div><div class="value" id="st-free">–</div><div class="sub">0 欠费风险</div></div>
   </div>
-  <div class="card">
-    <h2>API 端点</h2>
+
+  <div class="section">
+    <div class="section-head"><h2>📡 渠道状态</h2><span class="hint" id="refresh-hint">每 15 秒自动刷新</span></div>
+    <div class="ch-grid" id="ch-grid"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>🧪 快速测试</h2><span class="hint">选择模型发起真实请求(ZSCC 已排除)</span></div>
+    <div class="test-panel">
+      <div class="test-row">
+        <select id="t-model"></select>
+        <input id="t-prompt" placeholder="输入测试问题…" value="用一句话回答:1+1等于几?">
+        <button class="btn" id="t-btn">发送</button>
+      </div>
+      <div class="test-out" id="t-out">选择模型后点击发送,响应将显示在这里。</div>
+      <div class="test-note">⚠️ 测试会消耗对应渠道的额度;ZSCC(贵)已在候选列表中排除,不会触达。</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>📖 API 端点</h2><span class="hint">OpenAI 兼容</span></div>
     <table>
-      <tr><td>GET /api/health</td><td>全部渠道健康状态(JSON)</td></tr>
-      <tr><td>GET /api/channels</td><td>渠道列表 + key 状态</td></tr>
-      <tr><td>GET /v1/models</td><td>聚合各渠道可用模型</td></tr>
-      <tr><td>POST /v1/chat/completions</td><td>OpenAI 兼容 · 多渠道路由 + fallback · 支持 stream</td></tr>
-      <tr><td>POST /api/channels/&lt;id&gt;/key</td><td>保存渠道 key(本地 channels.json)</td></tr>
-      <tr><td>POST /api/channels/&lt;id&gt;/test</td><td>单渠道测速</td></tr>
+      <thead><tr><th>端点</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>GET /api/health</code></td><td>全部渠道健康状态(JSON)</td></tr>
+        <tr><td><code>GET /api/channels</code></td><td>渠道列表 + key 配置状态</td></tr>
+        <tr><td><code>GET /v1/models</code></td><td>聚合各渠道可用模型</td></tr>
+        <tr><td><code>POST /v1/chat/completions</code></td><td>OpenAI 兼容对话 · 多渠道路由 + fallback · 支持 stream</td></tr>
+        <tr><td><code>POST /api/channels/&lt;id&gt;/key</code></td><td>保存渠道 key(本地 channels.json)</td></tr>
+        <tr><td><code>POST /api/channels/&lt;id&gt;/test</code></td><td>单渠道健康探测</td></tr>
+      </tbody>
     </table>
   </div>
-  <div class="footer">AI Hub · <a href="http://localhost:8000/dashboard/index.html" target="_blank">返回控制台</a> · <a href="http://localhost:3000/" target="_blank">AI 搜索网关</a></div>
+
+  <div class="footer">AI Hub · <a href="http://localhost:3000/" target="_blank">AI 搜索网关</a> · <a href="http://localhost:8000/" target="_blank">中央导航</a></div>
 </div>
+
 <script>
-async function load(){
-  try{
+const ICONS = { opencode:'💻', modelscope:'🗼', sensetime:'🀄', agnes:'🌀', zscc:'🔮', deepseek:'🧠', gemini:'✨', openrouter:'🛰️', groq:'⚡', siliconflow:'💎', dashscope:'🎈', zhipu:'🌀' };
+const ORDER = ['opencode','modelscope','sensetime','agnes','zscc','deepseek','gemini','openrouter','groq','siliconflow','dashscope','zhipu'];
+// 快速测试禁用渠道(贵/特殊):zscc
+const TEST_EXCLUDE = new Set(['zscc']);
+
+let channels = {};
+
+async function load() {
+  try {
     const r = await fetch('/api/health');
     const d = await r.json();
-    document.getElementById('svc-dot').style.background = '#3fb950';
-    document.getElementById('svc-text').textContent = '服务运行中 · ' + d.time;
-    const box = document.getElementById('channels');
-    const order = ['opencode','deepseek','gemini','openrouter','groq','siliconflow','dashscope','zhipu'];
-    let html = '';
-    for (const id of order){
-      const c = (d.llm||{})[id]; if(!c) continue;
-      const dot = c.reachable && c.key_set ? 'ok' : (c.key_set ? 'mid' : 'bad');
-      const st = c.key_set ? (c.reachable ? '在线' : '不可达') : '未配置 key';
-      const nm = c.name || id;
-      html += '<div class="chan"><span class="dot '+dot+'"></span><span class="nm">'+nm+'</span><span class="st">'+st+'</span></div>';
-    }
-    box.innerHTML = html || '<div style="color:#8b93a1">无渠道数据</div>';
-  }catch(e){
-    document.getElementById('svc-dot').style.background = '#f85149';
-    document.getElementById('svc-text').textContent = '服务异常: ' + e.message;
+    channels = d.llm || {};
+    renderStats();
+    renderChannels();
+    renderModelOptions();
+    const pill = document.getElementById('svc-pill');
+    pill.className = 'pill ok';
+    document.getElementById('svc-text').textContent = '服务运行中 · ' + (d.time || '');
+  } catch (e) {
+    const pill = document.getElementById('svc-pill');
+    pill.className = 'pill bad';
+    document.getElementById('svc-text').textContent = '服务不可达';
   }
 }
+
+function renderStats() {
+  const list = Object.values(channels);
+  const online = list.filter(c => c.key_set && c.reachable).length;
+  const models = list.reduce((s, c) => s + (c.models || []).length, 0);
+  const free = list.filter(c => c.billing_type !== 'paid').length;
+  document.getElementById('st-total').textContent = list.length;
+  document.getElementById('st-online').textContent = online;
+  document.getElementById('st-models').textContent = models;
+  document.getElementById('st-free').textContent = free;
+}
+
+function renderChannels() {
+  const grid = document.getElementById('ch-grid');
+  let html = '';
+  for (const id of ORDER) {
+    const c = channels[id]; if (!c) continue;
+    const ok = c.key_set && c.reachable;
+    const mid = c.key_set && !c.reachable;
+    const cls = ok ? 'ok' : (mid ? 'mid' : 'bad');
+    const stText = ok ? '在线' : (mid ? '不可达' : '未配置');
+    const models = (c.models || []).slice(0, 4);
+    const more = (c.models || []).length - models.length;
+    const price = c.billing_type === 'paid' ? '🔴 付费' : '🟢 免费';
+    html += '<div class="ch-card ' + cls + '">'
+      + '<div class="ch-top"><div class="ch-ico">' + (ICONS[id] || '🔗') + '</div>'
+      + '<div class="ch-name">' + (c.name || id) + '</div>'
+      + '<span class="ch-status ' + cls + '">' + stText + '</span></div>'
+      + '<div class="ch-models">' + models.map(m => '<code>' + m + '</code>').join(' ') + (more > 0 ? ' <span style="color:var(--text-dim)">+' + more + '</span>' : '') + '</div>'
+      + '<div class="ch-foot"><span>' + price + '</span><span>' + (c.error || '') + '</span></div>'
+      + '</div>';
+  }
+  grid.innerHTML = html || '<div style="color:var(--text-dim);padding:20px">无渠道数据</div>';
+}
+
+function renderModelOptions() {
+  const sel = document.getElementById('t-model');
+  const opts = [];
+  for (const id of ORDER) {
+    const c = channels[id]; if (!c) continue;
+    if (!c.key_set || !c.reachable) continue;
+    if (TEST_EXCLUDE.has(id)) continue;
+    for (const m of (c.models || []).slice(0, 6)) {
+      opts.push({ label: (c.name || id) + ' · ' + m, value: m });
+    }
+  }
+  sel.innerHTML = opts.map(o => '<option value="' + o.value + '">' + o.label + '</option>').join('');
+  if (!opts.length) sel.innerHTML = '<option value="">无可用模型</option>';
+}
+
+document.getElementById('t-btn').addEventListener('click', async () => {
+  const model = document.getElementById('t-model').value;
+  const prompt = document.getElementById('t-prompt').value.trim();
+  const out = document.getElementById('t-out');
+  if (!model || !prompt) { out.innerHTML = '<span class="err">请选择模型并输入问题</span>'; return; }
+  const btn = document.getElementById('t-btn');
+  btn.disabled = true;
+  out.innerHTML = '⏳ 请求中…';
+  try {
+    const r = await fetch('/v1/chat/completions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 512 })
+    });
+    const text = await r.text();
+    let d; try { d = JSON.parse(text); } catch { d = null; }
+    if (!r.ok) {
+      out.innerHTML = '<span class="err">HTTP ' + r.status + '</span>
+' + (text || '');
+      return;
+    }
+    const msg = (d.choices && d.choices[0] && d.choices[0].message) || {};
+    const content = msg.content || '(空)';
+    const reasoning = msg.reasoning_content || msg.reasoning || '';
+    out.innerHTML = '<span class="ok">✅ 响应成功</span> · 模型 ' + (d.model || model) + '
+
+'
+      + (reasoning ? '🧠 思考(' + reasoning.length + '字):
+' + reasoning.slice(0, 500) + (reasoning.length > 500 ? '…' : '') + '
+
+' : '')
+      + '💬 回答:
+' + content;
+  } catch (e) {
+    out.innerHTML = '<span class="err">请求失败:</span> ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 load();
 setInterval(load, 15000);
 </script>

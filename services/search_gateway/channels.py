@@ -200,6 +200,10 @@ CHANNELS = {
 
 CHANNEL_ORDER = ["opencode", "modelscope", "sensetime", "agnes", "zscc", "deepseek", "gemini", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
 
+# 禁测渠道（用户 2026-08-16 指定）：这些渠道很贵，禁止发起任何测试/探测请求。
+# - zscc：用户明确「很贵，能用就行，禁止测试」
+NO_TEST_CHANNELS = {"zscc"}
+
 # fallback 链（前端模型未匹配时按此顺序路由）
 DEFAULT_CHAIN = ["opencode", "modelscope", "sensetime", "agnes", "zscc", "deepseek", "openrouter", "gemini", "groq", "siliconflow", "dashscope", "zhipu"]
 
@@ -326,6 +330,12 @@ def channel_health(channel_id):
                 "balance": "未配置 Key"}
 
     balance = get_balance(channel_id, key)
+    # 禁测渠道：不发起任何网络探测（很贵），仅按 key 状态静态标记可达
+    if channel_id in NO_TEST_CHANNELS:
+        return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": True,
+                "models": ch.get("models", []), "error": "禁测（贵）· 不探测", "can_fill": can_fill,
+                "provider": provider, "billing_tag": billing_tag, "billing_type": billing_type,
+                "balance": balance}
     base = ch["base_url"].rstrip("/")
     try:
         if channel_id == "openrouter":

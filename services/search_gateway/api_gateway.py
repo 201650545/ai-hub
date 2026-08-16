@@ -146,6 +146,9 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             return
         if path.startswith("/api/channels/") and path.endswith("/test"):
             cid = path[len("/api/channels/"):-len("/test")]
+            if cid in channels.NO_TEST_CHANNELS:
+                self._send_json(200, {"channel": cid, "reachable": True, "error": "禁测（贵）· 不发起测试", "no_test": True})
+                return
             key = channels.get_key(cid)
             if not key:
                 self._send_json(200, {"channel": cid, "reachable": False, "error": "未配置 key"})
