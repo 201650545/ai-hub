@@ -129,12 +129,25 @@ CHANNELS = {
         "models": ["glm-4-flash", "glm-4.5-flash", "glm-4-air"],
         "note": "GLM-4-Flash 永久免费，0 欠费风险。",
     },
+    "opencode": {
+        "name": "OpenCode Go",
+        "provider": "OpenCode Go (opencode.ai/zen/go)",
+        "billing_type": "paid",
+        "billing_tag": "🔴 付费扣费",
+        "icon": "💻",
+        "base_url": "https://opencode.ai/zen/go/v1",
+        "env_key": "OPENCODE_API_KEY",
+        "free": False,
+        "default_model": "deepseek-v4-flash",
+        "models": ["deepseek-v4-flash", "deepseek-v4-pro"],
+        "note": "OpenCode Go 渠道（用户 2026-08-15 提供），优先转发 DeepSeek V4 Flash。",
+    },
 }
 
-CHANNEL_ORDER = ["deepseek", "gemini", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
+CHANNEL_ORDER = ["opencode", "deepseek", "gemini", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
 
 # fallback 链（前端模型未匹配时按此顺序路由）
-DEFAULT_CHAIN = ["deepseek", "openrouter", "gemini", "groq", "siliconflow", "dashscope", "zhipu"]
+DEFAULT_CHAIN = ["opencode", "deepseek", "openrouter", "gemini", "groq", "siliconflow", "dashscope", "zhipu"]
 
 _config_cache = None
 
