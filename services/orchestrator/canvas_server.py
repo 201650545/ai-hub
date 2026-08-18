@@ -302,6 +302,18 @@ def main() -> None:
             daemon=True,
         ).start()
 
+    # 心跳上报到中央平台（:8000），让「组件编排器画布」卡片显示在线
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "search_gateway"))
+        import heartbeat as _hb
+        _hb.start_heartbeat(
+            gateway_id="canvas_orchestrator", name="组件编排器画布", icon="🎬",
+            description="画布观察窗 SSE 直播 — 课件生成实时事件流", port=args.port)
+        print("❤️  心跳上报已启动 (central " + _hb.CENTRAL_URL + ")")
+    except Exception as _e:  # noqa: BLE001
+        print("⚠️  心跳上报未启动: " + str(_e)[:80])
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
