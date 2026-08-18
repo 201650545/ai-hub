@@ -6,20 +6,35 @@
 <title>Universal AI Hub — 手机/桌面全端无限画布控制台</title>
 <style>
 :root {
-  --bg-canvas: #f1f3f8;
-  --bg-glass: rgba(255, 255, 255, 0.92);
+  --bg-canvas: #f5f5f7;
+  --bg-glass: rgba(255, 255, 255, 0.82);
   --bg-card: #ffffff;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --hairline: #cbd5e1;
-  --card-border: #e2e8f0;
-  --primary: #0052cc;
-  --primary-hover: #0041a3;
-  --green: #16a34a;
-  --amber: #d97706;
-  --red: #dc2626;
-  --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.05);
-  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+  --text-main: #1d1d1f;
+  --text-muted: #6e6e73;
+  --hairline: #d2d2d7;
+  --card-border: #d2d2d7;
+  --primary: #0071e3;
+  --primary-hover: #0077ed;
+  --green: #34c759;
+  --amber: #ff9f0a;
+  --red: #ff3b30;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+:root {
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --accent-subtle: #e8f1fd;
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #86868b;
+  --line: #d2d2d7;
+  --line-strong: #86868b;
+  --success: #34c759;
+  --danger: #ff3b30;
+  --warning: #ff9f0a;
+  --radius-lg: 18px;
+  --radius-md: 12px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -69,7 +84,7 @@ html, body {
   font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
-  background: #e2e8f0;
+  background: #e8e8ed;
   padding: 3px 6px;
   border-radius: 6px;
 }
@@ -113,11 +128,11 @@ html, body {
 }
 .btn:hover { background: #222; transform: translateY(-1px); }
 .btn-secondary {
-  background: #f1f5f9;
+  background: #f5f5f7;
   color: var(--text-main);
   border: 1.5px solid var(--card-border);
 }
-.btn-secondary:hover { background: #e2e8f0; }
+.btn-secondary:hover { background: #e8e8ed; }
 
 .top-actions {
   display: flex;
@@ -189,11 +204,11 @@ html, body {
   width: 6px;
 }
 .widget-library::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #f5f5f7;
   border-radius: 4px;
 }
 .widget-library::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #d2d2d7;
   border-radius: 4px;
 }
 .widget-library::-webkit-scrollbar-thumb:hover {
@@ -224,8 +239,8 @@ html, body {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background-color: #f1f5f9;
-  background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+  background-color: #f5f5f7;
+  background-image: radial-gradient(#d2d2d7 1.5px, transparent 1.5px);
   background-size: 28px 28px;
   background-position: 0 0;
   cursor: grab;
@@ -307,7 +322,7 @@ html, body {
   border-radius: 6px;
   touch-action: manipulation;
 }
-.icon-btn:hover { background: #e2e8f0; color: #000; }
+.icon-btn:hover { background: #e8e8ed; color: #000; }
 
 .widget-body {
   flex: 1;
@@ -315,15 +330,15 @@ html, body {
   overflow-y: auto;
   font-size: 14px;
   line-height: 1.75;
-  color: #0f172a !important;
+  color: #1d1d1f !important;
 }
 
 .node-body, .node-body *, .formatted-answer, .formatted-answer * {
-  color: #0f172a !important;
+  color: #1d1d1f !important;
 }
 
 .formatted-answer h1, .formatted-answer h2, .formatted-answer h3, .formatted-answer h4 {
-  color: #0f172a !important;
+  color: #1d1d1f !important;
   font-weight: 800 !important;
   margin-top: 14px !important;
   margin-bottom: 8px !important;
@@ -331,24 +346,24 @@ html, body {
 }
 .formatted-answer p {
   margin-bottom: 10px !important;
-  color: #0f172a !important;
+  color: #1d1d1f !important;
 }
 .formatted-answer ul, .formatted-answer ol {
   padding-left: 22px !important;
   margin-bottom: 10px !important;
-  color: #0f172a !important;
+  color: #1d1d1f !important;
 }
 .formatted-answer li {
   margin-bottom: 6px !important;
-  color: #0f172a !important;
+  color: #1d1d1f !important;
 }
 .formatted-answer strong, .formatted-answer b {
   color: #000000 !important;
   font-weight: 800 !important;
 }
 .formatted-answer pre, .formatted-answer code {
-  background: #f1f5f9 !important;
-  color: #0f172a !important;
+  background: #f5f5f7 !important;
+  color: #1d1d1f !important;
   padding: 4px 8px !important;
   border-radius: 6px !important;
   font-family: Consolas, monospace !important;
@@ -429,7 +444,7 @@ html, body {
 .step-chip.done { background: rgba(22, 163, 74, 0.12); color: var(--green); }
 
 .orch-logs-box {
-  background: #0f172a;
+  background: #1d1d1f;
   color: #f8fafc;
   font-family: Consolas, monospace;
   font-size: 11px;
@@ -490,8 +505,8 @@ html, body {
   <div class="dock-header">
     <h3>🧩 功能组件库</h3>
     <div style="display:flex;gap:4px;">
-      <button type="button" style="font-size:10px;padding:2px 6px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;cursor:pointer;" onclick="toggleAllCategoryGroups(true)">全展开</button>
-      <button type="button" style="font-size:10px;padding:2px 6px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;cursor:pointer;" onclick="toggleAllCategoryGroups(false)">全折叠</button>
+      <button type="button" style="font-size:10px;padding:2px 6px;border-radius:6px;border:1px solid #d2d2d7;background:#f8fafc;cursor:pointer;" onclick="toggleAllCategoryGroups(true)">全展开</button>
+      <button type="button" style="font-size:10px;padding:2px 6px;border-radius:6px;border:1px solid #d2d2d7;background:#f8fafc;cursor:pointer;" onclick="toggleAllCategoryGroups(false)">全折叠</button>
     </div>
   </div>
 
@@ -600,7 +615,7 @@ function toggleCanvasLock() {
   if (vp) vp.classList.toggle('canvas-locked', isCanvasLocked);
   if (btn) {
     btn.innerText = isCanvasLocked ? '🔒 已锁定' : '🔓 未锁定';
-    btn.style.background = isCanvasLocked ? 'var(--amber)' : '#f1f5f9';
+    btn.style.background = isCanvasLocked ? 'var(--amber)' : '#f5f5f7';
     btn.style.color = isCanvasLocked ? '#fff' : 'var(--text-main)';
   }
 }
@@ -611,7 +626,7 @@ function toggleHandMode() {
   const btn = document.getElementById('hand-mode-btn');
   const vp = document.getElementById('canvas-viewport');
   if (btn) {
-    btn.style.background = isHandMode ? 'var(--primary)' : '#f1f5f9';
+    btn.style.background = isHandMode ? 'var(--primary)' : '#f5f5f7';
     btn.style.color = isHandMode ? '#fff' : 'var(--text-main)';
   }
   if (vp) vp.style.cursor = isHandMode ? 'grab' : 'default';
@@ -790,7 +805,7 @@ function renderWidgetLibrary() {
     const countAdded = items.filter(w => activeWidgets.includes(w.id)).length;
 
     const header = document.createElement('div');
-    header.style.cssText = 'padding:8px 10px;font-size:12px;font-weight:700;color:var(--text-main);cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;background:#f1f5f9;border-radius:10px;';
+    header.style.cssText = 'padding:8px 10px;font-size:12px;font-weight:700;color:var(--text-main);cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;background:#f5f5f7;border-radius:10px;';
     header.onclick = () => toggleCategoryGroup(cat.id);
     header.innerHTML = `
       <span>${isOpen ? '▼' : '▶'} ${cat.title} <span style="font-size:10px;font-weight:500;color:var(--text-muted);">(${cat.badge})</span></span>
@@ -812,9 +827,9 @@ function renderWidgetLibrary() {
 
         card.innerHTML = `
           <div style="display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-weight:800;font-size:13px;color:#0f172a;">${item.icon} ${item.name}</span>
+            <span style="font-weight:800;font-size:13px;color:#1d1d1f;">${item.icon} ${item.name}</span>
             <button type="button" class="btn" onclick="addWidgetToCanvas('${item.id}')" 
-                    style="font-size:11px;padding:2px 8px;${isAdded ? 'background:#e2e8f0;color:#94a3b8;cursor:default;' : 'background:var(--primary);color:#fff;'}" 
+                    style="font-size:11px;padding:2px 8px;${isAdded ? 'background:#e8e8ed;color:#94a3b8;cursor:default;' : 'background:var(--primary);color:#fff;'}" 
                     ${isAdded ? 'disabled' : ''}>${isAdded ? '已挂载' : '+ 放置'}</button>
           </div>
           <span style="font-size:11px;color:var(--text-muted);">${item.badge}</span>
@@ -1380,8 +1395,8 @@ function formatInline(str) {
     .replace(/>/g, '&gt;')
     .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#000 !important;font-weight:800 !important;">$1</strong>')
     .replace(/\*(.*?)\*/g, '<em style="color:#334155 !important;">$1</em>')
-    .replace(/`([^`]+)`/g, '<code style="background:#f1f5f9 !important;color:#0f172a !important;padding:2px 6px;border-radius:4px;font-family:Consolas,monospace;font-size:13px;">$1</code>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#0052cc !important;font-weight:600;text-decoration:underline;">$1 ↗</a>');
+    .replace(/`([^`]+)`/g, '<code style="background:#f5f5f7 !important;color:#1d1d1f !important;padding:2px 6px;border-radius:4px;font-family:Consolas,monospace;font-size:13px;">$1</code>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#0071e3 !important;font-weight:600;text-decoration:underline;">$1 ↗</a>');
 }
 
 function safeMarkdownParse(str) {
@@ -1403,7 +1418,7 @@ function safeMarkdownParse(str) {
     
     if (line.trim().startsWith('```')) {
       if (inCode) {
-        html += `<pre style="background:#f1f5f9;padding:10px 12px;border-radius:8px;overflow-x:auto;font-family:Consolas,monospace;font-size:13px;margin:10px 0;color:#0f172a;"><code>${escapeHTML(codeBuf)}</code></pre>`;
+        html += `<pre style="background:#f5f5f7;padding:10px 12px;border-radius:8px;overflow-x:auto;font-family:Consolas,monospace;font-size:13px;margin:10px 0;color:#1d1d1f;"><code>${escapeHTML(codeBuf)}</code></pre>`;
         codeBuf = '';
         inCode = false;
       } else {
@@ -1424,22 +1439,22 @@ function safeMarkdownParse(str) {
 
     if (trimmed.startsWith('# ')) {
       if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
-      html += `<h1 style="font-size:18px;font-weight:800;color:#0f172a;margin:16px 0 8px 0;line-height:1.4;">${formatInline(trimmed.slice(2))}</h1>`;
+      html += `<h1 style="font-size:18px;font-weight:800;color:#1d1d1f;margin:16px 0 8px 0;line-height:1.4;">${formatInline(trimmed.slice(2))}</h1>`;
       continue;
     }
     if (trimmed.startsWith('## ')) {
       if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
-      html += `<h2 style="font-size:16px;font-weight:800;color:#0f172a;margin:14px 0 6px 0;line-height:1.4;">${formatInline(trimmed.slice(3))}</h2>`;
+      html += `<h2 style="font-size:16px;font-weight:800;color:#1d1d1f;margin:14px 0 6px 0;line-height:1.4;">${formatInline(trimmed.slice(3))}</h2>`;
       continue;
     }
     if (trimmed.startsWith('### ')) {
       if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
-      html += `<h3 style="font-size:15px;font-weight:700;color:#0f172a;margin:12px 0 4px 0;line-height:1.4;">${formatInline(trimmed.slice(4))}</h3>`;
+      html += `<h3 style="font-size:15px;font-weight:700;color:#1d1d1f;margin:12px 0 4px 0;line-height:1.4;">${formatInline(trimmed.slice(4))}</h3>`;
       continue;
     }
     if (trimmed.startsWith('#### ')) {
       if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
-      html += `<h4 style="font-size:14px;font-weight:700;color:#0f172a;margin:10px 0 4px 0;line-height:1.4;">${formatInline(trimmed.slice(5))}</h4>`;
+      html += `<h4 style="font-size:14px;font-weight:700;color:#1d1d1f;margin:10px 0 4px 0;line-height:1.4;">${formatInline(trimmed.slice(5))}</h4>`;
       continue;
     }
 
@@ -1452,7 +1467,7 @@ function safeMarkdownParse(str) {
       if (!inList) {
         inList = true;
         listType = type;
-        html += type === 'ul' ? '<ul style="padding-left:22px;margin:8px 0;color:#0f172a;">' : '<ol style="padding-left:22px;margin:8px 0;color:#0f172a;">';
+        html += type === 'ul' ? '<ul style="padding-left:22px;margin:8px 0;color:#1d1d1f;">' : '<ol style="padding-left:22px;margin:8px 0;color:#1d1d1f;">';
       }
       html += `<li style="margin-bottom:6px;line-height:1.7;">${formatInline(content)}</li>`;
       continue;
@@ -1464,11 +1479,11 @@ function safeMarkdownParse(str) {
     }
 
     if (trimmed.startsWith('> ')) {
-      html += `<blockquote style="border-left:4px solid #0052cc;padding:6px 12px;background:#f8fafc;color:#334155;margin:10px 0;border-radius:0 6px 6px 0;">${formatInline(trimmed.slice(2))}</blockquote>`;
+      html += `<blockquote style="border-left:4px solid #0071e3;padding:6px 12px;background:#f8fafc;color:#334155;margin:10px 0;border-radius:0 6px 6px 0;">${formatInline(trimmed.slice(2))}</blockquote>`;
       continue;
     }
 
-    html += `<p style="margin-bottom:10px;line-height:1.75;color:#0f172a;">${formatInline(line)}</p>`;
+    html += `<p style="margin-bottom:10px;line-height:1.75;color:#1d1d1f;">${formatInline(line)}</p>`;
   }
 
   if (inList) html += (listType === 'ul' ? '</ul>' : '</ol>');
@@ -1478,7 +1493,7 @@ function safeMarkdownParse(str) {
 function renderResultHTML(thinking, answer, answerHTML) {
   let html = '';
   if (thinking) {
-    html += `<details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-bottom:12px;">` +
+    html += `<details style="background:#f8fafc;border:1px solid #e8e8ed;border-radius:8px;padding:8px 12px;margin-bottom:12px;">` +
       `<summary style="font-size:12px;font-weight:700;color:var(--text-muted);cursor:pointer;">💡 展开思考过程</summary>` +
       `<div style="font-size:13px;color:#475569;margin-top:6px;white-space:pre-wrap;">${thinking}</div></details>`;
   }
@@ -1492,7 +1507,7 @@ function renderResultHTML(thinking, answer, answerHTML) {
     content = '暂无详细回答';
   }
 
-  html += `<div class="formatted-answer" style="color:#0f172a;font-size:14px;line-height:1.75;">${content}</div>`;
+  html += `<div class="formatted-answer" style="color:#1d1d1f;font-size:14px;line-height:1.75;">${content}</div>`;
   return html;
 }
 
@@ -1672,10 +1687,10 @@ async function renderModalHistoryList() {
         const answerText = item.answer || (item.results ? JSON.stringify(item.results, null, 2) : '');
         detailEl.innerHTML = `
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;border-bottom:1.5px solid var(--card-border);padding-bottom:8px;">
-            <div style="font-weight:800;font-size:15px;color:#0f172a;">🔍 ${q}</div>
+            <div style="font-weight:800;font-size:15px;color:#1d1d1f;">🔍 ${q}</div>
             <button type="button" class="btn" style="font-size:12px;padding:6px 14px;background:var(--primary);" onclick="restoreHistoryItemToCanvas(window._current_selected_history_item)">⚡ 一键还原到画布</button>
           </div>
-          <div style="font-size:13px;line-height:1.7;color:#0f172a;white-space:pre-wrap;background:#fff;padding:12px;border-radius:8px;border:1px solid var(--card-border);">${answerText || '历史记录详细文本已保留'}</div>
+          <div style="font-size:13px;line-height:1.7;color:#1d1d1f;white-space:pre-wrap;background:#fff;padding:12px;border-radius:8px;border:1px solid var(--card-border);">${answerText || '历史记录详细文本已保留'}</div>
         `;
       }
     };

@@ -61,3 +61,6 @@ services/*/__pycache__/
 ai-resource-hub/
 feishu-data-hub/
 
+
+# AI 搜索网关运行数据(每次搜索生成的 JSONL + HTML 报告)
+services/search_gateway/runs/

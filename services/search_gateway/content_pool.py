@@ -29,19 +29,22 @@ def _md(text):
         else: out.append("<p>"+_esc(line)+"</p>")
     return "\n".join(out)
 CSS = "".join([
-    "body{font-family:-apple-system,Segoe UI,Microsoft YaHei,sans-serif;background:#f5f6f8;color:#222;line-height:1.7;margin:0;padding:24px}",
+    "body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC','Microsoft YaHei',sans-serif;background:#f5f5f7;color:#1d1d1f;line-height:1.7;margin:0;padding:32px 16px}",
     ".wrap{max-width:860px;margin:0 auto}",
-    "header{background:#fff;border-radius:12px;padding:24px 28px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)}",
-    "h1{font-size:20px;margin:0 0 8px}.q{color:#555;font-size:15px}",
-    ".card{background:#fff;border-radius:12px;padding:22px 26px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}",
-    ".card h2{font-size:16px;margin:0 0 10px;border-bottom:1px solid #eee;padding-bottom:8px}",
-    ".meta{font-size:12px;color:#999;font-weight:normal;margin-left:8px}",
-    ".answer p{margin:8px 0}.answer h3{margin:14px 0 6px;font-size:15px}.answer pre{background:#f8f8f8;border-radius:6px;padding:10px;overflow-x:auto;font-size:13px}.answer li{margin-left:20px}",
-    "details.think{margin:10px 0;padding:10px 14px;background:#fafafa;border-radius:8px}",
-    "details.think summary{cursor:pointer;color:#666;font-size:13px}",
+    "header{background:#fff;border:1px solid #d2d2d7;border-radius:18px;padding:28px 32px;margin-bottom:20px;box-shadow:0 1px 2px rgba(0,0,0,.04)}",
+    "h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin:0 0 8px}",
+    ".q{color:#6e6e73;font-size:16px}",
+    ".meta-sm{color:#86868b;font-size:12px;margin-top:6px}",
+    ".card{background:#fff;border:1px solid #d2d2d7;border-radius:18px;padding:24px 28px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}",
+    ".card h2{font-size:18px;font-weight:600;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid #e8e8ed;color:#1d1d1f}",
+    ".meta{font-size:12px;color:#86868b;font-weight:normal;margin-left:8px}",
+    ".answer p{margin:8px 0;font-size:15px}.answer h3{margin:14px 0 6px;font-size:16px}.answer pre{background:#f5f5f7;border:1px solid #e8e8ed;border-radius:10px;padding:12px;overflow-x:auto;font-size:13px}.answer li{margin-left:20px;font-size:15px}",
+    "details.think{margin:10px 0;padding:12px 16px;background:#f5f5f7;border-radius:12px}",
+    "details.think summary{cursor:pointer;color:#6e6e73;font-size:13px;font-weight:500}",
     ".toolbar{position:fixed;right:20px;bottom:20px;display:flex;gap:8px}",
-    ".toolbar button{background:#333;color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px}",
-    "footer{color:#999;font-size:12px;text-align:center;margin:24px 0}",
+    ".toolbar button{background:#0071e3;color:#fff;border:none;border-radius:999px;padding:9px 18px;cursor:pointer;font-size:13px;font-weight:500;transition:opacity .15s}",
+    ".toolbar button:hover{opacity:.85}",
+    "footer{color:#86868b;font-size:12px;text-align:center;margin:28px 0;border-top:1px solid #e8e8ed;padding-top:20px}",
 ])
 
 def _llm_summarize(question, merged):
@@ -79,7 +82,7 @@ def _llm_summarize(question, merged):
 def _build_report(run_id, question, merged, summary=None):
     cards=[]
     if summary:
-        cards.append("<section class=card style='border-left:4px solid #16a34a'><h2>📌 综合整理</h2><div class=answer>"+_md(summary)+"</div></section>")
+        cards.append("<section class=card style='border-left:3px solid #0071e3'><h2>综合整理</h2><div class=answer>"+_md(summary)+"</div></section>")
     for r in merged:
         if r.get("status")=="ok":
             body=_md(r.get("answer") or r.get("thinking") or "") or "<p style=color:#999>（无有效内容）</p>"
@@ -102,11 +105,11 @@ def _build_report(run_id, question, merged, summary=None):
     return "".join([
         "<!DOCTYPE html><html lang=zh-CN><head><meta charset=utf-8><meta name=viewport content=width=device-width,initial-scale=1>",
         "<title>AI 搜索聚合报告 · "+rid+"</title><style>"+CSS+"</style></head><body><div class=wrap>",
-        "<header><h1>🔍 AI 搜索聚合报告</h1><div class=q>问题："+q+"</div>",
+        "<header><h1>AI 搜索聚合报告</h1><div class=q>问题："+q+"</div>",
         "<div class=q style=margin-top:6px;font-size:12px;color:#999>"+rid+" · "+str(n)+" 个引擎返回</div></header>",
         cards_html,
         "<footer>由 content_pool 自动生成</footer></div>",
-        "<div class=toolbar><button onclick=window.print()>🖨 打印/PDF</button><button onclick=window.scrollTo(0,0)>⬆ 顶部</button></div>",
+        "<div class=toolbar><button onclick=window.print()>打印 / PDF</button><button onclick=window.scrollTo(0,0)>返回顶部</button></div>",
         "</body></html>",
     ])
 def run_search(question, engine_ids=None):

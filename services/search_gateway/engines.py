@@ -138,14 +138,14 @@ ENGINES = {
         "session": "doubao",
         "site_url": "https://www.doubao.com/chat",
         "site_host": "doubao.com",
-        "fill_selector": "textarea",
+        "fill_selector": "[contenteditable=true]",
         "fill_nth": 0,
         "input_method": "type",
         "submit": {
-            "js_click": "document.getElementById('flow-end-msg-send') && document.getElementById('flow-end-msg-send').click()",
+            "js_click": "(function(){ var ce=document.querySelector('[contenteditable=true]'); if(!ce)return false; var btn=ce.closest('[class*=flex]'); for(var i=0;i<6&&btn;i++){var b=btn.querySelector('button[class*=size-26],button[aria-label*=发送],button:last-child'); if(b){b.click();return true;} btn=btn.parentElement;} return false; })()",
             "keys": "Enter",
         },
-        "probe_js": "!!document.querySelector('textarea')",
+        "probe_js": "!!document.querySelector('[contenteditable=true]')",
         "extract_js": DOUBAO_EXTRACT_JS,
     },
     "kimi": {
