@@ -66,7 +66,7 @@ def _llm_summarize(question, merged):
         "max_tokens": 800,
     }
     req = urllib.request.Request(
-        "http://127.0.0.1:3000/v1/chat/completions",
+        "http://127.0.0.1:3100/v1/chat/completions",  # 走 API 转发网关(OpenAI 兼容)。:3000 是搜索网关只认 yuanbao-search，会拒 deepseek-v4-flash
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
     )

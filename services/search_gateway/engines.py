@@ -63,57 +63,82 @@ YUANBAO_EXTRACT_JS = """(function(){
 
 GENERIC_EXTRACT_JS = """(function(){
   function textOf(e){ return (e.innerText||'').trim(); }
-  var candidates = Array.from(document.querySelectorAll('.markdown-body, [class*=markdown], [class*=response], [class*=answer], article'));
-  var best = '';
-  for (var i=0;i<candidates.length;i++){
-    var t = textOf(candidates[i]);
-    if (t.length > 40 && t.length > best.length) best = t;
+  var ans = '';
+  var answers = Array.from(document.querySelectorAll('[class*=message-select-wrapper-answer]'));
+  for(var i=0; i<answers.length; i++){ var t = textOf(answers[i]); if(t.length > ans.length) ans = t; }
+  if(!ans){
+    var mds = Array.from(document.querySelectorAll('.qk-markdown'));
+    for(var j=0; j<mds.length; j++){ var t = textOf(mds[j]); if(t.length > ans.length) ans = t; }
   }
-  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
+  if(!ans){
+    var cards = Array.from(document.querySelectorAll('.answer-common-card'));
+    for(var k=0; k<cards.length; k++){ var t = textOf(cards[k]); if(t.length > ans.length) ans = t; }
+  }
+  if(ans) return JSON.stringify({found:true, answer:ans, refs:0});
+  return JSON.stringify({found:false, answer:'', refs:0});
 })()"""
 
 DOUBAO_EXTRACT_JS = """(function(){
   function textOf(e){ return (e.innerText||'').trim(); }
-  var allMsgs = Array.from(document.querySelectorAll('[class*=message-content], [class*=bot-reply], [class*=answer-content], [class*=markdown]'));
-  var best = '';
-  var minLen = 10;
-  for(var i=0; i<allMsgs.length; i++){
-    var el = allMsgs[i];
-    var parent = el.parentElement;
-    var isUser = false;
-    while(parent && parent !== document.body){
-      if(parent.className && (String(parent.className).indexOf('human') > -1 || String(parent.className).indexOf('user') > -1)) { isUser=true; break; }
-      parent = parent.parentElement;
+  var thinking = '';
+  var answers = [];
+  // 收集所有带 thinking box 的行(排除用户消息/侧栏)
+  var rows = Array.from(document.querySelectorAll('.v_list_row, [data-thinking-box], [class*=thinking]'));
+  var seen = {};
+  for(var i=0; i<rows.length; i++){
+    var r = rows[i];
+    var th = r.querySelector('[data-thinking-box]') || r.querySelector('[data-thinking-box="content"]');
+    if(th){
+      var tt = textOf(th);
+      if(tt.length > 2 && tt.indexOf('已思考') === -1 && !seen[tt.slice(0,20)]) { seen[tt.slice(0,20)] = 1; thinking += (thinking ? '\n' : '') + tt; }
     }
-    if(isUser) continue;
-    var t = textOf(el);
-    if(t.length > minLen && t.length > best.length) best = t;
-  }
-  if(!best){
-    var divs = Array.from(document.querySelectorAll('main [class*=content]'));
-    for(var i=0; i<divs.length; i++){
-      var t = textOf(divs[i]);
-      if(t.length > 40 && t.length > best.length && t.indexOf('flow-chat') === -1) best = t;
+    // 本行的 markdown 正文
+    var mds = Array.from(r.querySelectorAll('.md-box-root, [class*=md-box], [class*=markdown]'));
+    for(var j=0; j<mds.length; j++){
+      var t = textOf(mds[j]);
+      if(t.length > 2 && t !== '已思考' && answers.indexOf(t) === -1) answers.push(t);
     }
   }
-  return JSON.stringify({found: best.length > 0, answer: best, refs: 0});
+  // 兜底:全页遍历 md-box
+  if(!answers.length){
+    var allMds = Array.from(document.querySelectorAll('.md-box-root, [class*=md-box], [class*=markdown]'));
+    for(var k=0; k<allMds.length; k++){
+      var t2 = textOf(allMds[k]);
+      if(t2.length > 2 && t2 !== '已思考' && answers.indexOf(t2) === -1) answers.push(t2);
+    }
+  }
+  // 取最后一条,过滤常见噪声前缀
+  var answer = '';
+  for(var m=answers.length-1; m>=0; m--){
+    var a = answers[m];
+    var isNoise = /^(已思考|正在|好的|用户|让我|首先|识别|Reference|参考|来源|搜索)/.test(a);
+    if(!isNoise && a.length > 1) { answer = a; break; }
+  }
+  if(!answer) return JSON.stringify({found:false});
+  return JSON.stringify({found:true, thinking:thinking, answer:answer, refs:0});
 })()"""
-
 KIMI_EXTRACT_JS = """(function(){
   function textOf(e){ return (e.innerText||'').trim(); }
-  var mds = Array.from(document.querySelectorAll('.segment-content .markdown, .markdown-body'));
-  if(mds.length > 0){
-    var t = textOf(mds[mds.length - 1]);
-    if(t.length > 10) return JSON.stringify({found:true, answer:t, refs:0});
+  var items = Array.from(document.querySelectorAll('.chat-content-item-assistant'));
+  if(!items.length) return JSON.stringify({found:false});
+  var ai = items[items.length - 1];
+  var thinking = '';
+  var tells = Array.from(ai.querySelectorAll('.toolcall-content-text .markdown, [class*=thinking-container] .markdown'));
+  for(var i=0; i<tells.length; i++){ var t = textOf(tells[i]); if(t.length > 5 && thinking.indexOf(t.slice(0,30)) === -1) thinking += (thinking ? '\n' : '') + t; }
+  var ans = '';
+  var mds = Array.from(ai.querySelectorAll('.markdown-container'));
+  for(var j=0; j<mds.length; j++){
+    var md = mds[j];
+    if(md.className && String(md.className).indexOf('toolcall') > -1) continue;
+    var t = textOf(md);
+    if(t.length > ans.length) ans = t;
   }
-  var segs = Array.from(document.querySelectorAll('.segment-content'));
-  if(segs.length > 0){
-    for(var i=segs.length-1; i>=0; i--){
-      var t = textOf(segs[i]);
-      if(t.length > 20) return JSON.stringify({found:true, answer:t, refs:0});
-    }
+  if(!ans){
+    var box = ai.querySelector('.segment-content-box');
+    if(box){ var full = textOf(box).replace(thinking, '').trim(); if(full.length > 2) ans = full; }
   }
-  return JSON.stringify({found:false, answer:'', refs:0});
+  if(!ans && !thinking) return JSON.stringify({found:false});
+  return JSON.stringify({found:true, thinking:thinking, answer:ans, refs:0});
 })()"""
 
 # ---------------------------------------------------------------- Engine registry
@@ -142,8 +167,7 @@ ENGINES = {
         "fill_nth": 0,
         "input_method": "type",
         "submit": {
-            "js_click": "(function(){ var ce=document.querySelector('[contenteditable=true]'); if(!ce)return false; var btn=ce.closest('[class*=flex]'); for(var i=0;i<6&&btn;i++){var b=btn.querySelector('button[class*=size-26],button[aria-label*=发送],button:last-child'); if(b){b.click();return true;} btn=btn.parentElement;} return false; })()",
-            "keys": "Enter",
+            "js_click": "(function(){ var b=document.querySelector('.send-btn-wrapper button'); if(b){b.click();return true;} return false; })()"
         },
         "probe_js": "!!document.querySelector('[contenteditable=true]')",
         "extract_js": DOUBAO_EXTRACT_JS,
@@ -156,7 +180,7 @@ ENGINES = {
         "site_url": "https://www.kimi.com/",
         "site_host": "kimi",
         "fill_selector": "[contenteditable=true]",
-        "submit": {"js_click": "(function(){ var s=document.querySelector('svg[name=Send]'); var btn=s?s.closest('button,div[role=button]'):null; if(btn)btn.click(); })()"},
+        "submit": {"js_click": "(function(){ var b=document.querySelector('.send-button-container'); if(b){b.click();return true;} return false; })()"},
         "probe_js": "!!document.querySelector('[contenteditable=true]')",
         "extract_js": KIMI_EXTRACT_JS,
     },
@@ -169,7 +193,8 @@ ENGINES = {
         "site_host": "qianwen",
         "fill_selector": "[contenteditable=true]",
         "input_method": "type",
-        "submit": {"enter": True},
+        "fill_nth": 0,
+        "submit": {"js_click": "(function(){ var b=document.querySelector('button.size-8.border-0'); if(b){b.click();return true;} return false; })()"},
         "probe_js": "!!document.querySelector('[contenteditable=true]')",
         "extract_js": GENERIC_EXTRACT_JS,
     },
@@ -307,8 +332,7 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
     input_method = eng.get("input_method", "fill")
     if input_method == "type":
         focus_js = ("(function(){var el=document.querySelector('%s');"
-                    "if(el){el.focus();document.execCommand('selectAll',false,null);"
-                    "document.execCommand('insertText',false,'');}return true;})()"
+                    "if(el){el.focus();}return true;})()"
                     % eng["fill_selector"])
         run_cli(["browser", sess, "eval", focus_js], timeout=30)
         type_args = ["browser", sess, "type"]
@@ -360,6 +384,10 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
         if current["found"] and (current["answer"] or current["thinking"]):
             if current.get("answer") == baseline_ans and current.get("thinking") == baseline_think:
                 continue
+            # 只要正文 answer 仍是旧回答(baseline 非空)，说明新回答尚未开始生成，
+            # 即便 thinking 已变化也不再稳定判定，继续等待新正文出现
+            if baseline_ans and current.get("answer") == baseline_ans:
+                continue
             curr_len = len(current.get("answer", "")) + len(current.get("thinking", ""))
             if curr_len > prev_len:
                 last = current
@@ -367,9 +395,10 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
                 stable_count = 0
                 if progress:
                     progress(f"正在思考与生成回答({curr_len}字)…")
-            else:
+            elif current["answer"]:
                 stable_count += 1
-                # 连续 2 次轮询（4秒）文本长度无增长，说明回答已打印完成
+                # 仅当正文答案已出现后，连续 2 次轮询（4秒）文本长度无增长，才判定回答完成
+                # （避免深度思考类引擎 thinking 与正文之间的间隙导致过早返回）
                 if stable_count >= 2:
                     return {
                         "status": "ok",
