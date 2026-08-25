@@ -4,11 +4,10 @@
 
 已接入真实渠道（key 已验证，2026-08-04）：
   deepseek  官方 API        （env DEEPSEEK_API_KEY）
-  gemini    Google Gemini   （env GOOGLE_API_KEY，走 OpenAI 兼容端点）
-  openrouter 20+ 免费模型聚合（env OPENROUTER_API_KEY）
+  openrouter 20+ 免费模型聚合（env OPENROUTER_API_KEY，支持 channels.json key_pools 多账号轮换）
 
 可填 key 槽位（网页渠道管理页填入，存本地 channels.json，填了才生效）：
-  groq / siliconflow / dashscope / zhipu
+  groq / siliconflow / dashscope / zhipu / xiaohongshu
 
 key 优先级：环境变量 > channels.json（网页填写）。
 不编造假 key；未填的槽位 health.key_set=False，路由会自动跳过。
@@ -25,6 +24,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 数据与代码分离：渠道配置统一在 仓库根/data/search_gateway/
 DATA_DIR = os.path.normpath(os.path.join(os.path.dirname(BASE_DIR), "..", "data", "search_gateway"))
 CHANNELS_JSON = os.path.join(DATA_DIR, "channels.json")
+ROUTING_JSON = os.path.join(DATA_DIR, "routing.json")
+MODEL_OVERRIDES_JSON = os.path.join(DATA_DIR, "model_overrides.json")
 
 # 本地额度统计（task_011）：调用成功后记录 quota.json，缺失时降级不记录
 GATEWAY_ID = os.environ.get("GATEWAY_ID", "ds_v4_cli")
@@ -53,26 +54,8 @@ CHANNELS = {
         "models": ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-reasoner"],
         "note": "使用官方 Key 扣除充值余额，请关注余额。",
     },
-    "gemini": {
-        "name": "Google Gemini 官方",
-        "provider": "Google (generativelanguage.googleapis.com)",
-        "billing_type": "free_quota",
-        "billing_tag": "🟢 免费配额 (1500次/天)",
-        "icon": "✨",
-        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
-        "env_key": "GOOGLE_API_KEY",
-        "free": True,
-        "proxy": "http://127.0.0.1:7890",  # Google 被墙，走本机 mihomo 代理
-        "speed": "fast",
-        "default_model": "gemini-3.5-flash",
-        "models": [
-            "gemini-3.5-flash", "gemini-3.5-flash-lite",
-            "gemini-3.1-flash-lite", "gemini-3.6-flash", "gemini-3.7-flash",
-            "gemini-flash-latest", "gemini-flash-lite-latest",
-            "gemini-omni-flash-preview",
-        ],  # 多模态理解模型（支持图像输入）。image 生模型免费配额 429 已剔除
-        "note": "谷歌官方免费配额（key 来自 Cherry Studio）。支持多模态图像理解。走 7890 代理访问（Google 被墙）。",
-    },
+    # gemini 渠道已移除（用户 2026-08-23 拍板）：Google 按自有 IP 情报判定代理出口为
+    # 不支持地区，稳定返回 400 FAILED_PRECONDITION，与公共 geo 库结论无关，无法修复。
     "openrouter": {
         "name": "OpenRouter 免费模型池",
         "provider": "OpenRouter (openrouter.ai)",
@@ -193,6 +176,21 @@ CHANNELS = {
         "models": ["agnes-2.5-flash", "agnes-image-2.1-flash", "agnes-video-v2.0"],
         "note": "AGNES AI（Cherry Studio 已配置 key，2026-08-16 收录）。",
     },
+    "xiaohongshu": {
+        "name": "小红书 Dots Note",
+        "provider": "小红书 (note3-prev-api.askdiandian.com)",
+        "billing_type": "free",
+        "billing_tag": "🟢 免费 (内测 API)",
+        "icon": "📕",
+        "base_url": "https://note3-prev-api.askdiandian.com/v1",
+        "env_key": "",
+        "free": True,
+
+        "speed": "medium",
+        "default_model": "dots3-note-prev",
+        "models": ["dots3-note-prev"],
+        "note": "小红书 dots3-note-preview 内测端点（key 与 Cherry Studio 同源，2026-08-23 收录）。",
+    },
     "zscc": {
         "name": "ZSCC",
         "provider": "ZSCC (api.zscc.in)",
@@ -205,9 +203,9 @@ CHANNELS = {
         "free": True,
         
         "speed": "medium",
-        "default_model": "kimi-k3-cc",
-        "models": ["kimi-k3-cc", "claude-opus-4-8", "claude-sonnet-5", "deepseek-v4-flash-cc"],
-        "note": "ZSCC（Cherry Studio 已配置 key，2026-08-16 收录）。",
+        "default_model": "claude-sonnet-5",
+        "models": ["claude-opus-4-8", "claude-sonnet-5", "gpt-5.6-sol"],
+        "note": "ZSCC（Cherry Studio 已配置 key；模型清单 2026-08-23 对齐 Cherry Studio，禁测）。",
     },
     "opencode": {
         "name": "OpenCode Go",
@@ -227,16 +225,20 @@ CHANNELS = {
     },
 }
 
-CHANNEL_ORDER = ["opencode", "modelscope", "sensetime", "agnes", "zscc", "deepseek", "gemini", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
+CHANNEL_ORDER = ["opencode", "modelscope", "sensetime", "agnes", "xiaohongshu", "zscc", "deepseek", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
 
 # 禁测渠道（用户 2026-08-16 指定）：这些渠道很贵，禁止发起任何测试/探测请求。
 # - zscc：用户明确「很贵，能用就行，禁止测试」
 NO_TEST_CHANNELS = {"zscc"}
 
 # fallback 链（前端模型未匹配时按此顺序路由）
-DEFAULT_CHAIN = ["opencode", "modelscope", "sensetime", "agnes", "zscc", "deepseek", "openrouter", "gemini", "groq", "siliconflow", "dashscope", "zhipu"]
+DEFAULT_CHAIN = ["opencode", "modelscope", "sensetime", "agnes", "xiaohongshu", "zscc", "deepseek", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
 
 _config_cache = None
+
+# 多账号 key 池轮换状态（get_key 用；key 本体存 channels.json 的 key_pools 字段）
+_POOL_IDX = {}
+_POOL_LOCK = threading.Lock()
 
 
 # ---------------------------------------------------------------- 配置读写
@@ -264,20 +266,332 @@ def save_channel_key(channel_id, key):
 
 
 def get_key(channel_id):
-    """渠道 key：环境变量优先，其次 channels.json。"""
+    """渠道 key：环境变量优先，其次 channels.json；配置了 key_pools 时在
+    「主 key + 池内 key」之间轮询返回（多账号摊薄免费额度，2026-08-23）。"""
     ch = CHANNELS.get(channel_id)
     if not ch:
         return ""
     env_name = ch.get("env_key", "")
+    primary = ""
     if env_name:
-        v = os.environ.get(env_name, "")
-        if v:
-            return v
-    return _load_config().get("keys", {}).get(channel_id, "")
+        primary = os.environ.get(env_name, "")
+    if not primary:
+        primary = _load_config().get("keys", {}).get(channel_id, "")
+    pool = [k for k in _load_config().get("key_pools", {}).get(channel_id, []) if k]
+    keys = ([primary] if primary else []) + pool
+    if len(keys) <= 1:
+        return primary
+    with _POOL_LOCK:
+        i = _POOL_IDX.get(channel_id, -1) + 1
+        _POOL_IDX[channel_id] = i
+    return keys[i % len(keys)]
+
+
+def get_key_pool_size(channel_id):
+    """该渠道参与轮换的 key 总数（主 key + 池），供健康页展示。"""
+    ch = CHANNELS.get(channel_id)
+    if not ch:
+        return 0
+    primary = ""
+    env_name = ch.get("env_key", "")
+    if env_name:
+        primary = os.environ.get(env_name, "")
+    if not primary:
+        primary = _load_config().get("keys", {}).get(channel_id, "")
+    pool = [k for k in _load_config().get("key_pools", {}).get(channel_id, []) if k]
+    return len(pool) + (1 if primary else 0)
+
+
+# ---------------------------------------------------------------- 渠道启停开关
+
+def get_channel_enabled(channel_id):
+    """渠道启停（channels.json channel_enabled，缺省启用）。停用后路由/模型列表全部跳过。"""
+    return bool(_load_config().get("channel_enabled", {}).get(channel_id, True))
+
+
+def set_channel_enabled(channel_id, enabled):
+    """持久化启停。启用=删键（默认即启用，保持文件干净），停用=False。"""
+    global _config_cache
+    cfg = _load_config()
+    m = cfg.setdefault("channel_enabled", {})
+    if enabled:
+        m.pop(channel_id, None)
+    else:
+        m[channel_id] = False
+    if not m:
+        cfg.pop("channel_enabled", None)
+    with open(CHANNELS_JSON, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    _config_cache = cfg
+
+
+def invalidate_channel_cache(channel_id=None):
+    """启停/改 key 后清健康缓存，下次请求立即重探。"""
+    with _cache_lock:
+        if channel_id:
+            _health_cache.pop(channel_id, None)
+        else:
+            _health_cache.clear()
+
+
+# ---------------------------------------------------------------- 手动路由编排（"搭积木"）
+
+_routing_cache = None
+
+
+def load_routing():
+    """读取 routing.json（每模型手动渠道顺序）。缓存模式同 channels.json。"""
+    global _routing_cache
+    if _routing_cache is None:
+        try:
+            with open(ROUTING_JSON, "r", encoding="utf-8") as f:
+                _routing_cache = json.load(f)
+        except Exception:
+            _routing_cache = {}
+    return _routing_cache
+
+
+def save_routing(model, order=None, disabled=None):
+    """持久化某模型的路由规则。order=None 时删除该模型规则（恢复自动排序）。
+    只保存 CHANNELS 中已知渠道 id（API 层会严格校验，这里做防御）。"""
+    global _routing_cache
+    cfg = load_routing()
+    rules = cfg.setdefault("routing", {})
+    key = (model or "").strip().lower()
+    if order is None:
+        rules.pop(key, None)
+    else:
+        rules[key] = {
+            "order": [c for c in (order or []) if c in CHANNELS],
+            "disabled": [c for c in (disabled or []) if c in CHANNELS],
+        }
+    if not rules:
+        cfg.pop("routing", None)
+    with open(ROUTING_JSON, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    _routing_cache = cfg
+
+
+def _routing_rule(model):
+    """返回 (order 列表, disabled 集合) 给某模型；无规则/规则全空 → (None, None)。"""
+    key = (model or "").strip().lower()
+    rule = load_routing().get("routing", {}).get(key)
+    if not rule or not isinstance(rule, dict):
+        return None, None
+    order = rule.get("order") or []
+    disabled = set(rule.get("disabled") or [])
+    if not order and not disabled:
+        return None, None
+    return order, disabled
 
 
 def key_is_set(channel_id):
     return bool(get_key(channel_id))
+
+
+# ---------------------------------------------------------------- 自定义可用模型（overrides）
+
+_overrides_cache = None
+
+
+def load_model_overrides():
+    """读取 model_overrides.json：{custom:[{name,channel,model}], hidden:[模型名]}。
+    custom = 自定义模型别名（公开模型名 → 指定渠道+上游实际模型名）；
+    hidden = 从模型列表隐藏的自动发现模型（路由仍可用，只是不展示）。缓存模式同 routing.json。"""
+    global _overrides_cache
+    if _overrides_cache is None:
+        try:
+            with open(MODEL_OVERRIDES_JSON, "r", encoding="utf-8") as f:
+                _overrides_cache = json.load(f)
+        except Exception:  # noqa: BLE001
+            _overrides_cache = {}
+    return _overrides_cache
+
+
+def save_model_overrides(cfg):
+    global _overrides_cache
+    with open(MODEL_OVERRIDES_JSON, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    _overrides_cache = cfg
+
+
+def add_custom_model(name, channel_id, upstream_model):
+    """新增/覆盖一个自定义模型别名。同名覆盖（不区分大小写）。"""
+    cfg = load_model_overrides()
+    customs = [c for c in (cfg.get("custom") or [])
+               if c.get("name", "").strip().lower() != name.strip().lower()]
+    customs.append({"name": name.strip(), "channel": channel_id,
+                    "model": (upstream_model or "").strip()})
+    cfg["custom"] = customs
+    save_model_overrides(cfg)
+
+
+def remove_custom_model(name):
+    cfg = load_model_overrides()
+    cfg["custom"] = [c for c in (cfg.get("custom") or [])
+                     if c.get("name", "").strip().lower() != name.strip().lower()]
+    save_model_overrides(cfg)
+
+
+def set_hidden_models(names):
+    cfg = load_model_overrides()
+    cfg["hidden"] = sorted({n.strip().lower() for n in (names or []) if n and n.strip()})
+    save_model_overrides(cfg)
+
+
+def _custom_provider_entry(cid, upstream, h):
+    """构造自定义模型条目的 provider 描述（形状与 model_providers 一致）。"""
+    ch = CHANNELS.get(cid, {})
+    st = h.get(cid, {})
+    return {
+        "id": cid,
+        "name": ch.get("name", cid),
+        "icon": ch.get("icon", "🤖"),
+        "provider": ch.get("provider", ""),
+        "base_url": ch.get("base_url", ""),
+        "billing_type": ch.get("billing_type", "free"),
+        "billing_tag": ch.get("billing_tag", ""),
+        "billing_label": "免费" if ch.get("billing_type") in ("free", "free_quota") else "付费",
+        "speed": ch.get("speed", "medium"),
+        "speed_label": {"fast": "快", "medium": "中", "slow": "慢"}.get(ch.get("speed", "medium"), "中"),
+        "reachable": st.get("reachable", False),
+        "key_set": st.get("key_set", False),
+        "matched_models": [upstream],
+        "no_test": cid in NO_TEST_CHANNELS,
+        "balance": st.get("balance", ""),
+        "custom": True,
+    }
+
+
+# ---------------------------------------------------------------- 统一模型组（跨厂商归一名）
+
+UNIFIED_JSON = os.path.join(DATA_DIR, "unified_models.json")
+
+_unified_cache = None
+
+
+def normalize_model_name(name):
+    """归一模型名：小写、空格/下划线 → 短横线（统一模型名以此为准）。"""
+    return ((name or "").strip().lower().replace(" ", "-").replace("_", "-"))
+
+
+def load_unified():
+    """读取 unified_models.json：{统一名: {display?, members:{渠道id: 上游模型名}}}。
+    统一名 = 我的 API 对外唯一模型名；members = 各渠道实际转发的上游真实模型名。缓存模式同 routing.json。"""
+    global _unified_cache
+    if _unified_cache is None:
+        try:
+            with open(UNIFIED_JSON, "r", encoding="utf-8") as f:
+                _unified_cache = json.load(f)
+        except Exception:  # noqa: BLE001
+            _unified_cache = {}
+    return _unified_cache
+
+
+def save_unified(cfg):
+    global _unified_cache
+    with open(UNIFIED_JSON, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    _unified_cache = cfg
+
+
+def set_unified_model(name, members, display=None):
+    """新增/更新统一模型组。members: {channel_id: 上游模型名}，至少一项且渠道合法。同名覆盖。"""
+    nm = normalize_model_name(name)
+    if not nm:
+        raise ValueError("统一模型名不能为空")
+    clean = {}
+    for cid, up in (members or {}).items():
+        if cid in CHANNELS and (up or "").strip():
+            clean[cid] = up.strip()
+    if not clean:
+        raise ValueError("至少需要一个有效成员（渠道存在且上游模型名非空）")
+    cfg = load_unified()
+    entry = {"members": clean}
+    if display and display.strip():
+        entry["display"] = display.strip()
+    cfg[nm] = entry
+    save_unified(cfg)
+    return entry
+
+
+def delete_unified_model(name):
+    cfg = load_unified()
+    nm = normalize_model_name(name)
+    if nm in cfg:
+        cfg.pop(nm, None)
+        save_unified(cfg)
+
+
+def unified_suggest(q, limit=60):
+    """按子串扫描各渠道在线模型，返回 {cid: [上游模型名,...]}，供建组时预填。"""
+    qq = normalize_model_name(q)
+    if not qq:
+        return {}
+    h = cached_health_all()
+    out = {}
+    for cid in CHANNEL_ORDER:
+        st = h.get(cid, {})
+        if not st.get("enabled", True) or not st.get("key_set"):
+            continue
+        hits = [m for m in (st.get("models") or []) if qq in normalize_model_name(m)]
+        if hits:
+            out[cid] = hits[:limit]
+    return out
+
+
+# ---------------------------------------------------------------- 渠道模型选择（单渠道已选置顶）
+
+CHANNEL_MODELS_JSON = os.path.join(DATA_DIR, "channel_models.json")
+
+_channel_models_cache = None
+
+
+def load_channel_models():
+    """读取 channel_models.json：{渠道id: {selected:[模型名,...]}}。
+    渠道无条目 = 未策展，对外暴露全量模型；有条目 = 只暴露已选（详情页仍可看全量、按名调用不受限）。"""
+    global _channel_models_cache
+    if _channel_models_cache is None:
+        try:
+            with open(CHANNEL_MODELS_JSON, "r", encoding="utf-8") as f:
+                _channel_models_cache = json.load(f)
+        except Exception:  # noqa: BLE001
+            _channel_models_cache = {}
+    return _channel_models_cache
+
+
+def save_channel_models(cfg):
+    global _channel_models_cache
+    with open(CHANNEL_MODELS_JSON, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    _channel_models_cache = cfg
+
+
+def get_channel_selection(cid):
+    """返回该渠道已选模型列表；未策展返回 None（区别于"选了但为空"——空列表同样视为未策展）。"""
+    sel = (load_channel_models().get(cid) or {}).get("selected")
+    if not isinstance(sel, list) or not sel:
+        return None
+    return list(sel)
+
+
+def set_channel_selection(cid, names):
+    """保存渠道已选模型；空列表 = 取消策展（回到全量）。返回清洗后的列表。"""
+    if cid not in CHANNELS:
+        raise ValueError("未知渠道: " + cid)
+    clean, seen = [], set()
+    for n in names or []:
+        n = (n or "").strip()
+        if n and n not in seen:
+            seen.add(n)
+            clean.append(n)
+    cfg = load_channel_models()
+    if clean:
+        cfg[cid] = {"selected": clean}
+    else:
+        cfg.pop(cid, None)
+    save_channel_models(cfg)
+    return clean
 
 
 # ---------------------------------------------------------------- 健康检查与余额查询
@@ -393,21 +707,16 @@ def channel_health(channel_id):
     try:
         if channel_id == "openrouter":
             data = _get_json(base + "/models", key, timeout=8, ua=ch.get("ua", "unified-ai-gateway/1.0"), channel_id=channel_id)
-            models = [m["id"] for m in data.get("data", [])
-                      if m.get("id", "").endswith(":free") or m.get("is_free")]
-            models = sorted(models)[:40]
+            models = sorted({m["id"] for m in data.get("data", []) if m.get("id")})
             return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": True, "models": models,
                     "error": "", "can_fill": can_fill, "provider": provider,
                     "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
         models_path = ch.get("models_path", "/models")
         data = _get_json(base + models_path, key, timeout=8, ua=ch.get("ua", "unified-ai-gateway/1.0"), channel_id=channel_id)
         models = [m.get("id") for m in (data.get("data") or []) if m.get("id")]
-        if channel_id == "deepseek":
-            models = [m for m in models if m in ("deepseek-v4-flash", "deepseek-v4-pro", "deepseek-reasoner", "deepseek-chat")]
-        elif channel_id == "gemini":
+        if channel_id == "gemini":
             models = [m.split("/", 1)[-1] for m in models if m]  # 去掉 models/ 前缀
-            models = [m for m in models if "image" in m or "flash" in m or "omni" in m][:30]
-        models = (models or ch.get("models", []))[:20]
+        models = sorted(set(models or ch.get("models", [])))  # 全量目录，不再截断（前端按厂商分组展示）
         return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": True, "models": models,
                 "error": "", "can_fill": can_fill, "provider": provider,
                 "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
@@ -431,6 +740,16 @@ _health_cache = {}
 _cache_lock = threading.Lock()
 
 
+def _augment_health(cid, st):
+    """健康条目补充运行时字段：启停开关 + key 池大小 + 已选模型数（不污染缓存原件）。"""
+    st = dict(st)
+    st["enabled"] = get_channel_enabled(cid)
+    st["key_pool"] = get_key_pool_size(cid)
+    sel = get_channel_selection(cid)
+    st["sel_count"] = len(sel) if sel is not None else None
+    return st
+
+
 def cached_health_all(ttl=60):
     """带 TTL 的渠道健康缓存；过期渠道并发惰性刷新，避免串行网络探测阻塞启动。"""
     now = time.time()
@@ -440,7 +759,7 @@ def cached_health_all(ttl=60):
         for cid in CHANNEL_ORDER:
             hit = _health_cache.get(cid)
             if hit and now - hit[0] < ttl:
-                out[cid] = hit[1]
+                out[cid] = _augment_health(cid, hit[1])
             else:
                 stale.append(cid)
     if stale:
@@ -463,7 +782,7 @@ def cached_health_all(ttl=60):
                 r = results.get(cid)
                 if r is not None:
                     _health_cache[cid] = (time.time(), r)
-                    out[cid] = r
+                    out[cid] = _augment_health(cid, r)
     return out
 
 
@@ -532,13 +851,14 @@ def _sse_usage(text):
 class _QuotaResponse:
     """包装 urllib response：响应成功时记录本地额度（task_011）。接口与 urllib response 兼容。"""
 
-    def __init__(self, channel_id, model, is_stream, upstream):
+    def __init__(self, channel_id, model, is_stream, upstream, route_info=None):
         self._channel = channel_id
         self._model = model
         self._is_stream = is_stream
         self._up = upstream
         self._recorded = False
         self._stream_buf = bytearray()
+        self._route_info = route_info or {}
 
     def _record(self, success, input_tokens=0, output_tokens=0):
         if self._recorded:
@@ -602,11 +922,13 @@ class _QuotaResponse:
             pass
 
 
-def chat_completion(channel_id, payload):
-    """转发 chat/completions 到指定渠道。返回 _QuotaResponse（urllib 兼容 + 记录额度）。"""
+def chat_completion(channel_id, payload, route_info=None):
+    """转发 chat/completions 到指定渠道。返回 _QuotaResponse（urllib 兼容 + 记录额度）。
+    route_info 可选，透传路由决策信息供响应头使用。
+    配置了 key_pools 时，遇 429（账号级限流）自动换下一把 key 重试，最多轮完一圈。"""
     ch = CHANNELS[channel_id]
-    key = get_key(channel_id)
-    if not key:
+    primary = get_key(channel_id)
+    if not primary:
         raise RuntimeError(f"{ch['name']} 未配置 key")
     req_payload = dict(payload)
     # developer 角色 → system（部分渠道不认 developer）
@@ -614,19 +936,32 @@ def chat_completion(channel_id, payload):
         if m.get("role") == "developer":
             m["role"] = "system"
     ua = ch.get("ua", "unified-ai-gateway/1.0")
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {key}",
-        "User-Agent": ua,
-    }
-    if req_payload.get("stream"):
-        headers["Accept"] = "text/event-stream"
     url = ch["base_url"].rstrip("/") + "/chat/completions"
-    req = urllib.request.Request(url, data=json.dumps(req_payload).encode("utf-8"),
-                                 headers=headers, method="POST")
-    resp = _urlopen(req, timeout=120, channel_id=channel_id)
-    model = req_payload.get("model") or ch.get("default_model", "")
-    return _QuotaResponse(channel_id, model, req_payload.get("stream"), resp)
+    body = json.dumps(req_payload).encode("utf-8")
+
+    attempts = max(1, get_key_pool_size(channel_id))
+    last_err = None
+    for i in range(attempts):
+        key = get_key(channel_id)  # 每圈取下一把（get_key 内部轮换）
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {key}",
+            "User-Agent": ua,
+        }
+        if req_payload.get("stream"):
+            headers["Accept"] = "text/event-stream"
+        req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+        try:
+            resp = _urlopen(req, timeout=120, channel_id=channel_id)
+        except urllib.error.HTTPError as he:
+            if he.code == 429 and i < attempts - 1:
+                he.read()  # 消费 body 便于连接复用
+                last_err = he
+                continue  # 换下一把 key 再试
+            raise
+        model = req_payload.get("model") or ch.get("default_model", "")
+        return _QuotaResponse(channel_id, model, req_payload.get("stream"), resp, route_info=route_info)
+    raise last_err  # 全部 key 都 429
 
 
 def model_to_chain(model):
@@ -657,17 +992,48 @@ def _channel_sort_key(cid, st):
     return (free_rank, speed_rank, order_rank)
 
 
+def _apply_routing_rule(matched, model_name):
+    """按保存的路由规则重排智能排序后的 provider 列表（"搭积木"顺序）。
+    用户手动排序的渠道提到最前（严格按 order 顺序，只在当前匹配到的渠道中取）；
+    其余匹配渠道（不在 order）按现有智能顺序补后；disabled 渠道整体剔除。
+    无规则/全空 → 原样返回。"""
+    order, disabled = _routing_rule(model_name)
+    if order is None and not disabled:
+        return matched
+    if disabled:
+        matched = [p for p in matched if p["id"] not in disabled]
+        if not order:
+            return matched
+    by_id = {p["id"]: p for p in matched}
+    head = [by_id[cid] for cid in order if cid in by_id]
+    tail = [p for p in matched if p["id"] not in order]
+    return head + tail
+
+
+def effective_order(model_name):
+    """某模型应用路由规则后的渠道 id 顺序（含未配置 key 的会被跳过）。
+    作为测试/参考的单点真源；与 model_providers 返回顺序一致。"""
+    return [p["id"] for p in model_providers(model_name)]
+
+
 def all_models():
     """聚合所有在线渠道的全部模型（去重），返回 [{name, providers:[cid,...]}]。
     每个 provider 含 {id, name, icon, billing_type, billing_tag, speed, reachable}。"""
     h = cached_health_all()
+    sel_map = load_channel_models()
     model_map = {}  # model_name -> {providers: []}
     for cid in CHANNEL_ORDER:
         st = h.get(cid, {})
-        if not st.get("key_set") or not st.get("reachable"):
+        if not st.get("enabled", True) or not st.get("key_set") or not st.get("reachable"):
             continue
         ch = CHANNELS.get(cid, {})
-        for m in st.get("models", []) or []:
+        models = st.get("models", []) or []
+        # 渠道模型策展：已选列表存在时，对外只暴露已选（详情页仍可看全量、按名调用不受限）
+        sel = (sel_map.get(cid) or {}).get("selected")
+        if isinstance(sel, list) and sel:
+            sset = set(sel)
+            models = [m for m in models if m in sset]
+        for m in models:
             if m not in model_map:
                 model_map[m] = {"name": m, "providers": []}
             model_map[m]["providers"].append({
@@ -681,6 +1047,32 @@ def all_models():
                 "reachable": st.get("reachable", False),
                 "no_test": cid in NO_TEST_CHANNELS,
             })
+    # 自定义模型别名：注入为该模型的 provider（渠道已匹配则跳过，防重复）
+    for c in load_model_overrides().get("custom") or []:
+        cid, nm = c.get("channel", ""), (c.get("name") or "").strip()
+        if not nm or cid not in CHANNELS:
+            continue
+        st = h.get(cid, {})
+        if st.get("enabled") is False or not st.get("key_set"):
+            continue
+        mm = model_map.setdefault(nm, {"name": nm, "providers": []})
+        if not any(p["id"] == cid for p in mm["providers"]):
+            mm["providers"].append(_custom_provider_entry(cid, c.get("model") or nm, h))
+    # 隐藏模型：不出现在模型列表（直接按名请求仍可路由）
+    for nm in set(load_model_overrides().get("hidden") or []):
+        model_map.pop(nm, None)
+    # 统一模型组：跨厂商归一名 → 覆盖为独立条目（成员=显式配置的各渠道上游名）
+    for uname, u in load_unified().items():
+        provs = []
+        for cid, up in (u.get("members") or {}).items():
+            st = h.get(cid, {})
+            if not st.get("enabled", True) or not st.get("key_set"):
+                continue
+            provs.append(_custom_provider_entry(cid, up, h))
+        if provs:
+            model_map[uname] = {"name": uname, "providers": provs, "unified": True}
+            if u.get("display"):
+                model_map[uname]["display"] = u["display"]
     # 每个 model 的 providers 按智能排序
     for m in model_map:
         model_map[m]["providers"].sort(key=lambda x: _channel_sort_key(x["id"], {}))
@@ -689,17 +1081,31 @@ def all_models():
     return out
 
 
-def model_providers(model_name):
+def model_providers(model_name, full=False):
     """反查支持某模型的所有渠道（包含搜索），返回按智能排序的 provider 列表。
-    包含搜索：渠道模型名包含 query 即算支持（不区分大小写）。"""
+    包含搜索：渠道模型名包含 query 即算支持（不区分大小写）。
+    full=True 时返回原始智能排序结果（不应用手动路由规则、不过滤 disabled），
+    供前端编辑态展示全部匹配渠道（含已排除的）。"""
     q = (model_name or "").strip().lower()
     if not q:
         return []
+    # 统一模型组：精确命中归一名 → 只用显式成员（转发时按渠道改写为上游真实名），不参与包含搜索
+    uni = load_unified().get(normalize_model_name(q))
+    if uni is not None:
+        h = cached_health_all()
+        members = []
+        for cid, up in (uni.get("members") or {}).items():
+            st = h.get(cid, {})
+            if not st.get("enabled", True) or not st.get("key_set"):
+                continue
+            members.append(_custom_provider_entry(cid, up, h))
+        members.sort(key=lambda x: _channel_sort_key(x["id"], {}))
+        return members if full else _apply_routing_rule(members, model_name)
     h = cached_health_all()
     matched = []
     for cid in CHANNEL_ORDER:
         st = h.get(cid, {})
-        if not st.get("key_set"):
+        if not st.get("enabled", True) or not st.get("key_set"):
             continue
         ch = CHANNELS.get(cid, {})
         models = st.get("models", []) or []
@@ -724,7 +1130,21 @@ def model_providers(model_name):
             "no_test": cid in NO_TEST_CHANNELS,
             "balance": st.get("balance", ""),
         })
+    # 自定义模型别名：精确命中别名时注入指定渠道（渠道已匹配则跳过，防重复）
+    for c in load_model_overrides().get("custom") or []:
+        if (c.get("name") or "").strip().lower() != q:
+            continue
+        cid = c.get("channel", "")
+        if cid not in CHANNELS or any(x["id"] == cid for x in matched):
+            continue
+        st = h.get(cid, {})
+        if st.get("enabled") is False or not st.get("key_set"):
+            continue
+        matched.append(_custom_provider_entry(cid, c.get("model") or model_name, h))
     # 智能排序：免费优先 → 速度快优先 → 渠道顺序
     matched.sort(key=lambda x: _channel_sort_key(x["id"], {}))
-    return matched
+    if full:
+        return matched  # 编辑态原始列表：不应用路由、不过滤 disabled
+    # 手动路由规则（"搭积木"）：有规则则重排，无规则保持智能顺序
+    return _apply_routing_rule(matched, model_name)
 
