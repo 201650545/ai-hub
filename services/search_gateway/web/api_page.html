@@ -1038,6 +1038,8 @@ td .d{color:var(--t2)}
   <div class="v-body">
     <div class="ch-tools">
       <button class="btn-primary" onclick="openAddChannel()">＋ 新增渠道</button>
+      <button class="btn-ghost" id="btn-sync-cherry" onclick="syncToCherry()">🍒 同步到 Cherry Studio</button>
+      <span id="sync-cherry-msg" style="font-size:12px;color:var(--t3);margin-left:8px"></span>
     </div>
     <div class="rules glass" id="ch-box"><div class="rules-empty">加载中…</div></div>
     <div class="rules glass ch-hidden-wrap" id="ch-hidden-wrap" style="display:none">
@@ -2082,6 +2084,20 @@ async function submitAddChannel(){
   loadChannels(); load();
 }
 let HIDDEN=[];  // 已隐藏渠道元数据
+async function syncToCherry(){
+  const btn=document.getElementById('btn-sync-cherry');
+  const msg=document.getElementById('sync-cherry-msg');
+  if(btn.disabled)return;
+  btn.disabled=true; btn.textContent='🍒 同步中…'; msg.textContent='';
+  try{
+    const r=await fetch('/api/sync-cherry',{method:'POST'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){msg.textContent='❌ '+(d.error||r.status);}
+    else{msg.textContent='✅ 已同步 '+d.providers+' 渠道 / '+d.models+' 模型';}
+  }catch(e){msg.textContent='❌ '+e.message;}
+  btn.disabled=false; btn.textContent='🍒 同步到 Cherry Studio';
+  setTimeout(()=>{msg.textContent='';},8000);
+}
 async function loadChannels(){
   try{
     const r=await fetch('/api/health',{cache:'no-store'});

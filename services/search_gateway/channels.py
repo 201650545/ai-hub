@@ -119,9 +119,11 @@ CHANNELS = {
         "free": True,
         
         "speed": "medium",
-        "default_model": "qwen-plus",
-        "models": ["qwen-plus", "qwen-turbo", "qwen-max"],
-        "note": "注册赠送数千万 Tokens 试用。",
+        "default_model": "qwen3.8-flash",
+        "models": ["qwen3.8-flash", "qwen-plus", "qwen-turbo", "qwen-max"],
+        "note": "Qwen3.8-Flash 2026-08-26 首发：新用户每模型送 100 万 tokens（90 天，北京地域），推理价 ¥1/百万输入、¥3/百万输出",
+        "promo": "Qwen3.8-Flash 首发（8/26 上线「千问办公」）：推理价每百万输入 tokens 仅 1 元、输出 3 元，为 DeepSeek-V4-Flash 的 1/3。阿里云百炼新用户每模型赠送 100 万 tokens 免费额度（90 天有效，仅华北2北京地域；未认证用户额度耗尽自动停止不扣费）。",
+        "free_models": ["qwen3.8-flash"],
     },
     "zhipu": {
         "name": "智谱 GLM BigModel",
