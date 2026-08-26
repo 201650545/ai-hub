@@ -35,6 +35,11 @@ dashboard_dir = BASE_DIR / "dashboard"
 if dashboard_dir.exists():
     app.mount("/dashboard", StaticFiles(directory=str(dashboard_dir)), name="dashboard")
 
+# 挂载共享设计系统（theme.css 唯一真源）
+static_dir = BASE_DIR / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
 # 挂载应用（AI 画布 / 词境挖空 等前端应用，静态单页）
 apps_dir = PROJECT_DIR / "apps"
 if apps_dir.exists():
@@ -86,22 +91,27 @@ async def health():
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    """导航首页 — 所有网关卡片。"""
+    """导航首页 — 苹果官网风极简线条。"""
     gateways = get_gateways().get("gateways", {})
     cards = []
     for gid, gw in gateways.items():
         status = gw.get("status", "offline")
-        status_class = "online" if status == "online" else "offline"
-        status_text = "在线" if status == "online" else "离线"
+        is_online = status == "online"
+        dot_cls = "dot-on" if is_online else "dot-off"
+        status_text = "在线" if is_online else "离线"
         cards.append(f"""
-        <div class="card {status_class}" onclick="window.open('{gw.get('url', '')}', '_blank')">
-            <div class="card-icon">{gw.get('icon', '🔗')}</div>
-            <div class="card-name">{gw.get('name', gid)}</div>
-            <div class="card-desc">{gw.get('description', '')}</div>
-            <div class="card-status">{status_text} · 端口 {gw.get('port', '?')}</div>
+        <div class="gw-card" onclick="window.open('{gw.get('url', '')}', '_blank')">
+            <div class="gw-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
+            </div>
+            <div class="gw-body">
+                <div class="gw-name">{gw.get('name', gid)}</div>
+                <div class="gw-desc">{gw.get('description', '')}</div>
+                <div class="gw-status"><span class="status-dot {dot_cls}"></span>{status_text} · 端口 {gw.get('port', '?')}</div>
+            </div>
         </div>""")
 
-    cards_html = "\n".join(cards) if cards else '<p style="color:#888">暂无已注册的网关</p>'
+    cards_html = "\n".join(cards) if cards else '<p class="empty">暂无已注册的网关</p>'
 
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -109,57 +119,187 @@ async def index():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI Hub — 中央导航</title>
+<link rel="stylesheet" href="/static/theme.css">
+<link rel="stylesheet" href="/static/nav-skins.css">
+<script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'light')</script>
 <style>
-* {{ margin:0; padding:0; box-sizing:border-box; }}
-body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-       background:#0a0a0f; color:#e0e0e0; min-height:100vh; padding:40px; }}
-.header {{ text-align:center; margin-bottom:48px; }}
-.header h1 {{ font-size:32px; font-weight:700; color:#fff; margin-bottom:8px; }}
-.header p {{ color:#888; font-size:14px; }}
-.grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
-         gap:20px; max-width:1200px; margin:0 auto; }}
-.card {{ background:#14141f; border:1px solid #222; border-radius:16px;
-         padding:24px; cursor:pointer; transition:all .2s; }}
-.card:hover {{ border-color:#444; transform:translateY(-2px); }}
-.card.online {{ border-left:3px solid #4ade80; }}
-.card.offline {{ border-left:3px solid #666; opacity:.6; }}
-.card-icon {{ font-size:32px; margin-bottom:12px; }}
-.card-name {{ font-size:18px; font-weight:600; color:#fff; margin-bottom:6px; }}
-.card-desc {{ font-size:13px; color:#888; margin-bottom:12px; }}
-.card-status {{ font-size:12px; color:#666; }}
-.footer {{ text-align:center; margin-top:48px; color:#444; font-size:12px; }}
-.section-title {{ text-align:center; margin:34px auto 16px; color:#888; font-size:12px; letter-spacing:2px; }}
-.app-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px; max-width:1200px; margin:0 auto; }}
-.app-card {{ background:#14141f; border:1px solid #2a2a3a; border-radius:16px; padding:24px; cursor:pointer; transition:all .2s; border-top:3px solid #c06a3f; }}
-.app-card:hover {{ border-color:#c06a3f; transform:translateY(-2px); }}
+  body {{ padding: 0 24px 64px; }}
+  .theme-toggle {{ position: fixed; top: 24px; right: 24px; z-index: 200; box-shadow: var(--shadow-sm); }}
+  .hero {{ text-align: center; padding: 112px 0 64px; max-width: 980px; margin: 0 auto; }}
+  .hero h1 {{ font-size: 56px; font-weight: 700; letter-spacing: -0.015em; color: var(--text-primary); margin-bottom: 16px; }}
+  .hero p {{ font-size: 21px; color: var(--text-secondary); font-weight: 400; max-width: 640px; margin: 0 auto 32px; line-height: 1.4; }}
+  .hero .cta {{ display: inline-flex; align-items: center; gap: 8px; }}
+  .hero .meta {{ margin-top: 14px; font-size: 14px; color: var(--text-tertiary); }}
+
+  .section {{ max-width: 1080px; margin: 0 auto 64px; }}
+  .section-label {{ font-size: 12px; font-weight: 600; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }}
+  .section-title {{ font-size: 32px; font-weight: 700; letter-spacing: -0.01em; color: var(--text-primary); margin-bottom: 32px; }}
+
+  .app-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }}
+  .app-card {{ background: var(--bg-elevated); border: 1px solid var(--line); border-radius: var(--radius-lg);
+              padding: 32px; cursor: pointer; transition: transform var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease); box-shadow: var(--shadow-sm); }}
+  .app-card:hover {{ transform: translateY(-3px); border-color: var(--line-strong); }}
+  .app-card .ico {{ width: 40px; height: 40px; color: var(--accent); margin-bottom: 20px; }}
+  .app-card .ico svg {{ width: 40px; height: 40px; }}
+  .app-card h3 {{ font-size: 21px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }}
+  .app-card p {{ font-size: 14px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 16px; }}
+  .app-card .tag {{ font-size: 12px; color: var(--text-tertiary); }}
+
+  .gw-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }}
+  .gw-card {{ display: flex; gap: 16px; background: var(--bg-elevated); border: 1px solid var(--line);
+             border-radius: var(--radius-lg); padding: 20px 24px; cursor: pointer; transition: transform var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease); box-shadow: var(--shadow-sm); }}
+  .gw-card:hover {{ transform: translateY(-2px); border-color: var(--line-strong); }}
+  .gw-icon {{ width: 40px; height: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+             background: var(--bg-subtle); border-radius: var(--radius-md); color: var(--accent); }}
+  .gw-icon svg {{ width: 22px; height: 22px; }}
+  .gw-body {{ flex: 1; min-width: 0; }}
+  .gw-name {{ font-size: 17px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }}
+  .gw-desc {{ font-size: 13px; color: var(--text-secondary); line-height: 1.45; margin-bottom: 10px; }}
+  .gw-status {{ display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-tertiary); }}
+  .status-dot {{ width: 7px; height: 7px; border-radius: 50%; }}
+  .dot-on {{ background: var(--success); }}
+  .dot-off {{ background: var(--danger); }}
+  .empty {{ color: var(--text-tertiary); font-size: 14px; }}
+
+  .footer {{ text-align: center; padding: 32px 0 0; border-top: 1px solid var(--line); max-width: 1080px; margin: 0 auto;
+            font-size: 14px; color: var(--text-tertiary); }}
+  .footer a {{ color: var(--text-secondary); }}
+  @media (max-width: 734px) {{
+    .hero h1 {{ font-size: 40px; }}
+    .hero p {{ font-size: 17px; }}
+    body {{ padding: 0 16px 48px; }}
+  }}
 </style>
 </head>
 <body>
-<div class="header">
-    <h1>🌐 AI Hub</h1>
-    <p>统一 AI 聚合管理平台 · 中央导航</p>
-    <a href="/dashboard/index.html" style="display:inline-block;margin-top:18px;padding:11px 26px;background:#c06a3f;color:#fff;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600;letter-spacing:.5px;">📊 进入管理面板</a>
-    <p style="margin-top:10px;font-size:12px;color:#666;">网关管理 · GitHub 项目 · 飞书同步 · 统计分析 · 资源清单</p>
-</div>
-<div class="section-title">— 应用 · AI 工具 —</div>
-<div class="app-grid">
-    <div class="app-card" onclick="window.open('/ai-canvas/index.html','_blank')">
-        <div class="card-icon">🎨</div>
-        <div class="card-name">AI 画布</div>
-        <div class="card-desc">白板画图 → AI 识别 → 生成动态图解</div>
-        <div class="card-status">应用 · 接真实 AI</div>
-    </div>
-    <div class="app-card" onclick="window.open('/word-cloze/index.html','_blank')">
-        <div class="card-icon">✍️</div>
-        <div class="card-name">词境挖空</div>
-        <div class="card-desc">把喜欢的内容变成填空练习，主动写出来</div>
-        <div class="card-status">应用 · AI 内容供给</div>
+<button class="theme-toggle" id="theme-toggle" aria-label="切换深色模式" title="切换深色模式">
+    <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+</button>
+<section class="hero">
+    <h1>AI Hub</h1>
+    <p>统一 AI 聚合管理平台 · 把你的每一个 AI 能力收拢到一个入口</p>
+    <a href="/dashboard/index.html" class="btn-primary cta">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        进入管理面板
+    </a>
+    <div class="meta">网关管理 · GitHub 项目 · 飞书同步 · 统计分析 · 资源清单</div>
+</section>
+
+<div class="section">
+    <div class="section-label">应用</div>
+    <div class="section-title">AI 工具</div>
+    <div class="app-grid">
+        <div class="app-card" onclick="window.open('/ai-canvas/index.html','_blank')">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7-3-3-7 7v3h3z"/><path d="M5 21h14"/></svg></div>
+            <h3>AI 画布</h3>
+            <p>白板画图 → AI 识别 → 生成动态图解。在无限白板上自由画写，让 AI 把抽象概念画成动态图给你看。</p>
+            <span class="tag">应用 · 接真实 AI</span>
+        </div>
+        <div class="app-card" onclick="window.open('/word-cloze/index.html','_blank')">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M4 20V6a2 2 0 012-2h12a2 2 0 012 2v14M9 10h6M9 14h4"/></svg></div>
+            <h3>词境挖空</h3>
+            <p>把喜欢的内容变成填空练习，主动写出来比认出来记得更牢。AI 供给内容、随机挖空、即时判定。</p>
+            <span class="tag">应用 · AI 内容供给</span>
+        </div>
     </div>
 </div>
 
-<div class="section-title">— 网关 —</div>
-<div class="grid">{cards_html}</div>
-<div class="footer">AI Hub v1.0 · 局域网模式 · <a href="/dashboard/index.html" style="color:#c06a3f">管理面板</a> · <a href="/docs" style="color:#666">API 文档</a></div>
+<div class="section">
+    <div class="section-label">网关</div>
+    <div class="section-title">已接入节点</div>
+    <div class="gw-grid">{cards_html}</div>
+</div>
+
+<div class="section">
+    <div class="section-label">数据</div>
+    <div class="section-title">多维表格管理</div>
+    <div id="bases-grid" class="gw-grid">
+        <p class="empty">加载中...</p>
+    </div>
+    <div style="margin-top: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+        <button class="btn-secondary" onclick="refreshBases()" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-elevated); color: var(--text-primary); cursor: pointer; font-size: 14px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9h-4m-5 9a9 9 0 0 1-9-9m9 9v-4m-9-5a9 9 0 0 1 9-9m-9 9h4m5-9v4"/></svg>
+            刷新
+        </button>
+        <button class="btn-secondary" onclick="showAddBase()" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-elevated); color: var(--text-primary); cursor: pointer; font-size: 14px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            添加 Base
+        </button>
+        <span id="bases-status" style="font-size: 13px; color: var(--text-tertiary);"></span>
+    </div>
+</div>
+
+<script>
+async function loadBases() {{
+    try {{
+        const r = await fetch('/api/bases');
+        const data = await r.json();
+        const grid = document.getElementById('bases-grid');
+        if (!data.bases || data.bases.length === 0) {{
+            grid.innerHTML = '<p class="empty">暂无已记录的多维表格</p>';
+            return;
+        }}
+        let html = '';
+        for (let i = 0; i < data.bases.length; i++) {{
+            const b = data.bases[i];
+            const tables = (b.tables || []).join(' · ');
+            html += '<div class="gw-card" style="cursor: default;">'
+                + '<div class="gw-icon" style="color: var(--success);">'
+                + '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>'
+                + '</div><div class="gw-body">'
+                + '<div class="gw-name">' + (b.name || b.token) + '</div>'
+                + '<div class="gw-desc">' + (b.description || '') + '</div>'
+                + '<div class="gw-status" style="margin-top: 6px;">'
+                + '<span style="font-size: 11px; background: var(--bg-subtle); padding: 2px 8px; border-radius: 4px; color: var(--text-tertiary);">' + b.token + '</span>'
+                + (tables ? '<span style="font-size: 11px; color: var(--text-tertiary); margin-left: 8px;">' + tables + '</span>' : '')
+                + '<button onclick="deleteBase(\'' + b.token + '\')" style="margin-left: auto; background: none; border: none; color: var(--danger); cursor: pointer; font-size: 12px; opacity: 0.6;">删除</button>'
+                + '</div></div></div>';
+        }}
+        grid.innerHTML = html;
+        document.getElementById('bases-status').textContent = '共 ' + data.bases.length + ' 个 Base · ' + (data.updated_at || '');
+    }} catch(e) {{
+        document.getElementById('bases-grid').innerHTML = '<p class="empty">加载失败</p>';
+    }}
+}}
+
+async function refreshBases() {{
+    const btn = event.target.closest('button');
+    btn.disabled = true; btn.textContent = '刷新中...';
+    try {{
+        const r = await fetch('/api/bases/refresh', {{ method: 'POST' }});
+        const data = await r.json();
+        document.getElementById('bases-status').textContent = '✅ ' + (data.message || '已刷新');
+        loadBases();
+    }} catch(e) {{
+        document.getElementById('bases-status').textContent = '❌ 刷新失败';
+    }}
+    btn.disabled = false; btn.innerHTML = '... 刷新';
+}}
+
+async function deleteBase(token) {{
+    if (!confirm('确定删除这个 Base 记录？')) return;
+    await fetch('/api/bases/' + token, {{ method: 'DELETE' }});
+    loadBases();
+}}
+
+function showAddBase() {{
+    const token = prompt('输入 Base Token：');
+    if (!token) return;
+    const name = prompt('输入名称（可选）：');
+    fetch('/api/bases', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ token: token, name: name || undefined }})
+    }}).then(function() {{ loadBases(); }});
+}}
+
+loadBases();
+</script>
+
+<div class="footer">AI Hub v1.0 · 局域网模式 · <a href="/dashboard/index.html">管理面板</a> · <a href="/docs">API 文档</a></div>
+<script src="/static/theme-toggle.js"></script>
+<script src="/static/nav-skins.js"></script>
 </body>
 </html>"""
 
@@ -416,6 +556,120 @@ async def stats():
         "online_gateways": online,
         "offline_gateways": len(gateways) - online,
     }
+
+
+# ---------------------------------------------------------------- 多维表格管理
+
+BASES_JSON = CONFIG_DIR / "bases.json"
+
+# 已知初始数据（从记忆中恢复）
+SEED_BASES = [
+    {
+        "token": "RaqVbiwkbaCh5csWhO0c6Wagnlc",
+        "name": "技能注册中心",
+        "description": "Agent 技能注册与安装状态管理",
+        "tables": ["技能注册表", "Agent安装状态"],
+        "source": "memory"
+    },
+    {
+        "token": "StmDbTXQWaujshs9NpIc3UFpnAc",
+        "name": "ai-resource-hub 数据桥",
+        "description": "AI 资源公开数据桥（工具资产/能力规格/实例）",
+        "tables": ["工具资产明细表", "资源能力规格表", "资源实例表"],
+        "source": "memory"
+    },
+    {
+        "token": "K15hbHNwtaY3BWs1STLcG092n4g",
+        "name": "英语学习系统",
+        "description": "英语学习追踪（词汇/学习日志/计划）",
+        "tables": ["learning-log", "vocabulary", "学习计划表"],
+        "source": "memory"
+    }
+]
+
+
+def get_bases():
+    data = load_json(BASES_JSON, {"bases": []})
+    # 首次启动时种子数据
+    if not data.get("bases"):
+        data["bases"] = SEED_BASES
+        data["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+        save_json(BASES_JSON, data)
+    return data
+
+
+def save_bases(data):
+    data["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    save_json(BASES_JSON, data)
+
+
+@app.get("/api/bases")
+async def list_bases():
+    """列出所有已记录的多维表格。"""
+    return get_bases()
+
+
+@app.post("/api/bases")
+async def add_base(request: Request):
+    """手动添加一个多维表格。"""
+    body = await request.json()
+    token = body.get("token", "")
+    if not token:
+        raise HTTPException(400, "缺少 base token")
+    data = get_bases()
+    # 去重
+    for b in data["bases"]:
+        if b["token"] == token:
+            b.update({k: v for k, v in body.items() if v})
+            b["source"] = "manual"
+            save_bases(data)
+            return {"ok": True, "token": token, "action": "updated"}
+    data["bases"].append({
+        "token": token,
+        "name": body.get("name", token),
+        "description": body.get("description", ""),
+        "tables": body.get("tables", []),
+        "source": "manual",
+    })
+    save_bases(data)
+    return {"ok": True, "token": token, "action": "added"}
+
+
+@app.delete("/api/bases/{token}")
+async def delete_base(token: str):
+    """删除一个多维表格记录。"""
+    data = get_bases()
+    data["bases"] = [b for b in data["bases"] if b["token"] != token]
+    save_bases(data)
+    return {"ok": True}
+
+
+@app.post("/api/bases/refresh")
+async def refresh_bases():
+    """尝试通过飞书 API 发现更多多维表格（需要用户登录态）。"""
+    import subprocess
+    # 尝试通过 lark-cli 探测已知 base 的详情
+    data = get_bases()
+    lark = os.path.expandvars(r"%APPDATA%\npm\lark-cli.cmd")
+    home = os.path.expandvars(r"%USERPROFILE%")
+    for b in data["bases"]:
+        try:
+            env = os.environ.copy()
+            env["HOME"] = home
+            env["USERPROFILE"] = home
+            r = subprocess.run(
+                [lark, "base", "+base-get", "--base-token", b["token"], "--format", "json"],
+                capture_output=True, text=True, timeout=15, env=env
+            )
+            if r.returncode == 0:
+                info = json.loads(r.stdout)
+                if info.get("ok") and info.get("data"):
+                    b["name"] = info["data"].get("name", b["name"])
+                    b["description"] = info["data"].get("description", b.get("description", ""))
+        except Exception:
+            pass
+    save_bases(data)
+    return {"ok": True, "count": len(data["bases"]), "message": "已刷新 Base 信息，可用飞书 CLI 补充更多"}
 
 
 # ---------------------------------------------------------------- 启动

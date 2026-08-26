@@ -1,0 +1,306 @@
+/* =====================================================================
+   AI Hub · Apple-Style Design System (theme.css)
+   唯一真源：design tokens + 组件类。4 个前端统一引用。
+   「白、留白、细线、大字、一个蓝」。
+   ===================================================================== */
+
+/* ---------- Design Tokens（§2，一字不差） ---------- */
+:root {
+  /* 背景 */
+  --bg: #ffffff;
+  --bg-subtle: #f5f5f7;
+  --bg-elevated: #ffffff;
+
+  /* 文字 */
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #86868b;
+
+  /* 强调色（唯一主色） */
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --accent-subtle: #e8f1fd;
+
+  /* 语义色（仅状态） */
+  --success: #34c759;
+  --danger: #ff3b30;
+  --warning: #ff9f0a;
+
+  /* 线条 */
+  --line: #d2d2d7;
+  --line-strong: #86868b;
+
+  /* 字体 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    "SF Pro Text", "Helvetica Neue", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+
+  /* 间距（8pt 网格） */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-6: 24px; --sp-8: 32px; --sp-12: 48px; --sp-16: 64px; --sp-24: 96px;
+
+  /* 圆角 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 28px;
+
+  /* 阴影（克制） */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+
+  /* 动效 */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-fast: 0.15s;
+  --duration: 0.3s;
+
+  /* ---- legacy 别名：dashboard/app.js 内联样式仍用旧名，映射到苹果色 ---- */
+  --primary: var(--accent);
+  --primary-hover: var(--accent-hover);
+  --primary-glow: rgba(0,113,227,0.18);
+  --bg-main: var(--bg);
+  --bg-card: var(--bg-elevated);
+  --bg-card-hover: var(--bg-subtle);
+  --bg-sidebar: var(--bg);
+  --border-color: var(--line);
+  --border-highlight: var(--line-strong);
+  --text-main: var(--text-primary);
+  --text-muted: var(--text-secondary);
+  --text-dim: var(--text-tertiary);
+  --emerald: var(--success);
+  --emerald-bg: rgba(52,199,89,0.12);
+  --rose: var(--danger);
+  --rose-bg: rgba(255,59,48,0.10);
+  --amber: var(--warning);
+  --shadow-card: var(--shadow-sm);
+  --transition: all var(--duration-fast) var(--ease);
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+}
+
+/* ---------- 深色模式（data-theme="dark" 切换） ---------- */
+:root[data-theme="dark"] {
+  --bg: #000000;
+  --bg-subtle: #1d1d1f;
+  --bg-elevated: #1d1d1f;
+  --text-primary: #f5f5f7;
+  --text-secondary: #a1a1a6;
+  --text-tertiary: #86868b;
+  --accent: #2997ff;
+  --accent-hover: #5ab0ff;
+  --accent-subtle: rgba(41,151,255,0.16);
+  --line: #424245;
+  --line-strong: #6e6e73;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.5);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.6);
+  /* legacy 别名同步 */
+  --bg-main: var(--bg);
+  --bg-card: var(--bg-elevated);
+  --bg-card-hover: #2a2a2c;
+  --bg-sidebar: var(--bg);
+  --border-color: var(--line);
+  --border-highlight: var(--line-strong);
+  --text-main: var(--text-primary);
+  --text-muted: var(--text-secondary);
+  --text-dim: var(--text-tertiary);
+}
+
+/* ---------- 基础重置 ---------- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* =====================================================================
+   组件类（§3，所有页面复用同一套类名）
+   ===================================================================== */
+
+/* ---------- 按钮（§3.1） ---------- */
+.btn-primary,
+.btn-secondary,
+.btn-ghost,
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: 9999px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  outline: none;
+  transition: all var(--duration-fast) var(--ease);
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+.btn-primary:active { transform: scale(0.98); }
+
+.btn-secondary {
+  background: var(--bg);
+  color: var(--text-primary);
+  border-color: var(--line);
+}
+.btn-secondary:hover {
+  background: var(--bg-subtle);
+  border-color: var(--line-strong);
+}
+.btn-secondary:active { transform: scale(0.98); }
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent);
+  padding: 10px 16px;
+}
+.btn-ghost:hover {
+  background: var(--accent-subtle);
+  text-decoration: none;
+}
+
+.btn-danger {
+  background: var(--bg);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.btn-danger:hover { background: var(--rose-bg); }
+
+/* ---------- 卡片（§3.2） ---------- */
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-fast) var(--ease),
+              border-color var(--duration-fast) var(--ease);
+}
+.card:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-strong);
+}
+
+/* ---------- 顶部导航（§3.3 毛玻璃） ---------- */
+.nav-blur {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 52px;
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--line);
+  z-index: 100;
+}
+:root[data-theme="dark"] .nav-blur {
+  background: rgba(0,0,0,0.72);
+}
+
+/* ---------- 表格（§3.4） ---------- */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.data-table th {
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--line);
+}
+.data-table td {
+  padding: 12px 16px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-primary);
+}
+.data-table tbody tr:hover { background: var(--bg-subtle); }
+
+/* ---------- 表单（§3.5） ---------- */
+.form-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease),
+              box-shadow var(--duration-fast) var(--ease);
+}
+.form-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+.form-input::placeholder { color: var(--text-tertiary); }
+
+/* ---------- 状态徽章（浅底深字，克制） ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.badge.online  { background: var(--emerald-bg); color: var(--success); }
+.badge.offline { background: var(--bg-subtle); color: var(--text-tertiary); }
+.badge.warning { background: rgba(255,159,10,0.12); color: var(--warning); }
+.badge.danger  { background: var(--rose-bg); color: var(--danger); }
+.badge.info    { background: var(--accent-subtle); color: var(--accent); }
+
+/* ---------- 通用文本色类 ---------- */
+.text-emerald { color: var(--success); }
+.text-rose    { color: var(--danger); }
+.text-muted   { color: var(--text-secondary); }
+
+/* ---------- 主题切换按钮（首页 / dashboard 共用） ---------- */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all var(--duration-fast) var(--ease);
+  flex-shrink: 0;
+  outline: none;
+}
+.theme-toggle:hover {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+  border-color: var(--line-strong);
+}
+.theme-toggle:active { transform: scale(0.95); }
+.theme-toggle svg { width: 18px; height: 18px; }
+.theme-toggle .sun { display: none; }
+.theme-toggle .moon { display: inline; }
+:root[data-theme="dark"] .theme-toggle .sun { display: inline; }
+:root[data-theme="dark"] .theme-toggle .moon { display: none; }

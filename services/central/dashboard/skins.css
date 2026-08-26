@@ -1,0 +1,100 @@
+/* =====================================================================
+   AI Hub 控制台(:8000) · 多风格皮肤层（规范见 D:\项目\services\THEME_GUIDE.md）
+   覆盖对象：/static/theme.css 的 token（本文件在两 CSS 之后加载，同名变量胜出）
+   皮肤集：apple(默认·现状) / huawei 华为 / xiaomi 小米 / xiuxian 修仙 / midnight 暗夜
+   ===================================================================== */
+
+/* ── 华为商务：科技蓝渐变 + 网格 + 方正 ── */
+html[data-skin="huawei"]{
+  --bg:#e9eff8; --bg-subtle:#dfe7f3; --bg-elevated:#ffffff; --bg-sidebar:#f4f7fc;
+  --text-primary:#0b2a4a; --text-secondary:#41546e; --text-tertiary:#6c7f97;
+  --accent:#007dff; --accent-hover:#0066cc; --accent-subtle:#e3edff;
+  --line:#c5d3e8; --line-strong:#8fa5c2;
+  --radius-sm:6px; --radius-md:8px; --radius-lg:10px; --radius-xl:14px;
+  --primary-glow:rgba(0,125,255,.16);
+  --shadow-md:0 4px 18px rgba(9,30,66,.14);
+  --shadow-lg:0 14px 36px rgba(9,30,66,.22);
+}
+html[data-skin="huawei"] body{
+  background:
+    linear-gradient(rgba(0,125,255,.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,125,255,.04) 1px,transparent 1px),
+    #e9eff8;
+  background-size:34px 34px,34px 34px,auto;
+}
+
+/* ── 小米活力：暖白 + 橙 + 大圆角 ── */
+html[data-skin="xiaomi"]{
+  --bg:#fff7f0; --bg-subtle:#ffefdf; --bg-elevated:#ffffff; --bg-sidebar:#fffaf5;
+  --accent:#ff6900; --accent-hover:#e55e00; --accent-subtle:#ffe8d9;
+  --line:#ffd9bd;
+  --radius-sm:12px; --radius-md:16px; --radius-lg:20px; --radius-xl:26px;
+  --primary-glow:rgba(255,105,0,.15);
+}
+html[data-skin="xiaomi"] body{
+  background:
+    radial-gradient(900px 320px at 15% -6%,rgba(255,105,0,.13),transparent 60%),
+    radial-gradient(700px 300px at 90% -4%,rgba(255,180,80,.11),transparent 55%),
+    #fff7f0;
+}
+html[data-skin="xiaomi"] .btn-primary{
+  background:linear-gradient(135deg,#ff8a2a,#ff6900)!important;
+  border-radius:999px!important;font-weight:800;
+}
+html[data-skin="xiaomi"] .btn-primary:active{transform:scale(.94);}
+
+/* ── 修道仙侠：宣纸 + 墨 + 朱砂，楷体 ── */
+html[data-skin="xiuxian"]{
+  --bg:#f3ede1; --bg-subtle:#ece4d2; --bg-elevated:#faf6ec; --bg-sidebar:#f6f0e3;
+  --text-primary:#2b2b28; --text-secondary:#5d564a; --text-tertiary:#7a7263;
+  --accent:#a03a2a; --accent-hover:#8a2f21; --accent-subtle:rgba(160,58,42,.10);
+  --line:#d8cdb4; --line-strong:#b3a586;
+  --radius-sm:4px; --radius-md:6px; --radius-lg:8px; --radius-xl:10px;
+  --font-sans:"KaiTi","STKaiti","楷体","SimSun",serif;
+}
+html[data-skin="xiuxian"] .sidebar{border-right-color:#d8cdb4;}
+html[data-skin="xiuxian"] .brand-info h2{letter-spacing:.12em;}
+
+/* ── 科技暗夜：星空 + 青/紫霓虹（叠加在深色模式上亦成立） ── */
+html[data-skin="midnight"]{
+  --bg:#0b1020; --bg-subtle:#111735; --bg-elevated:#141a2e; --bg-sidebar:#0e1428;
+  --text-primary:#e6ecff; --text-secondary:#aab4dd; --text-tertiary:#8b96c2;
+  --accent:#22d3ee; --accent-hover:#67e8f9; --accent-subtle:rgba(34,211,238,.14);
+  --line:#2a3555; --line-strong:#42508a;
+  --shadow-md:0 4px 18px rgba(0,0,0,.5);
+  --shadow-lg:0 14px 40px rgba(0,0,0,.6);
+}
+html[data-skin="midnight"] body::after{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    radial-gradient(1.4px 1.4px at 12% 22%,rgba(255,255,255,.7),transparent 55%),
+    radial-gradient(1.2px 1.2px at 68% 12%,rgba(160,200,255,.65),transparent 55%),
+    radial-gradient(1.6px 1.6px at 84% 64%,rgba(255,255,255,.55),transparent 55%),
+    radial-gradient(1.1px 1.1px at 32% 78%,rgba(190,170,255,.6),transparent 55%);
+}
+
+/* ── 悬浮切换坞 ── */
+#skin-dock{position:fixed;right:18px;bottom:76px;z-index:900;display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+#skin-fab{
+  width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;font-size:19px;
+  background:var(--bg-elevated);color:var(--text-primary);box-shadow:var(--shadow-md);
+  transition:transform .15s;
+}
+#skin-fab:hover{transform:scale(1.12) rotate(10deg);}
+#skin-menu{
+  display:none;flex-direction:column;gap:5px;padding:9px;border-radius:14px;
+  background:var(--bg-elevated);border:1px solid var(--line);box-shadow:var(--shadow-lg);
+}
+#skin-menu.open{display:flex;}
+.skin-chip{
+  display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:9px;border:1.5px solid transparent;
+  background:transparent;cursor:pointer;font-size:13px;font-weight:700;color:var(--text-primary);white-space:nowrap;
+}
+.skin-chip:hover{background:var(--accent-subtle);}
+.skin-chip.on{border-color:var(--accent);background:var(--accent-subtle);}
+#skin-toast{
+  position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);z-index:999;
+  padding:9px 20px;border-radius:999px;background:var(--text-primary);color:var(--bg-elevated);
+  font-size:13px;font-weight:700;opacity:0;pointer-events:none;transition:all .25s;
+}
+#skin-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}

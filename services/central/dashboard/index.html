@@ -6,6 +6,7 @@
     <title>AI Hub — 控制台</title>
     <link rel="stylesheet" href="/static/theme.css">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="skins.css">
     <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'light')</script>
 </head>
 <body>
@@ -386,5 +387,50 @@
 
     <script src="/static/theme-toggle.js"></script>
     <script src="app.js"></script>
+    <!-- ═════════ 多风格皮肤切换器（规范见 D:\项目\services\THEME_GUIDE.md）═════════ -->
+    <div id="skin-dock">
+      <div id="skin-menu"></div>
+      <button id="skin-fab" title="切换界面风格">🎨</button>
+    </div>
+    <div id="skin-toast"></div>
+    <script>
+    (function(){
+      const SKINS=[
+        {id:'apple',   name:'苹果极简', icon:'🍎'},
+        {id:'huawei',  name:'华为商务', icon:'🔵'},
+        {id:'xiaomi',  name:'小米活力', icon:'🧡'},
+        {id:'xiuxian', name:'修道仙侠', icon:'☯'},
+        {id:'midnight',name:'科技暗夜', icon:'🌌'},
+      ];
+      const KEY='cd-skin';
+      const menu=document.getElementById('skin-menu'), fab=document.getElementById('skin-fab');
+      menu.innerHTML=SKINS.map(s=>
+        '<button class="skin-chip" data-skin="'+s.id+'">'+s.icon+' '+s.name+'</button>'
+      ).join('');
+      fab.addEventListener('click',()=>menu.classList.toggle('open'));
+      document.addEventListener('click',e=>{
+        if(!document.getElementById('skin-dock').contains(e.target))menu.classList.remove('open');
+      });
+      let _st=null;
+      function showToast(msg){
+        const t=document.getElementById('skin-toast');
+        t.textContent=msg;t.classList.add('show');
+        clearTimeout(_st);_st=setTimeout(()=>t.classList.remove('show'),1600);
+      }
+      function apply(id,quiet){
+        document.documentElement.setAttribute('data-skin',id);
+        try{localStorage.setItem(KEY,id);}catch(e){}
+        menu.querySelectorAll('.skin-chip').forEach(c=>c.classList.toggle('on',c.dataset.skin===id));
+        fab.textContent=id==='xiuxian'?'☯':'🎨';
+        if(!quiet){const s=SKINS.find(x=>x.id===id);showToast((s?s.icon+' ':'')+'已切换：'+(s?s.name:id));}
+      }
+      menu.addEventListener('click',e=>{
+        const c=e.target.closest('.skin-chip');if(c)apply(c.dataset.skin);
+      });
+      let cur='apple';
+      try{cur=localStorage.getItem(KEY)||'apple';}catch(e){}
+      apply(cur,true);
+    })();
+    </script>
 </body>
 </html>

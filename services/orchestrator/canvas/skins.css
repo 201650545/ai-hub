@@ -1,0 +1,103 @@
+/* =====================================================================
+   :8791 编排器画布 · 多风格皮肤层（规范见 D:\项目\services\THEME_GUIDE.md）
+   纯 token 覆盖：styles.css 全部走 CSS 变量，这里只换变量 + 少量装饰
+   皮肤集：apple(默认·现状) / midnight 科技暗夜 / xiuxian 修道仙侠
+   ===================================================================== */
+
+/* ── 科技暗夜：星空底 + 青/紫霓虹 ── */
+html[data-skin="midnight"]{
+  --bg-dark:#0b1020;
+  --bg-card:#141a2e;
+  --bg-card-hover:#1b2340;
+  --border-card:#2a3555;
+  --text-main:#e6ecff;
+  --text-muted:#8b96c2;
+  --primary:#22d3ee;
+  --primary-hover:#67e8f9;
+  --primary-glow:rgba(34,211,238,.18);
+  --green:#34d399;
+  --amber:#fbbf24;
+  --red:#fb7185;
+  --shadow-card:0 6px 22px rgba(0,0,0,.55);
+}
+html[data-skin="midnight"] body::after{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    radial-gradient(1.4px 1.4px at 12% 22%,rgba(255,255,255,.7),transparent 55%),
+    radial-gradient(1.2px 1.2px at 68% 12%,rgba(160,200,255,.65),transparent 55%),
+    radial-gradient(1.6px 1.6px at 84% 64%,rgba(255,255,255,.55),transparent 55%),
+    radial-gradient(1.1px 1.1px at 32% 78%,rgba(190,170,255,.6),transparent 55%),
+    radial-gradient(1.3px 1.3px at 52% 44%,rgba(255,255,255,.4),transparent 55%),
+    radial-gradient(1px 1px at 8% 58%,rgba(140,220,255,.5),transparent 55%);
+  animation:orch-twinkle 5s ease-in-out infinite alternate;
+}
+@keyframes orch-twinkle{from{opacity:.55}to{opacity:1}}
+html[data-skin="midnight"] .top-header,
+html[data-skin="midnight"] .sidebar-logs,
+html[data-skin="midnight"] .bottom-bar{
+  background:rgba(20,26,46,.82)!important;
+  border-color:#2a3555!important;
+}
+
+/* ── 修道仙侠：宣纸米 + 墨 + 朱砂，楷体 ── */
+html[data-skin="xiuxian"]{
+  --bg-dark:#f3ede1;
+  --bg-card:#faf6ec;
+  --bg-card-hover:#f1ead9;
+  --border-card:#d8cdb4;
+  --text-main:#2b2b28;
+  --text-muted:#7a7263;
+  --primary:#a03a2a;
+  --primary-hover:#8a2f21;
+  --primary-glow:rgba(160,58,42,.13);
+  --green:#5a7247;
+  --amber:#b07a2a;
+  --red:#a03a2a;
+  --shadow-card:0 3px 14px rgba(90,75,45,.16);
+}
+html[data-skin="xiuxian"] body,
+html[data-skin="xiuxian"] .brand-title,
+html[data-skin="xiuxian"] .gallery-page h1{
+  font-family:"KaiTi","STKaiti","楷体","SimSun",serif;
+}
+html[data-skin="xiuxian"] body{
+  background:
+    radial-gradient(720px 300px at 50% -120px,rgba(160,58,42,.06),transparent 60%),
+    #f3ede1;
+}
+html[data-skin="xiuxian"] .top-header,
+html[data-skin="xiuxian"] .bottom-bar{
+  background:rgba(250,246,236,.94)!important;
+  border-color:#d8cdb4!important;
+  box-shadow:inset 0 2px 0 rgba(160,58,42,.25)!important;
+}
+html[data-skin="xiuxian"] .brand-title span{color:#a03a2a!important;}
+html[data-skin="xiuxian"] .step-item.active{color:#a03a2a!important;}
+html[data-skin="xiuxian"] .sample-card,
+html[data-skin="xiuxian"] .site-tag{border-radius:6px;}
+
+/* ── 悬浮切换坞（两页共用） ── */
+#skin-dock{position:fixed;right:16px;bottom:76px;z-index:900;display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+#skin-fab{
+  width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;font-size:19px;
+  background:var(--bg-card);color:var(--text-main);
+  box-shadow:var(--shadow-card);transition:transform .15s;
+}
+#skin-fab:hover{transform:scale(1.12) rotate(10deg);}
+#skin-menu{
+  display:none;flex-direction:column;gap:5px;padding:9px;border-radius:14px;
+  background:var(--bg-card);border:1px solid var(--border-card);box-shadow:var(--shadow-card);
+}
+#skin-menu.open{display:flex;}
+.skin-chip{
+  display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:9px;border:1.5px solid transparent;
+  background:transparent;cursor:pointer;font-size:13px;font-weight:700;color:var(--text-main);white-space:nowrap;
+}
+.skin-chip:hover{background:var(--primary-glow);}
+.skin-chip.on{border-color:var(--primary);background:var(--primary-glow);}
+#skin-toast{
+  position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);z-index:999;
+  padding:9px 20px;border-radius:999px;background:var(--text-main);color:var(--bg-card);
+  font-size:13px;font-weight:700;opacity:0;pointer-events:none;transition:all .25s;
+}
+#skin-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}

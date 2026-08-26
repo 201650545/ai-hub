@@ -149,6 +149,27 @@ html, body {
   align-content: start;
 }
 
+/* 空态（serve-only 无编排任务时引导，否则页面空白 = 用户眼中「打不开」） */
+.empty-state {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 64px 32px;
+  background: var(--bg-card);
+  border: 1px dashed var(--border-card);
+  border-radius: 16px;
+  color: var(--text-muted);
+  min-height: 320px;
+}
+.empty-state svg { color: var(--text-muted); opacity: 0.6; }
+.empty-state h2 { font-size: 21px; font-weight: 700; color: var(--text-main); }
+.empty-state p { font-size: 14px; max-width: 480px; line-height: 1.6; }
+.empty-state .hint { font-size: 13px; color: var(--text-muted); }
+
 /* 槽位状态卡片 */
 .slot-card {
   background: var(--bg-card);

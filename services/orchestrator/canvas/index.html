@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>组件编排器 —— AI 画布观察窗 UI</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="skins.css">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'light')</script>
 </head>
 <body>
@@ -16,6 +17,7 @@
   </div>
 
   <div class="top-right">
+    <a href="gallery.html" style="font-size:13px;color:var(--primary);font-weight:500;text-decoration:none;margin-right:8px;" tabindex="-1">🎨 美术资源</a>
     <div class="timeline-stepper" id="timeline-stepper">
       <div class="step-item active" id="step-framework"><div class="step-dot"></div>1. 框架生成</div>
       <div class="step-item" id="step-scan"><div class="step-dot"></div>2. 槽位扫描</div>
@@ -58,6 +60,7 @@
 
 <script src="mock_events.js"></script>
 <script src="app.js"></script>
+<script src="skins.js"></script>
 <script>
 (function(){
   var d=document.documentElement, b=document.getElementById('theme-toggle');

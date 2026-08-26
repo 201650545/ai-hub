@@ -7,6 +7,8 @@ let totalSlots = 5;
 let completedSlots = 0;
 let es = null;
 let receivedRealEvent = false;
+let demoStarted = false;
+let emptyTimer = null;
 
 const PHASES = ["framework", "scan", "asset_fill", "verify", "deliver"];
 
@@ -21,6 +23,7 @@ function initCanvas() {
       try {
         const d = JSON.parse(ev.data);
         receivedRealEvent = true;
+        if (emptyTimer) { clearTimeout(emptyTimer); emptyTimer = null; }
         if (d.event === 'stream_end') {
           es.close();
           updatePhaseTimeline('deliver');
@@ -31,20 +34,43 @@ function initCanvas() {
     };
     es.onerror = () => {
       es.close();
-      if (!receivedRealEvent) startMockStream();
+      if (!receivedRealEvent) showEmptyState();
     };
   } catch(e) {
-    if (!receivedRealEvent) startMockStream();
+    if (!receivedRealEvent) showEmptyState();
   }
+
+  // serve-only 模式：SSE 静默 keepalive 无事件 → 数秒后显示空态引导（否则页面一直空白 = 用户眼中的「打不开」）
+  emptyTimer = setTimeout(() => {
+    if (!receivedRealEvent) showEmptyState();
+  }, 4000);
 }
 
 function startMockStream() {
-  if (!window.MOCK_EVENT_SEQUENCE) return;
+  if (!window.MOCK_EVENT_SEQUENCE || demoStarted) return;
+  demoStarted = true;
   window.MOCK_EVENT_SEQUENCE.forEach((item, idx) => {
     setTimeout(() => {
       handleSSEEvent(item);
-    }, idx * 1800);
+    }, idx * 900);
   });
+}
+
+function startDemo() {
+  startMockStream();
+}
+
+function showEmptyState() {
+  const grid = document.getElementById('slot-grid');
+  if (receivedRealEvent || demoStarted || !grid) return;
+  grid.innerHTML = `
+    <div class="empty-state">
+      <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 10h18M8 2l1 2M16 2l1 2M7 14h4M7 17h8"/></svg>
+      <h2>暂无编排任务</h2>
+      <p>当前为常驻观察模式（serve-only）。编排器画布会实时直播课件生成的完整事件流：框架生成 → 槽位扫描 → 资产填充 → 规则校验 → 交付完工。</p>
+      <p class="hint">在终端启动一次编排任务（canvas_server.py --topic "主题" --lesson L27）即可看到真实事件流；下面是模拟演示。</p>
+      <button type="button" class="btn" onclick="startDemo()">▶ 运行演示流程</button>
+    </div>`;
 }
 
 function handleSSEEvent(data) {

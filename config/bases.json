@@ -1,0 +1,37 @@
+{
+  "bases": [
+    {
+      "token": "RaqVbiwkbaCh5csWhO0c6Wagnlc",
+      "name": "技能注册中心",
+      "description": "Agent 技能注册与安装状态管理",
+      "tables": [
+        "技能注册表",
+        "Agent安装状态"
+      ],
+      "source": "memory"
+    },
+    {
+      "token": "StmDbTXQWaujshs9NpIc3UFpnAc",
+      "name": "ai-resource-hub 数据桥",
+      "description": "AI 资源公开数据桥（工具资产/能力规格/实例）",
+      "tables": [
+        "工具资产明细表",
+        "资源能力规格表",
+        "资源实例表"
+      ],
+      "source": "memory"
+    },
+    {
+      "token": "K15hbHNwtaY3BWs1STLcG092n4g",
+      "name": "英语学习系统",
+      "description": "英语学习追踪（词汇/学习日志/计划）",
+      "tables": [
+        "learning-log",
+        "vocabulary",
+        "学习计划表"
+      ],
+      "source": "memory"
+    }
+  ],
+  "updated_at": "2026-08-21T09:28:30"
+}

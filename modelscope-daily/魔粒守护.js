@@ -168,7 +168,9 @@ function main() {
   while (attempt <= CFG.retry) {
     const url = attempt === 0 ? CFG.urls.primary : CFG.urls.fallback;
     log(`第 ${attempt + 1} 次唤起：${url}`);
-    const opened = browser(['open', url, '--window', 'background'], 120000);
+    // v1.8.6 起 open 不再支持 --window background（已静默忽略）；
+    // 默认即在新标签打开且不抢占焦点，行为与旧版一致，故去掉该僵尸 flag。
+    const opened = browser(['open', url], 120000);
     if (!opened.ok) {
       log('页面打开失败：' + opened.out.slice(0, 200));
       attempt++;

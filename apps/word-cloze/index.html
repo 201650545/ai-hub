@@ -4,85 +4,92 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>词境挖空 · 主动输出训练器</title>
+<link rel="stylesheet" href="/static/theme.css">
 <style>
-  :root{
-    --bg:#f4efe4; --card:#fffdf5; --ink:#2f2a21; --sub:#8a7f6a; --line:#e0d6c2;
-    --accent:#c06a3f; --accent-d:#9d5330; --sage:#5e7f62; --sage-d:#4a664e;
-    --ok:#27ae60; --err:#c0392b; --radius:14px;
-  }
+  /* tokens 复用 /static/theme.css；此处只放页面专属样式 */
   *{box-sizing:border-box; margin:0; padding:0;}
-  body{background:var(--bg); color:var(--ink); font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif; min-height:100vh;}
-  .wrap{max-width:820px; margin:0 auto; padding:18px 16px 60px;}
+  body{background:var(--bg); color:var(--text-primary);
+       font-family:var(--font-sans); min-height:100vh; -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:820px; margin:0 auto; padding:24px 16px 64px;}
 
-  header{display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; padding:14px 4px 10px;}
-  .logo{font-size:22px; font-weight:700; letter-spacing:.5px;}
-  .logo small{font-size:12px; font-weight:400; color:var(--sub); margin-left:8px;}
-  .badge{font-size:11px; color:#fff; background:var(--accent); border-radius:99px; padding:3px 10px; letter-spacing:1px;}
+  header{display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; padding:8px 4px 20px;
+         border-bottom:1px solid var(--line); margin-bottom:24px;}
+  .logo{font-size:21px; font-weight:700; letter-spacing:-.01em; color:var(--text-primary);}
+  .logo small{font-size:12px; font-weight:400; color:var(--text-secondary); margin-left:8px;}
+  .badge{font-size:11px; color:var(--accent); background:var(--accent-subtle); border-radius:99px;
+         padding:3px 10px; letter-spacing:.06em; font-weight:500;}
   .spacer{flex:1;}
-  .hbtn{font-size:13px; border:1px solid var(--line); background:var(--card); color:var(--ink);
-        border-radius:99px; padding:6px 14px; cursor:pointer; font-family:inherit;}
-  .hbtn:hover{border-color:var(--accent); color:var(--accent-d);}
-  .progress{font-size:12px; color:var(--sub); display:flex; align-items:center; gap:8px;}
+  .hbtn{font-size:13px; border:1px solid var(--line); background:var(--bg); color:var(--text-primary);
+        border-radius:99px; padding:6px 14px; cursor:pointer; font-family:inherit; transition:all .15s var(--ease);}
+  .hbtn:hover{border-color:var(--line-strong); background:var(--bg-subtle);}
+  .progress{font-size:12px; color:var(--text-secondary); display:flex; align-items:center; gap:8px;}
+  .progress b{color:var(--text-primary);}
 
   /* ---------- 控制区 ---------- */
-  .ctl{background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
-       padding:16px 18px; margin-bottom:14px; box-shadow:0 2px 10px rgba(120,100,60,.05);}
-  .ctl .row{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:10px;}
+  .ctl{background:var(--bg-elevated); border:1px solid var(--line); border-radius:var(--radius-lg);
+       padding:20px 22px; margin-bottom:16px; box-shadow:var(--shadow-sm);}
+  .ctl .row{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px;}
   .ctl .row:last-child{margin-bottom:0;}
-  .ctl label{font-size:12.5px; color:var(--sub);}
-  .ctl input[type=text], .ctl textarea{flex:1; min-width:200px; border:1px solid var(--line); border-radius:8px;
-        padding:8px 10px; font-size:13.5px; font-family:inherit; background:#fff; color:var(--ink);}
+  .ctl label{font-size:12.5px; color:var(--text-secondary);}
+  .ctl input[type=text], .ctl textarea{flex:1; min-width:200px; border:1px solid var(--line); border-radius:var(--radius-md);
+        padding:10px 12px; font-size:13.5px; font-family:inherit; background:var(--bg); color:var(--text-primary);
+        outline:none; transition:border-color .15s var(--ease), box-shadow .15s var(--ease);}
+  .ctl input[type=text]:focus, .ctl textarea:focus{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-subtle);}
   .ctl textarea{width:100%; min-height:80px; resize:vertical;}
-  .ctl select, .ctl input[type=range]{border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px; background:#fff; color:var(--ink);}
-  .btn{font-size:13px; border:none; border-radius:99px; padding:8px 16px; cursor:pointer; font-family:inherit; font-weight:600;}
-  .btn-acc{background:var(--accent); color:#fff;} .btn-acc:hover{background:var(--accent-d);}
-  .btn-sage{background:var(--sage); color:#fff;} .btn-sage:hover{background:var(--sage-d);}
-  .btn-line{border:1px solid var(--line); background:var(--card); color:var(--ink);}
-  .btn-line:hover{border-color:var(--accent); color:var(--accent-d);}
+  .ctl select, .ctl input[type=range]{border:1px solid var(--line); border-radius:var(--radius-md); padding:8px 10px;
+        font-size:13px; background:var(--bg); color:var(--text-primary); font-family:inherit;}
+  .btn{font-size:13px; border:none; border-radius:99px; padding:9px 18px; cursor:pointer; font-family:inherit;
+       font-weight:500; transition:all .15s var(--ease);}
+  .btn-acc{background:var(--accent); color:#fff;} .btn-acc:hover{background:var(--accent-hover);}
+  .btn-sage{background:var(--accent); color:#fff;} .btn-sage:hover{background:var(--accent-hover);}
+  .btn-line{border:1px solid var(--line); background:var(--bg); color:var(--text-primary);}
+  .btn-line:hover{border-color:var(--line-strong); background:var(--bg-subtle);}
   .btn:disabled{opacity:.5; cursor:not-allowed;}
+  .btn:active{transform:scale(.98);}
 
   /* ---------- AI 候选卡片 ---------- */
-  .cand{display:block; width:100%; text-align:left; background:#fff; border:1px solid var(--line); border-radius:10px;
-        padding:11px 13px; margin-bottom:8px; cursor:pointer; font-family:inherit; transition:all .15s;}
-  .cand:hover{border-color:var(--accent); box-shadow:0 2px 8px rgba(192,106,63,.12);}
-  .cand .ct{font-size:13.5px; font-weight:700; color:var(--ink); margin-bottom:3px;}
-  .cand .cp{font-size:12px; color:var(--sub); line-height:1.5;}
+  .cand{display:block; width:100%; text-align:left; background:var(--bg); border:1px solid var(--line); border-radius:var(--radius-md);
+        padding:13px 15px; margin-bottom:10px; cursor:pointer; font-family:inherit; transition:all .15s var(--ease);}
+  .cand:hover{border-color:var(--accent); box-shadow:0 2px 10px rgba(0,113,227,.10);}
+  .cand .ct{font-size:14px; font-weight:600; color:var(--text-primary); margin-bottom:4px;}
+  .cand .cp{font-size:12px; color:var(--text-secondary); line-height:1.5;}
 
   /* ---------- 文章 ---------- */
-  article{background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
-          padding:30px 34px 26px; box-shadow:0 2px 14px rgba(120,100,60,.06);}
-  .story-title{font-size:23px; font-weight:700; margin-bottom:4px;}
-  .story-meta{font-size:12.5px; color:var(--sub); margin-bottom:18px; padding-bottom:14px; border-bottom:1px dashed var(--line);}
-  .story{font-size:18px; line-height:2.1; text-align:justify;}
-  .blank{display:inline-block; width:110px; border:none; border-bottom:2px solid var(--ink);
-         background:transparent; font-size:16px; padding:2px 6px; margin:0 2px; text-align:center; color:var(--ink);
-         font-family:inherit; outline:none; transition:all .2s;}
-  .blank:focus{border-bottom-color:var(--accent); background:#fff8ee;}
-  .blank.ok{border-bottom-color:var(--ok); color:var(--ok); background:#eafaf0;}
-  .blank.err{border-bottom-color:var(--err); color:var(--err); background:#fdecea;}
-  .blank.show{border-bottom-color:var(--err); color:var(--err);}
+  article{background:var(--bg-elevated); border:1px solid var(--line); border-radius:var(--radius-lg);
+          padding:36px 40px 28px; box-shadow:var(--shadow-sm);}
+  .story-title{font-size:24px; font-weight:700; letter-spacing:-.01em; margin-bottom:4px; color:var(--text-primary);}
+  .story-meta{font-size:12.5px; color:var(--text-secondary); margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--line);}
+  .story{font-size:17px; line-height:2.0; text-align:justify; color:var(--text-primary);}
+  /* 挖空输入：保留下划线交互（产品特色），颜色统一 accent */
+  .blank{display:inline-block; width:110px; border:none; border-bottom:2px solid var(--line-strong);
+         background:transparent; font-size:16px; padding:2px 6px; margin:0 2px; text-align:center; color:var(--text-primary);
+         font-family:inherit; outline:none; transition:all .2s var(--ease);}
+  .blank:focus{border-bottom-color:var(--accent); background:var(--accent-subtle);}
+  .blank.ok{border-bottom-color:var(--success); color:var(--success); background:rgba(52,199,89,.10);}
+  .blank.err{border-bottom-color:var(--danger); color:var(--danger); background:rgba(255,59,48,.08);}
+  .blank.show{border-bottom-color:var(--danger); color:var(--danger);}
 
   /* ---------- 底部控制 ---------- */
-  .foot{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:18px; padding-top:16px; border-top:1px dashed var(--line);}
-  .stat{font-size:13px; color:var(--sub);}
-  .stat b{color:var(--ink); font-weight:700;}
-  .stat .ok{color:var(--ok);} .stat .err{color:var(--err);}
+  .foot{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:20px; padding-top:18px; border-top:1px solid var(--line);}
+  .stat{font-size:13px; color:var(--text-secondary);}
+  .stat b{color:var(--text-primary); font-weight:700;}
+  .stat .ok{color:var(--success);} .stat .err{color:var(--danger);}
 
   /* ---------- 错题本 ---------- */
-  .wrongbox{margin-top:16px; background:#fbf7ec; border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; display:none;}
+  .wrongbox{margin-top:18px; background:var(--bg-subtle); border:1px solid var(--line); border-radius:var(--radius-lg); padding:16px 18px; display:none;}
   .wrongbox.show{display:block;}
-  .wrongbox h4{font-size:13px; color:var(--sub); margin-bottom:8px; letter-spacing:1px;}
-  .w-item{display:inline-block; background:#fff; border:1px solid var(--line); border-radius:8px; padding:5px 10px; margin:3px 4px 3px 0; font-size:13px;}
-  .w-item .ans{color:var(--err); font-weight:700;}
+  .wrongbox h4{font-size:12px; color:var(--text-secondary); margin-bottom:10px; letter-spacing:.06em; text-transform:uppercase; font-weight:600;}
+  .w-item{display:inline-block; background:var(--bg); border:1px solid var(--line); border-radius:var(--radius-sm); padding:6px 11px; margin:3px 4px 3px 0; font-size:13px; color:var(--text-primary);}
+  .w-item .ans{color:var(--danger); font-weight:600;}
 
-  .note{font-size:12px; color:var(--sub); background:#f3ecd8; border-radius:8px; padding:8px 10px; margin-top:10px; line-height:1.6;}
-  .loading{display:flex; align-items:center; gap:8px; color:var(--sub); font-size:13px; padding:8px 0;}
+  .note{font-size:12px; color:var(--text-secondary); background:var(--bg-subtle); border-radius:var(--radius-sm); padding:10px 12px; margin-top:12px; line-height:1.6;}
+  .loading{display:flex; align-items:center; gap:8px; color:var(--text-secondary); font-size:13px; padding:8px 0;}
   .loading .dot{width:6px; height:6px; border-radius:50%; background:var(--accent); animation:blink 1s infinite;}
   .loading .dot:nth-child(2){animation-delay:.2s;} .loading .dot:nth-child(3){animation-delay:.4s;}
   @keyframes blink{0%,100%{opacity:.2;}50%{opacity:1;}}
 
-  footer{text-align:center; color:var(--sub); font-size:12px; margin-top:20px;}
-  @media (max-width:600px){ article{padding:22px 16px;} .story{font-size:16px;} .blank{width:80px;} }
+  footer{text-align:center; color:var(--text-tertiary); font-size:12px; margin-top:28px;}
+  @media (max-width:600px){ article{padding:24px 18px;} .story{font-size:16px;} .blank{width:80px;} }
 </style>
 </head>
 <body>
@@ -357,7 +364,7 @@ document.getElementById("btnAIGo").addEventListener("click", async function(){
     var obj = extractJSON(raw);
     var cands = obj.candidates || [];
     if(!cands.length) throw new Error("未生成候选");
-    el.candBox.innerHTML = '<div style="font-size:13px;color:#8a7f6a;margin-bottom:6px;">AI 给出 '+cands.length+' 篇候选，选一篇开始挖空：</div>';
+    el.candBox.innerHTML = '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;">AI 给出 '+cands.length+' 篇候选，选一篇开始挖空：</div>';
     cands.forEach(function(c,i){
       var b = document.createElement("button");
       b.className = "cand";

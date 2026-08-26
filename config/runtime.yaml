@@ -36,7 +36,7 @@ services:
   search_gateway:
     label: 搜索网关
     cwd: services/search_gateway
-    command: unified_gateway.py
+    command: search_gateway.py
     host: 127.0.0.1
     port: 3000
     url: http://localhost:3000
@@ -59,4 +59,18 @@ services:
       ok: 200
     startup:
       order: 3
+      depends_on: []
+
+  api_gateway:
+    label: API 转发网关
+    cwd: services/search_gateway
+    command: api_gateway.py
+    host: 127.0.0.1
+    port: 3100
+    url: http://localhost:3100
+    health:
+      path: /api/health
+      ok: 200
+    startup:
+      order: 4
       depends_on: []

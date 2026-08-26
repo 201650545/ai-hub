@@ -281,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span>在线在线率</span>
                     <strong>${onlinePct}% (${online}/${total})</strong>
                 </div>
-                <div style="height:10px; background:#1a1c2b; border-radius:5px; overflow:hidden;">
+                <div style="height:10px; background:var(--bg-subtle); border-radius:5px; overflow:hidden;">
                     <div style="width:${onlinePct}%; height:100%; background:var(--emerald);"></div>
                 </div>
             </div>
