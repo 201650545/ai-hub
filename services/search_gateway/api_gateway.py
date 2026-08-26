@@ -43,6 +43,11 @@ os.environ.setdefault("GATEWAY_ID", "api_gateway")
 import channels
 
 try:
+    import sync_cherry as _sync_cherry
+except Exception:  # noqa: BLE001
+    _sync_cherry = None
+
+try:
     from quota import get_usage as _get_usage
 except Exception:  # noqa: BLE001
     _get_usage = None
@@ -85,6 +90,17 @@ def save_state(enabled):
 
 def is_enabled():
     return bool(load_state().get("enabled", True))
+
+
+def trigger_cherry_sync():
+    """后台触发 网关→Cherry Studio 同步（渠道配置变更后调用，不阻塞响应）。"""
+    if _sync_cherry is None:
+        return
+    try:
+        t = threading.Thread(target=_sync_cherry.run_sync, kwargs={"dry": False}, daemon=True)
+        t.start()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 # ---------------------------------------------------------------- 网关 API key 鉴权
@@ -515,6 +531,7 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             enabled = bool(data.get("enabled", True))
             channels.set_channel_enabled(cid, enabled)
             channels.invalidate_channel_cache(cid)
+            trigger_cherry_sync()
             self._send_json(200, {"channel": cid, "enabled": enabled})
             return
         if path.startswith("/api/channels/") and path.endswith("/hidden"):
@@ -529,6 +546,7 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 return
             hidden = bool(data.get("hidden", True))
             channels.set_hidden_channel(cid, hidden)
+            trigger_cherry_sync()
             self._send_json(200, {"channel": cid, "hidden": hidden})
             return
         if path.startswith("/api/channels/") and path.endswith("/models"):
@@ -546,6 +564,7 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json(400, {"error": "selected 必须是字符串数组"})
                 return
             clean = channels.set_channel_selection(cid, sel)
+            trigger_cherry_sync()
             self._send_json(200, {"status": "ok", "channel": cid,
                                   "selected": clean, "curated": bool(clean)})
             return
@@ -779,6 +798,7 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 key = data.get("key", "")
                 if key:
                     channels.save_channel_key(cid, key)
+                    trigger_cherry_sync()
                     self._send_json(200, {"status": "ok", "channel": cid})
                 else:
                     self._send_json(400, {"error": "key 必填"})
@@ -908,7 +928,27 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             key = (data.get("key") or "").strip()
             if key:
                 channels.save_channel_key(cid, key)
+            trigger_cherry_sync()
             self._send_json(200, {"status": "ok", "channel": cid})
+            return
+        if path == "/api/sync-cherry":
+            # 手动触发 网关→Cherry Studio 同步（渠道页「同步到 Cherry」按钮）
+            if _sync_cherry is None:
+                self._send_json(500, {"error": "sync_cherry 模块不可用"})
+                return
+            try:
+                res = _sync_cherry.run_sync(dry=False)
+                self._send_json(200, {
+                    "status": "ok",
+                    "providers": len(res["providers"]),
+                    "models": len(res["models"]),
+                    "providers_detail": [
+                        {"channel": cid, "provider": pid, "name": name, "enabled": en}
+                        for cid, pid, name, en in res["providers"]
+                    ],
+                })
+            except Exception as e:  # noqa: BLE001
+                self._send_json(500, {"error": str(e)[:200]})
             return
         self._send_json(404, {"error": "not found"})
 
