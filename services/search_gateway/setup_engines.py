@@ -15,7 +15,7 @@ import subprocess
 import sys
 import time
 
-sys.path.insert(0, r"D:\游戏\ds_v4_cli")
+sys.path.insert(0, r"D:\项目\services\search_gateway")
 import engines  # noqa: E402
 
 

@@ -177,6 +177,26 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 })
             except Exception as ex:  # noqa: BLE001
                 self._send_json(500, {"status": "err", "error": str(ex)[:200]})
+        elif path == "/api/search_json":
+            # 同步 JSON 版聚合搜索（供 DSH hub-web-search 插件等机器调用方使用）：
+            # 与 /api/search_aggregate 同源，但把各引擎回答正文内联返回，免二次读文件
+            import content_pool
+            q = query.get("q", [""])[0] or query.get("prompt", [""])[0]
+            if not q:
+                self._send_json(400, {"error": "q 必填"})
+                return
+            req_e = query.get("engines", [""])[0]
+            eids = [e.strip() for e in req_e.split(",") if e.strip()] if req_e else None
+            try:
+                run_id, report_path, records = content_pool.run_search(q, engine_ids=eids)
+                self._send_json(200, {
+                    "status": "ok", "run_id": run_id, "report": report_path,
+                    "records": [{"provider": r["provider"], "status": r["status"],
+                                 "answer": r.get("answer") or "",
+                                 "elapsed": round(r.get("elapsed", 0), 1)} for r in records],
+                })
+            except Exception as ex:  # noqa: BLE001
+                self._send_json(500, {"status": "err", "error": str(ex)[:200]})
         elif path == "/api/history":
             if query.get("limit"):
                 try:
@@ -219,6 +239,7 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 threading.Thread(target=_delayed_launch, args=(eid, idx * 1.5), daemon=True).start()
             remaining = set(active_eids)
             done_items = []
+            result_items = {}
             while remaining:
                 try:
                     item = out_q.get(timeout=10)
@@ -227,9 +248,12 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 eid = item.get("id")
                 if item.get("status") == "done":
                     remaining.discard(eid)
-                    done_items.append(item)
+                # 保存实际结果（含 answer/thinking 等），用于历史记录
+                if eid and (item.get("answer") or item.get("thinking")):
+                    result_items[eid] = item
                 self.wfile.write(("data: " + json.dumps(item, ensure_ascii=False) + "\n\n").encode("utf-8"))
                 self.wfile.flush()
+            done_items = list(result_items.values())
             if done_items:
                 save_history_record(prompt, done_items)
             self.wfile.write(b"data: [DONE]\n\n")

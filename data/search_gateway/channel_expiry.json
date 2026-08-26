@@ -1,0 +1,62 @@
+{
+  "opencode": {
+    "expires": null,
+    "note": "Go 订阅 $5/月（首月 $5 之后 $10/月），可随时取消，无固定到期日",
+    "checked": "2026-08-26"
+  },
+  "modelscope": {
+    "expires": null,
+    "note": "每日 2000 次免费调用，无固定到期日",
+    "checked": "2026-08-26"
+  },
+  "sensetime": {
+    "expires": null,
+    "note": "公测期完全免费，公测结束后转付费，具体结束日期待核实",
+    "checked": "2026-08-26"
+  },
+  "ark": {
+    "expires": null,
+    "note": "调整中·暂不可用（等郭老师通知）",
+    "checked": "2026-08-26"
+  },
+  "agnes": {
+    "expires": null,
+    "note": "全模态免费 API 平台，免费上线一周即达 4T 调用量，无到期日",
+    "checked": "2026-08-26"
+  },
+  "xiaohongshu": {
+    "expires": "2026-09-30",
+    "note": "OpenRouter 免费档至 2026-09-30；本地直连渠道无到期（按量计费）",
+    "checked": "2026-08-26"
+  },
+  "zscc": {
+    "expires": null,
+    "note": "按量计费，无免费期；待核实具体到期日",
+    "checked": "2026-08-26"
+  },
+  "groq": {
+    "expires": null,
+    "note": "免费计划免信用卡，按速率限制，无到期日",
+    "checked": "2026-08-26"
+  },
+  "zenmux": {
+    "expires": null,
+    "note": "待核实到期日",
+    "checked": "2026-08-26"
+  },
+  "bai": {
+    "expires": null,
+    "note": "新用户注册送 100 万 Credits，9B 以下模型永久免费，无到期日",
+    "checked": "2026-08-26"
+  },
+  "gmi": {
+    "expires": "2026-09-06",
+    "note": "MiniMax Week 限时免费（8/24-9/6），之后恢复标准计费",
+    "checked": "2026-08-26"
+  },
+  "openrouter": {
+    "expires": null,
+    "note": "免费模型每日 50 次/天，充值 $10 后 1000 次/天，无到期日",
+    "checked": "2026-08-26"
+  }
+}

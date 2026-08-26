@@ -287,6 +287,8 @@ button{font-family:var(--sf)}
 .chip-ic{flex:none;display:flex;align-items:center;justify-content:center;border-radius:13px;
   background:var(--acc-softer);border:1px solid var(--gborder);
   box-shadow:inset 0 1px 0 var(--hl)}
+/* 图标字段支持图片 URL：渲染 <img> 时按盒子等比缩放 */
+.chip-ic img,.ch-ic img{width:62%;height:62%;object-fit:contain;border-radius:4px}
 
 /* ═══════════ 一级页面(启动台·单屏不滚动) ═══════════ */
 .home{height:100vh;display:flex;flex-direction:column;overflow-y:auto;padding:0 max(28px,calc((100vw - 1200px)/2 + 28px))}
@@ -411,6 +413,10 @@ button{font-family:var(--sf)}
 .v-back:hover{transform:translateX(-2px);color:var(--acc-t)}
 .v-title{font-size:19px;font-weight:700}
 .v-title small{display:block;font-size:12.5px;font-weight:400;color:var(--t3)}
+/* 图片图标在各处按文本字号收敛，避免原始尺寸撑大布局 */
+.v-title img{width:22px;height:22px;object-fit:contain;vertical-align:-4px;border-radius:4px;margin-right:4px}
+.bchip .bicn img{width:19px;height:19px;object-fit:contain;vertical-align:-3px;border-radius:3px}
+.sug-col h4 img{width:18px;height:18px;object-fit:contain;vertical-align:-3px;border-radius:3px}
 .v-sp{flex:1}
 .v-body{flex:1;min-height:0;overflow-y:auto;padding:22px max(24px,calc((100vw - 1240px)/2 + 24px)) 50px}
 .sect-h{display:flex;align-items:baseline;gap:10px;margin-bottom:16px;flex-wrap:wrap}
@@ -437,6 +443,10 @@ button{font-family:var(--sf)}
 .m-item .nm{flex:1;font-size:14px;font-weight:500;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .m-item .cnt{font-size:12px;color:var(--t3);background:var(--thead);padding:2px 9px;border-radius:990px;white-space:nowrap}
 .m-item.sel .cnt{background:var(--glass2);color:var(--acc-t)}
+.m-free{font-size:11px;padding:2px 8px;border-radius:990px;font-weight:700;flex:none}
+.m-free.all{background:var(--green-bg);color:var(--green)}
+.m-free.part{background:var(--acc-softer);color:var(--acc-t)}
+.m-free.none{background:var(--red-bg);color:var(--red)}
 
 .chain-head{display:flex;align-items:center;gap:10px;padding:14px 17px;border-bottom:1px solid var(--line2);background:var(--thead);flex-wrap:wrap}
 .chip{font-size:14px;font-weight:600;padding:5px 13px;border-radius:990px;background:var(--acc-soft);color:var(--acc-t);font-family:var(--mono)}
@@ -505,6 +515,11 @@ button{font-family:var(--sf)}
 .cd-chip .cdn:hover{background:var(--red-bg);color:var(--red)}
 .cd-chip .cdn.add:hover{background:var(--acc-soft);color:var(--acc-t)}
 .cd-chip .cdt{font-family:var(--mono);font-size:13px;word-break:break-all}
+.cd-promo{border:1px solid var(--acc-t);background:var(--acc-softer);border-radius:var(--radius-s);padding:12px 15px;margin-bottom:14px}
+.cd-promo-t{font-size:13px;font-weight:700;color:var(--acc-t);margin-bottom:5px}
+.cd-promo-d{font-size:13px;color:var(--t2);line-height:1.65}
+.cd-promo-m{margin-top:8px;font-size:12.5px;color:var(--green);font-weight:600}
+.cd-free{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:990px;background:var(--green-bg);color:var(--green);flex:none}
 /* ── 光线芯片·点击换上游模型弹层 ── */
 .mp-list{max-height:min(52vh,430px);overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-top:12px;padding-right:2px}
 .mp-row{text-align:left;font-family:var(--mono);font-size:13px;padding:9px 12px;border-radius:11px;border:1px solid var(--line2);background:color-mix(in oklab,var(--t) 3%,transparent);cursor:pointer;color:var(--t);word-break:break-all}
@@ -615,6 +630,34 @@ button{font-family:var(--sf)}
 .rule-act button.del{color:var(--red);border-color:var(--red-bg)}
 .rules-empty{padding:34px;text-align:center;color:var(--t3);font-size:15px}
 
+/* ── 模型能力排行榜 ── */
+.rank-box{border-radius:var(--radius);overflow:hidden}
+.rank-row{display:flex;align-items:center;gap:14px;padding:14px 18px;border-top:1px solid var(--line2);cursor:pointer;transition:.15s}
+.rank-row:first-child{border-top:none}
+.rank-row:hover{background:var(--acc-softer)}
+.rank-row.no1{background:linear-gradient(90deg,var(--acc-softer),transparent 70%)}
+.rank-medal{flex:none;width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+  font-size:21px;font-weight:800;background:var(--thead)}
+.rank-medal.g1{background:linear-gradient(135deg,#f7c95c,#e8a13c);color:#fff;box-shadow:0 5px 14px -4px rgba(232,161,60,.6)}
+.rank-medal.g2{background:linear-gradient(135deg,#ccd2dc,#98a2b2);color:#fff}
+.rank-medal.g3{background:linear-gradient(135deg,#e0a06b,#c97b45);color:#fff}
+.rank-main{flex:1;min-width:0}
+.rank-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rank-title b{font-size:15px;font-family:var(--mono)}
+.rank-display{font-size:12.5px;color:var(--t3)}
+.rank-tag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:990px;background:var(--acc-soft);color:var(--acc-t);white-space:nowrap}
+.rank-dims{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 16px;margin-top:9px}
+.rd{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t3)}
+.rd i{width:36px;flex:none;font-style:normal;font-weight:600}
+.rd em{flex:1;height:5px;border-radius:99px;background:var(--thead);overflow:hidden}
+.rd em b{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.rd u{width:24px;flex:none;text-align:right;font-style:normal;font-weight:700;color:var(--t2)}
+.rank-score{flex:none;text-align:center;min-width:78px;padding-left:16px;border-left:1px solid var(--line2)}
+.rank-score b{display:block;font-size:25px;font-weight:800;letter-spacing:-.03em;font-family:var(--fh,var(--sf));
+  background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.rank-score i{font-style:normal;font-size:11px;color:var(--t3)}
+@media (max-width:760px){.rank-dims{grid-template-columns:repeat(2,1fr)}.rank-score{display:none}}
+
 table{width:100%;border-collapse:collapse}
 thead{background:var(--thead)}
 th{text-align:left;padding:13px 20px;font-size:13px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.04em}
@@ -649,6 +692,7 @@ td .d{color:var(--t2)}
 .ch-row:first-child{border-top:none}
 .ch-row:hover{background:var(--acc-softer)}
 .ch-row.off{opacity:.5}
+.ch-idx{flex:none;min-width:22px;text-align:center;font-size:11.5px;font-weight:700;color:var(--t3);font-family:var(--mono);margin-right:-6px}
 .ch-ic{width:46px;height:46px;font-size:22px;box-shadow:inset 0 1px 0 var(--hl),0 2px 10px -4px rgba(0,0,0,.16)}
 .ch-info{flex:1;min-width:0}
 .ch-name{font-size:16px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -941,6 +985,10 @@ td .d{color:var(--t2)}
       <span class="sub">手动编排过的模型 · 点「编排」回到光线调整</span></div>
     <div class="rules glass" id="rules-box"><div class="rules-empty">加载中…</div></div>
 
+    <div class="sect-h" style="margin-top:22px"><h2>🏆 模型能力排行榜</h2>
+      <span class="sub">已选中模型（统一模型 + 手动编排）能力综合评分 · 点击模型回到光线编排</span></div>
+    <div class="rank-box glass" id="rank-box"><div class="rules-empty">加载中…</div></div>
+
     <details class="adv glass">
       <summary>🙈 隐藏模型 与 ✨ 自定义别名<span style="margin-left:10px;font-weight:400;font-size:12.5px;color:var(--t3)">低频整理功能，收在这里</span></summary>
       <div class="adv-body">
@@ -1008,7 +1056,7 @@ td .d{color:var(--t2)}
     <div class="mhint">把一个新的 API 厂商接入网关。填名称 + 接口地址 + Key；模型目录可在补 Key 后自动测活拉取，或先手动填几个已知模型名。</div>
     <div class="ch-f"><label>名称</label><input id="ch-a-name" placeholder="如 GEMMUX" oninput="autoId()"></div>
     <div class="ch-f"><label>id 标识</label><input id="ch-a-id" placeholder="自动生成，如 gemmux"></div>
-    <div class="ch-f"><label>图标</label><input id="ch-a-icon" class="w-icon" value="🤖" maxlength="8"></div>
+    <div class="ch-f"><label>图标</label><input id="ch-a-icon" class="w-icon" value="🤖" maxlength="64" placeholder="emoji 或 /img/… 图片路径"></div>
     <div class="ch-f"><label>接口地址</label><input id="ch-a-base" placeholder="https://api.example.com/v1"></div>
     <div class="ch-f"><label>API Key</label><input id="ch-a-key" placeholder="sk-…（可选，可稍后填）"></div>
     <div class="ch-f"><label>计费</label>
@@ -1045,6 +1093,7 @@ td .d{color:var(--t2)}
   <div class="v-body">
     <div class="search-box cd-search"><span class="ico">🔍</span>
       <input id="cd-q" placeholder="搜模型名或厂商，如 flash / qwen / openai…" autocomplete="off" oninput="renderChannelModels()"></div>
+    <div class="cd-promo" id="cd-promo" style="display:none"></div>
     <div class="sect-h"><h2>⭐ 已选模型<small id="cd-sel-n"></small></h2>
       <span class="sub">置顶展示 · 对外模型列表只含已选 · 点 ✕ 取消</span></div>
     <div class="cd-grid" id="cd-sel"><div class="rules-empty">加载中…</div></div>
@@ -1174,7 +1223,7 @@ print(resp.choices[0].message.content)</pre>
 </div>
 
 <script>
-let ALL_MODELS=[], CH={}, ROUTING={};
+let ALL_MODELS=[], CH={}, ROUTING={}, CH_EXPIRY={};
 let selModel='', cur=[], excluded=new Set();
 const NO_TEST=new Set(['zscc']);
 
@@ -1341,6 +1390,7 @@ function go(v){location.hash=v?'#/'+v:'#/';}
 async function ensureOrchestrate(){
   loadOverrides();renderRules();
   await loadUnified();renderUnifiedStrip();
+  renderRank();
   if(!selModel)pickDefault();
 }
 function render(){
@@ -1360,11 +1410,13 @@ window.addEventListener('hashchange',render);
 /* ═══ 数据加载 ═══ */
 async function load(){
   try{
-    const [h1,h2,h3]=await Promise.all([
+    const [h1,h2,h3,h4]=await Promise.all([
       fetch('/api/health',{cache:'no-store'}).then(r=>r.json()),
       fetch('/api/models',{cache:'no-store'}).then(r=>r.json()),
-      fetch('/api/routing',{cache:'no-store'}).then(r=>r.json()).catch(()=>({routing:{}}))
+      fetch('/api/routing',{cache:'no-store'}).then(r=>r.json()).catch(()=>({routing:{}})),
+      fetch('/api/expiry',{cache:'no-store'}).then(r=>r.json()).catch(()=>({}))
     ]);
+    CH_EXPIRY=h4||{};
     CH=h1.llm||{}; ALL_MODELS=h2.models||[]; ROUTING=h3.routing||{};
     stats(); renderModels(); renderTestModels(); renderBadges(); loadHome();
     if(document.getElementById('view-orchestrate').classList.contains('on')){
@@ -1373,6 +1425,7 @@ async function load(){
         if(selModel&&!ALL_MODELS.some(m=>m.name===selModel)){selModel=null;
           document.getElementById('chain-live').style.display='none';
           document.getElementById('chain-empty').style.display='block';}
+        renderRank();
       });
       renderRules();
       if(!selModel)pickDefault();
@@ -1428,6 +1481,11 @@ async function loadHome(){
   }catch(e){}
 }
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function iconHtml(icon){
+  const v=(icon||'').trim();
+  if(/^(https?:|\/)/.test(v))return '<img src="'+esc(v)+'" alt="" onerror="this.style.display=\'none\'">';
+  return esc(v||'🤖');
+}
 
 /* ═══ 模型编排:模型架 ═══ */
 function renderModels(){
@@ -1441,9 +1499,11 @@ function renderModels(){
   el.innerHTML=list.map(m=>{
     const sel=m.name===selModel?' sel':'';
     const free=m.providers.filter(p=>p.billing_type!=='paid').length;
+    const badge=free===m.providers.length?'<span class="m-free all">🟢全免费</span>':
+      (free>0?'<span class="m-free part">🟡部分免费</span>':'<span class="m-free none">🔴付费</span>');
     return '<div class="m-item'+sel+'" onclick="pickModel(\''+esc(m.name).replace(/'/g,"\\'")+'\')">'+
       '<span class="pin">'+(m.unified?'✨':(ROUTING[m.name]?'📌':''))+'</span>'+
-      '<span class="nm">'+esc(m.name)+'</span>'+
+      '<span class="nm">'+esc(m.name)+'</span>'+badge+
       '<span class="cnt">'+(m.display?esc(m.display)+' · ':'')+m.providers.length+'家·'+free+'免费</span></div>';
   }).join('');
 }
@@ -1467,6 +1527,28 @@ async function loadUnified(){
   try{const r=await fetch('/api/unified',{cache:'no-store'});UNIFIED=(await r.json()).unified||{};}
   catch(e){UNIFIED={};}
 }
+
+function renderPillExpiry(groupName){
+  // #51: show expiry badge for the worst-case channel in the group
+  var u = UNIFIED[groupName];
+  if (!u) return '';
+  var expires = [];
+  Object.keys(u.members || {}).forEach(function(cid){
+    var ex = CH_EXPIRY[cid] || {};
+    if (ex.expires) expires.push({cid: cid, date: ex.expires, note: ex.note || ''});
+  });
+  if (expires.length === 0) return '';
+  var earliest = expires.sort(function(a,b){ return a.date.localeCompare(b.date); })[0];
+  var now = new Date();
+  var exDt = new Date(earliest.date);
+  var daysLeft = Math.ceil((exDt - now) / (1000*60*60*24));
+  if (daysLeft <= 0) {
+    return '<span style="display:inline-block;padding:1px 6px;border-radius:4px;background:#fee2e2;color:#dc2626;font-size:10px;margin-left:4px;">已过期</span>';
+  } else if (daysLeft <= 7) {
+    return '<span style="display:inline-block;padding:1px 6px;border-radius:4px;background:#ffedd5;color:#c2410c;font-size:10px;margin-left:4px;">剩 '+daysLeft+' 天</span>';
+  }
+  return '';
+}
 function renderUnifiedStrip(){
   const el=document.getElementById('ug-strip');if(!el)return;
   let html=Object.keys(UNIFIED).map(n=>{
@@ -1475,6 +1557,7 @@ function renderUnifiedStrip(){
     return '<div class="ug-pill'+(selModel===n?' sel':'')+'" onclick="pickModel(\''+nm+'\')">'+
       '<span class="uico">✨</span>'+esc(u.display||n)+
       '<span class="ucnt">'+cnt+' 渠道</span>'+
+      '<span class="ug-exp">'+renderPillExpiry(n)+'</span>'+
       '<button class="upill-x" title="删除统一模型" onclick="event.stopPropagation();delUnified(\''+nm+'\')">🗑</button></div>';
   }).join('');
   html+='<div class="ug-pill new" onclick="openGroupForm()">＋ 新建统一模型</div>';
@@ -1512,7 +1595,7 @@ function renderSuggest(sug){
   }
   el.innerHTML=Object.keys(sug).map(cid=>{
     const c=CH[cid]||{};
-    return '<div class="sug-col"><h4>'+esc(c.icon||'🤖')+' '+esc(c.name||cid)+'</h4>'+
+    return '<div class="sug-col"><h4>'+iconHtml(c.icon||'🤖')+' '+esc(c.name||cid)+'</h4>'+
       sug[cid].map(m=>'<label><input type="checkbox" '+(GFORM&&GFORM.members[cid]===m?'checked':'')+
         ' onchange="toggleSug(\''+esc(cid)+'\',\''+esc(m).replace(/'/g,"\\'")+'\',this.checked)"> '+esc(m)+'</label>').join('')+
       '</div>';
@@ -1562,7 +1645,7 @@ async function delUnified(name){
       document.getElementById('chain-live').style.display='none';
       document.getElementById('chain-empty').style.display='block';
     }
-    await load();renderUnifiedStrip();renderRules();
+    await load();renderUnifiedStrip();renderRules();renderRank();
   }catch(e){alert('删除失败: '+e.message);}
 }
 
@@ -1593,12 +1676,12 @@ function beamChip(p,i,zone){
   const up=esc((p.matched_models||[selModel])[0]||selModel);
   if(zone==='pool'){
     return '<div class="bchip" draggable="true" data-cid="'+esc(p.id)+'" title="拖回光线重新启用">'+
-      '<span class="bicn">'+(p.icon||'🔗')+'</span><span><span class="bn">'+esc(p.name)+'</span>'+
+      '<span class="bicn">'+iconHtml(p.icon||'🔗')+'</span><span><span class="bn">'+esc(p.name)+'</span>'+
       '<span class="bm">'+up+'</span></span></div>';
   }
   return '<div class="bchip'+(i===0?' first':'')+(p.reachable===false?' unreach':'')+'" draggable="true" data-cid="'+esc(p.id)+'">'+
     '<span class="rank">'+(i+1)+'</span>'+
-    '<span class="row1"><span class="bicn">'+(p.icon||'🔗')+'</span><span class="bn">'+esc(p.name)+'</span></span>'+
+    '<span class="row1"><span class="bicn">'+iconHtml(p.icon||'🔗')+'</span><span class="bn">'+esc(p.name)+'</span></span>'+
     '<span class="bm">'+up+(p.reachable===false?' · ⚠不可达':'')+'</span></div>';
 }
 function renderChain(isAuto){
@@ -1787,7 +1870,7 @@ async function pickModelFor(m){
     if(!r.ok){alert('保存失败: '+(d.error||r.status));return;}
     g.members=members;
     closeModelPick();toast('已固定 '+cid+' → '+m+' ✓（已同步进渠道筛选）');
-    await loadChain();renderRules();renderModels();renderBadges();
+    await loadChain();renderRules();renderModels();renderBadges();renderRank();
   }catch(e){alert('保存失败: '+e.message);}
 }
 /* 弹窗列表事件委托（模型名含斜杠/引号，避免内联 onclick 转义问题） */
@@ -1827,8 +1910,66 @@ async function resetFrom(name){
     if(!r.ok){alert('失败');return;}
     delete ROUTING[name];
     if(selModel===name)loadChain();
-    renderModels();renderBadges();renderRules();
+    renderModels();renderBadges();renderRules();renderRank();
   }catch(e){alert('失败: '+e.message);}
+}
+
+/* ═══ 模型能力排行榜 ═══ */
+const CAP_W={reason:.25,code:.20,chat:.15,ctx:.15,multi:.10,speed:.15};
+const CAP_DIMS=[['reason','推理'],['code','代码'],['chat','通用'],['ctx','上下文'],['multi','多模态'],['speed','速度']];
+const MODEL_CAPS={
+  'deepseek-v4-pro':{reason:98,code:97,chat:92,ctx:90,multi:55,speed:62,tag:'🧠 旗舰推理'},
+  'deepseek-v4-flash':{reason:85,code:88,chat:86,ctx:84,multi:50,speed:92,tag:'⚡ 快速免费'},
+  'glm-5.2':{reason:90,code:86,chat:94,ctx:86,multi:62,speed:78,tag:'💬 对话强'},
+  'fast':{reason:76,code:78,chat:80,ctx:74,multi:45,speed:95,tag:'🆓 免费快线'},
+};
+function capOf(name){
+  const n=String(name).toLowerCase();
+  const hit=MODEL_CAPS[n]||MODEL_CAPS[Object.keys(MODEL_CAPS).find(k=>n.includes(k))];
+  if(hit)return Object.assign({},hit);
+  let c={reason:70,code:70,chat:72,ctx:70,multi:40,speed:70,tag:''};
+  if(/pro|ultra|reasoner|thinking|max/.test(n)){c.reason+=15;c.code+=10;c.tag='🧠 高性能';}
+  if(/flash|lite|mini|small|tiny|fast/.test(n)){c.speed+=18;c.reason-=8;c.tag='⚡ 快速';}
+  if(/vision|multimodal|omni/.test(n)){c.multi+=35;c.tag=(c.tag||'')+'👁 多模态';}
+  if(/code|dev/.test(n)){c.code+=18;c.tag=(c.tag||'')+'💻 代码';}
+  if(/note|long|128k|256k|512k|1m/.test(n)){c.ctx+=15;}
+  if(/free/.test(n)){c.speed+=6;c.tag=(c.tag||'')+'🆓';}
+  c.reason=Math.min(99,c.reason);c.code=Math.min(99,c.code);c.chat=Math.min(99,c.chat);
+  c.ctx=Math.min(99,c.ctx);c.multi=Math.min(99,c.multi);c.speed=Math.min(99,c.speed);
+  return c;
+}
+function capScore(c){return Math.round(10*(c.reason*CAP_W.reason+c.code*CAP_W.code+c.chat*CAP_W.chat+c.ctx*CAP_W.ctx+c.multi*CAP_W.multi+c.speed*CAP_W.speed))/10;}
+function renderRank(){
+  const box=document.getElementById('rank-box');
+  if(!box)return;
+  const names=[...new Set(Object.keys(UNIFIED).concat(Object.keys(ROUTING)))];
+  if(!names.length){box.innerHTML='<div class="rules-empty">还没有选中的模型 —— 新建统一模型或手动编排后，这里自动生成能力排行榜</div>';return;}
+  const rows=names.map(name=>{
+    const cap=capOf(name);
+    const m=ALL_MODELS.find(x=>x.name===name);
+    const display=(UNIFIED[name]&&UNIFIED[name].display)||(m&&m.display)||'';
+    return {name,display,cap,score:capScore(cap)};
+  }).sort((a,b)=>b.score-a.score);
+  const best={};
+  for(const [k] of CAP_DIMS)best[k]=Math.max(...rows.map(r=>r.cap[k]));
+  const medals=['🥇','🥈','🥉'];
+  box.innerHTML=rows.map((r,idx)=>{
+    const medal=medals[idx]||String(idx+1);
+    const dims=CAP_DIMS.map(([k,label])=>{
+      const v=r.cap[k];
+      const hot=v===best[k]&&rows.length>1?' style="color:var(--acc-t);font-weight:800"':'';
+      return '<span class="rd"><i'+hot+'>'+label+'</i><em><b style="width:'+v+'%"></b></em><u'+hot+'>'+v+'</u></span>';
+    }).join('');
+    const nm=esc(r.name).replace(/'/g,"\\'");
+    return '<div class="rank-row'+(idx===0?' no1':'')+'" onclick="pickModel(\''+nm+'\')" title="点击回到光线编排">'+
+      '<span class="rank-medal'+(idx<3?' g'+(idx+1):'')+'">'+medal+'</span>'+
+      '<div class="rank-main">'+
+        '<div class="rank-title"><b>'+esc(r.name)+'</b>'+(r.display?'<span class="rank-display">'+esc(r.display)+'</span>':'')+
+        (r.cap.tag?'<span class="rank-tag">'+esc(r.cap.tag)+'</span>':'')+'</div>'+
+        '<div class="rank-dims">'+dims+'</div>'+
+      '</div>'+
+      '<div class="rank-score"><b>'+r.score.toFixed(1)+'</b><i>综合分</i></div></div>';
+  }).join('');
 }
 
 /* ═══ 渠道管理(启停/测活/key池) ═══ */
@@ -1843,7 +1984,7 @@ function renderChannels(){
   const box=document.getElementById('ch-box');
   const ids=Object.keys(CH);
   if(!ids.length){box.innerHTML='<div class="rules-empty">加载中…</div>';return;}
-  box.innerHTML=ids.map(cid=>{
+  box.innerHTML=ids.map((cid,idx)=>{
     const c=CH[cid]||{};
     const st=CH_TESTING[cid]?{cls:'testing',txt:'⏳ 测活中…'}:chStateOf(c);
     const off=c.enabled===false;
@@ -1855,12 +1996,33 @@ function renderChannels(){
     const paid=String(c.billing_tag||'').indexOf('付费')>-1;
     const bt=(c.billing_tag||'').replace(/^[🔴🟢⚪⚫]\s*/,'');
     const bill=bt?'<span class="ch-bill '+(paid?'paid':'free')+'">'+esc(bt)+'</span>':'';
+    // #51: expiry badge
+    const ex = CH_EXPIRY[cid] || {};
+    const exDate = ex.expires;
+    let exBadge = '';
+    if (exDate) {
+      const now = new Date();
+      const exDt = new Date(exDate);
+      const daysLeft = Math.ceil((exDt - now) / (1000*60*60*24));
+      if (daysLeft <= 0) {
+        exBadge = '<span class="ch-bill" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;">已过期</span>';
+      } else if (daysLeft <= 7) {
+        exBadge = '<span class="ch-bill" style="background:#ffedd5;color:#c2410c;border:1px solid #fdba74;">到期 '+exDate+' · 剩 '+daysLeft+' 天</span>';
+      } else {
+        exBadge = '<span class="ch-bill" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;">到期 '+exDate+'</span>';
+      }
+    } else if (ex.note && ex.note.indexOf('调整中') > -1) {
+      exBadge = '<span class="ch-bill" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;">调整中·暂不可用</span>';
+    } else if (ex.note && ex.note.indexOf('待核实') > -1) {
+      exBadge = '<span class="ch-bill" style="background:#f5f5f7;color:#6b7280;border:1px solid #d2d2d7;">待核实</span>';
+    }
     return '<div class="ch-row'+(off?' off':'')+'" onclick="go(\'channel/'+cid+'\')" title="点击进入模型选择">'+
-      '<span class="chip-ic ch-ic">'+(c.icon||'🤖')+'</span>'+
+      '<span class="ch-idx">'+(idx+1)+'</span>'+
+      '<span class="chip-ic ch-ic">'+iconHtml(c.icon)+'</span>'+
       '<span class="ch-info"><span class="ch-name">'+esc(c.name||cid)+
         (c.custom?'<span class="tag" style="background:var(--acc-soft);color:var(--acc-t)">自定义</span>':'')+
         '</span>'+
-      '<span class="ch-sub">'+bill+'<span class="ch-sub-t">'+esc(host||cid)+' · '+nmodels+' 模型'+seln+pool+'</span></span></span>'+
+      '<span class="ch-sub">'+bill+'<span class="ch-sub-t">'+esc(host||cid)+' · '+nmodels+' 模型'+seln+pool+'</span></span><span style="display:flex;gap:4px;margin-top:4px;">'+exBadge+'</span></span>'+
       '<span class="ch-st '+st.cls+'">'+st.txt+'</span>'+
       '<span class="ch-acts">'+
         '<button class="ch-hide" onclick="event.stopPropagation();hideChannel(\''+cid+'\')" title="从列表收起（配置全保留，可恢复）">隐藏</button>'+
@@ -1879,7 +2041,7 @@ function renderHidden(){
   wrap.style.display='block';
   n.textContent='('+HIDDEN.length+')';
   box.innerHTML=HIDDEN.map(c=>{
-    return '<div class="ch-hidden-row"><span class="chip-ic ch-ic">'+(c.icon||'🤖')+'</span>'+
+    return '<div class="ch-hidden-row"><span class="chip-ic ch-ic">'+iconHtml(c.icon||'🤖')+'</span>'+
       '<span class="hn">'+esc(c.name||c.id)+'</span><span class="hm">'+esc(c.id)+'</span>'+
       '<button class="ch-hide" onclick="unhideChannel(\''+c.id+'\')">恢复</button></div>';
   }).join('');
@@ -1969,8 +2131,15 @@ async function openChannelDetail(cid){
   CD={cid,all:[],sel:[],q:''};_cdIdx=[];
   document.getElementById('cd-q').value='';
   const c=CH[cid]||{};
-  document.getElementById('cd-title').innerHTML=esc(c.icon||'🤖')+' '+esc(c.name||cid)+
+  document.getElementById('cd-title').innerHTML=iconHtml(c.icon)+' '+esc(c.name||cid)+
     '<small>'+(esc(c.billing_tag||'')||'渠道')+' · 已选置顶 · 全量目录 · 搜索过滤</small>';
+  CD.free=(c.free_models||[]);
+  const promo=document.getElementById('cd-promo');
+  if(c.promo||CD.free.length){
+    promo.style.display='block';
+    promo.innerHTML='<div class="cd-promo-t">🎁 活动福利</div><div class="cd-promo-d">'+esc(c.promo||'')+'</div>'+
+      (CD.free.length?'<div class="cd-promo-m">🟢 免费模型：'+CD.free.map(esc).join(' · ')+'</div>':'');
+  }else promo.style.display='none';
   document.getElementById('cd-sel').innerHTML='<div class="rules-empty">加载中…</div>';
   document.getElementById('cd-all').innerHTML='';
   document.getElementById('cd-sel-n').textContent='';
@@ -2012,7 +2181,7 @@ function renderChannelModels(){
   }else{
     selBox.innerHTML=selVis.map(n=>{
       const i=_cdIdx.push(n)-1;
-      return '<div class="cd-chip glass sel"><button class="cdn" onclick="toggleCdModel('+i+',false)" title="取消选择">✕</button><span class="cdt">'+esc(n)+'</span></div>';
+      return '<div class="cd-chip glass sel"><button class="cdn" onclick="toggleCdModel('+i+',false)" title="取消选择">✕</button><span class="cdt">'+esc(n)+'</span>'+(CD.free&&CD.free.indexOf(n)>-1?'<span class="cd-free">免费</span>':'')+'</div>';
     }).join('');
   }
   // 全部模型：按厂商品牌分组；搜索同时匹配模型名与品牌名，命中时强制展开
@@ -2037,7 +2206,7 @@ function renderChannelModels(){
       const folded=CD.q?false:(CD.fold[key]===undefined?CD.foldDef:CD.fold[key]);
       const chips=g.items.map(n=>{
         const i=_cdIdx.push(n)-1;
-        return '<div class="cd-chip glass"><button class="cdn add" onclick="toggleCdModel('+i+',true)" title="加入已选置顶">＋</button><span class="cdt">'+esc(n)+'</span></div>';
+        return '<div class="cd-chip glass"><button class="cdn add" onclick="toggleCdModel('+i+',true)" title="加入已选置顶">＋</button><span class="cdt">'+esc(n)+'</span>'+(CD.free&&CD.free.indexOf(n)>-1?'<span class="cd-free">免费</span>':'')+'</div>';
       }).join('');
       return '<div class="cd-group"><div class="cd-gh glass'+(folded?' folded':'')+'" data-lb="'+esc(g.l)+'" onclick="toggleCdGroup(this.dataset.lb)">'
         +'<span class="cd-ar">▼</span><b>'+esc(g.l)+'</b><span class="cd-gn">'+g.items.length+' 个模型</span></div>'
@@ -2295,7 +2464,7 @@ function renderCustomModels(){
     return '<div class="cm-row">'+
       '<span class="cm-name">✨ <code>'+esc(c.name)+'</code></span>'+
       '<span class="cm-arrow">→</span>'+
-      '<span class="cm-target"><span class="chip-ic">'+esc(ch.icon||'🤖')+'</span>'+
+      '<span class="cm-target"><span class="chip-ic">'+iconHtml(ch.icon||'🤖')+'</span>'+
         '<span><b style="font-size:14px">'+esc(ch.name||c.channel)+'</b><br>'+
         '<code style="font-size:12.5px;color:var(--acc-t);background:var(--acc-softer);padding:2px 8px;border-radius:6px">'+esc(c.model||c.name)+'</code></span></span>'+
       '<button class="bxcl" onclick="delCustom(\''+esc(c.name).replace(/'/g,"\\'")+'\')">🗑 删除</button></div>';

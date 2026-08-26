@@ -89,8 +89,8 @@ CHANNELS = {
         "free": True,
         
         "speed": "fast",
-        "default_model": "gpt-oss-120b",
-        "models": ["gpt-oss-120b", "gpt-oss-20b", "qwen3.6-27b", "compound-mini"],
+        "default_model": "openai/gpt-oss-120b",
+        "models": ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b", "qwen/qwen3.8-27b", "groq/compound-mini"],
         "note": "LPU 硬件加速，免费配额，0 欠费风险。",
     },
     "siliconflow": {
@@ -877,7 +877,7 @@ def channel_health(channel_id):
                     "error": "", "can_fill": can_fill, "provider": provider,
                     "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
         models_path = ch.get("models_path", "/models")
-        data = _get_json(base + models_path, key, timeout=8, ua=ch.get("ua", "unified-ai-gateway/1.0"), channel_id=channel_id)
+        data = _get_json(base + models_path, key, timeout=ch.get("health_timeout", 8), ua=ch.get("ua", "unified-ai-gateway/1.0"), channel_id=channel_id)
         models = [m.get("id") for m in (data.get("data") or []) if m.get("id")]
         if channel_id == "gemini":
             models = [m.split("/", 1)[-1] for m in models if m]  # 去掉 models/ 前缀
@@ -891,9 +891,12 @@ def channel_health(channel_id):
                 "error": f"HTTP {e.code}", "can_fill": can_fill, "provider": provider,
                 "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
     except Exception as e:  # noqa: BLE001
-        return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": False,
+        # health_fallback_ok：/models 探测失败（如限流超时）时回退硬编码目录并标记可达，
+        # 避免渠道实际可用（chat 接口正常）却因目录接口超时被路由跳过
+        fb_ok = bool(ch.get("health_fallback_ok"))
+        return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": fb_ok,
                 "models": list(ch.get("models") or []),  # 同上：异常也回退硬编码目录
-                "error": str(e)[:120], "can_fill": can_fill, "provider": provider,
+                "error": "" if fb_ok else str(e)[:120], "can_fill": can_fill, "provider": provider,
                 "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
 
 
@@ -1054,9 +1057,10 @@ def _est_tokens(text):
 class _QuotaResponse:
     """包装 urllib response：响应成功时记录本地额度（task_011）。接口与 urllib response 兼容。"""
 
-    def __init__(self, channel_id, model, is_stream, upstream, route_info=None, req_text=""):
+    def __init__(self, channel_id, model, is_stream, upstream, key="", route_info=None, req_text=""):
         self._channel = channel_id
         self._model = model
+        self._key = key  # 实际使用的 key（用于 shell 检测后正确回填 429）
         self._is_stream = is_stream
         self._up = upstream
         self._recorded = False
@@ -1194,9 +1198,9 @@ def chat_completion(channel_id, payload, route_info=None):
         except Exception:  # noqa: BLE001
             # 本地/网络异常：无法确认请求是否已发出，保守不回滚预占（最多多占一个窗口位）
             raise
-        if _rate_limit is not None:
-            _rate_limit.record_result(channel_id, model, key, 200)
-        return _QuotaResponse(channel_id, model, req_payload.get("stream"), resp, route_info=route_info,
+        # 不立即 record_result(200)：等 route_completion 验证通过后再记（P0-1：否则 200 清空 consec429）
+        return _QuotaResponse(channel_id, model, req_payload.get("stream"), resp, key=key,
+                              route_info=route_info,
                               req_text=json.dumps(req_payload.get("messages", ""), ensure_ascii=False))
     if last_err is not None:
         raise last_err  # 全部 key 都 429
@@ -1206,17 +1210,30 @@ def chat_completion(channel_id, payload, route_info=None):
     raise RuntimeError(f"{ch['name']} 无可用请求")
 
 
-def mark_shell_failure(channel_id, model):
+def mark_shell_failure(channel_id, model, key=""):
     """上游以 HTTP 200 返回空壳/错误载荷时由 api_gateway 回填：按合成 429 记入限流台账，
     触发指数退避熔断，让后续请求 try_acquire 直接跳过该渠道（否则统一组每次重试
     都会先撞一遍这个死渠道再 failover，客户端侧表现为反复重启不换渠道）。
-    连续失败按 BACKOFF_STEPS 15s→300s 升级；成功请求照常清零计数。"""
+    连续失败按 BACKOFF_STEPS 15s→300s 升级；成功请求照常清零计数。
+    key：实际产生该空壳的 key（由调用方从 _QuotaResponse._key 传入，避免重新 get_key
+    轮换到错误 key — P0-2 修复）。"""
     if _rate_limit is None:
         return
     try:
-        key = get_key(channel_id)
         if key:
             _rate_limit.record_result(channel_id, model, key, 429)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def record_channel_success(channel_id, model, key):
+    """验证通过后记录渠道成功（P0-1：延迟记录，避免 HTTP 200 提前清零 consec429）。
+    由 route_completion 在空壳/流式首包验证通过后调用。"""
+    if _rate_limit is None:
+        return
+    try:
+        if key:
+            _rate_limit.record_result(channel_id, model, key, 200)
     except Exception:  # noqa: BLE001
         pass
 

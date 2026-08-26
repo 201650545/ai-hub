@@ -2,16 +2,18 @@
 """
 统一 AI 聚合网关 (Unified AI Gateway) v2.1 —— 单一 :3000 入口
 ============================================================
-在 v1（4 大 AI 搜索引擎并发检索 + OpenAI 兼容 API）基础上，升级为**多渠道 API 聚合站**：
+专注 **AI 搜索聚合**：7 大 AI 搜索引擎并发检索 + 内容池汇总 + OpenAI 兼容 API 转发。
+渠道管理/路由编排/用量记账在 :3100 api_gateway，课件编排在 :8791 canvas_orchestrator。
 
-- GET  /                    → 多 Tab 聚合站页面（渠道对话 / AI 搜索 / 渠道管理）
-- GET  /api/channels        → 全部 LLM 渠道健康状态（deepseek/gemini/openrouter + 待填槽位）
-- POST /api/channels/<id>/key   → 保存网页填入的渠道 key 到 channels.json
-- POST /api/channels/<id>/test  → 渠道测速（发一条 ping）
-- GET  /api/unified_stream  → AI 搜索 SSE（4 引擎并发，未连接引擎不阻塞）
+- GET  /                    → 无限画布 AI 搜索页（7 引擎卡片对比）
+- GET  /aggregate           → 多引擎聚合报告交付页
+- GET  /api/unified_stream  → AI 搜索 SSE（7 引擎并发，未连接引擎不阻塞）
+- GET  /api/search_aggregate→ 内容池聚合（内部调 /v1/chat/completions 做汇总）
 - GET  /api/health          → 引擎会话 + LLM 渠道健康
+- GET  /api/history         → 搜索历史
+- GET  /api/quota           → 用量记账
 - GET  /v1/models           → 聚合各渠道可用模型
-- POST /v1/chat/completions → OpenAI 兼容，多渠道路由 + 失败自动 fallback
+- POST /v1/chat/completions → OpenAI 兼容，多渠道路由 + 失败自动 fallback（content_pool/Chatbox 依赖）
       model=yuanbao-search  → 腾讯元宝网页端真实检索（浏览器无感）
       model=deepseek-*/gemini-*/openrouter 模型 → 自动路由到对应渠道
 
@@ -31,6 +33,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+# GATEWAY_ID 必须在 import channels 前冻结（channels 导入时读环境变量），
+# 否则账本/注册会混入默认 ds_v4_cli（GATEWAY_ID 陷阱，见共享 memory）
+os.environ.setdefault("GATEWAY_ID", "search_gateway")
 
 import channels
 import engines
@@ -189,18 +195,22 @@ def engine_thread(engine_id, prompt, out_q):
     """单个引擎的 SSE 事件生产线程。终态必然发 done，保证前端不卡。"""
     try:
         eng = engines.ENGINES.get(engine_id)
+        if not eng:
+            out_q.put({"id": engine_id, "status": "error", "error": "无此引擎适配器"})
+            out_q.put({"id": engine_id, "status": "done", "refs": 0, "ref_links": []})
+            return
         out_q.put({"id": engine_id, "status": "connecting"})
         h = engines.engine_health(engine_id)
         if not h["connected"]:
             out_q.put({"id": engine_id, "status": "unconnected",
                        "error": f"{eng['name']} 会话未绑定（需 setup_engines.py 绑定 + 登录）"})
-            out_q.put({"id": engine_id, "status": "done", "refs": 0})
+            out_q.put({"id": engine_id, "status": "done", "refs": 0, "ref_links": []})
             return
         result = engines.ask_engine(engine_id, prompt, progress=lambda m: out_q.put(
             {"id": engine_id, "status": "progress", "msg": m}))
         if result["status"] != "ok" or not result["answer"]:
             out_q.put({"id": engine_id, "status": "error", "error": result.get("error") or "检索失败"})
-            out_q.put({"id": engine_id, "status": "done", "refs": 0})
+            out_q.put({"id": engine_id, "status": "done", "refs": 0, "ref_links": []})
             return
         answer = result["answer"]
         for i in range(0, len(answer), 30):
@@ -208,16 +218,18 @@ def engine_thread(engine_id, prompt, out_q):
             time.sleep(0.12)
         out_q.put({
             "id": engine_id,
+            "name": eng.get("name", engine_id),
             "status": "done",
             "thinking": result.get("thinking", ""),
             "answer": result.get("answer", ""),
             "answer_html": result.get("answer_html", ""),
-            "refs": result.get("refs", 0)
+            "refs": result.get("refs", 0),
+            "ref_links": result.get("ref_links", []),
         })
     except Exception as e:  # noqa: BLE001
         try:
             out_q.put({"id": engine_id, "status": "error", "error": str(e)})
-            out_q.put({"id": engine_id, "status": "done", "refs": 0})
+            out_q.put({"id": engine_id, "status": "done", "refs": 0, "ref_links": []})
         except Exception:  # noqa: BLE001
             pass
 
@@ -365,8 +377,6 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 "llm": channels.cached_health_all(),
                 "time": time.strftime("%H:%M:%S"),
             })
-        elif path == "/api/channels":
-            self._send_json(200, {"channels": channels.cached_health_all()})
         elif path == "/api/history":
             # task_010：支持 engine=/limit= 查询参数；未传参则返回旧的搜索历史（兼容）
             if query.get("engine") or query.get("limit"):
@@ -443,7 +453,7 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                     if delay > 0:
                         time.sleep(delay)
                     engine_thread(e_id, prompt, out_q)
-                threading.Thread(target=_delayed_launch, args=(eid, idx * 1.5), daemon=True).start()
+                threading.Thread(target=_delayed_launch, args=(eid, idx * 0.5), daemon=True).start()
             remaining = set(active_eids)
             done_items = []
             while remaining:
@@ -456,9 +466,18 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                     remaining.discard(eid)
                     done_items.append(item)
                 self.wfile.write(f"data: {json.dumps(item, ensure_ascii=False)}\n\n".encode("utf-8"))
-                self.wfile.flush()
+                self.wfile.flush()  # 确保每条SSE事件立即发送
             if done_items:
                 save_history_record(prompt, done_items)
+            # #49：所有引擎完成后，调 LLM 汇总生成综合卡片事件
+            try:
+                import content_pool
+                summary = content_pool.llm_summarize(prompt, done_items)
+                if summary:
+                    self.wfile.write(f"data: {json.dumps({'id':'__summary__','status':'done','answer':summary,'refs':0}, ensure_ascii=False)}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+            except Exception:  # noqa: BLE001
+                pass
             self.wfile.write(b"data: [DONE]\n\n")
             self.wfile.flush()
 
@@ -468,86 +487,12 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             prompt = query.get("prompt", [""])[0]
             payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "stream": True}
             self._handle_chat(payload)
-        elif path == "/api/orchestrator/stream":
-            self.send_response(200)
-            self.send_header("Content-Type", "text/event-stream")
-            self.send_header("Cache-Control", "no-cache")
-            self.send_header("Connection", "keep-alive")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            
-            events = [
-                {"ts": time.strftime("%H:%M:%S"), "phase": "framework", "slot": "main", "event": "framework_start", "detail": "正在生成 7 段式 HTML 课件结构..."},
-                {"ts": time.strftime("%H:%M:%S"), "phase": "framework", "slot": "main", "event": "framework_done", "detail": "HTML 框架就绪，扫描到 3 个媒体槽位"},
-                {"ts": time.strftime("%H:%M:%S"), "phase": "scan", "slot": "main", "event": "scan_done", "detail": "扫描到 p12_market (图片), p15_reading (图片), p20_video (视频)"},
-                {"ts": time.strftime("%H:%M:%S"), "phase": "asset_fill", "slot": "p12_market", "event": "generating", "detail": "opencli 注入智谱清言 AI 提示词..."},
-                {"ts": time.strftime("%H:%M:%S"), "phase": "asset_fill", "slot": "p12_market", "event": "done", "detail": "图片生图成功，存入课时资产库", "preview": "file:///d:/项目/06_组件编排器/勘探样例/probe_zhipu.png"},
-                {"ts": time.strftime("%H:%M:%S"), "phase": "asset_fill", "slot": "p15_reading", "event": "generating", "detail": "opencli 注入哩布哩布 Liblib 提示词..."},
-                {"ts": time.strftime("%H:%M:%S"), "phase": "asset_fill", "slot": "p15_reading", "event": "done", "detail": "插图提取完成，存入课时资产库", "preview": "file:///d:/项目/06_组件编排器/勘探样例/probe_liblib.png"},
-                {"ts": time.strftime("%H:%M:%S"), "phase": "verify", "slot": "main", "event": "verify_start", "detail": "正在执行 6 项 HTML verify 规则校验..."},
-                {"ts": time.strftime("%H:%M:%S"), "phase": "verify", "slot": "main", "event": "verify_done", "detail": "Verify 规则校验 100% 绿灯通测！"},
-                {"ts": time.strftime("%H:%M:%S"), "phase": "deliver", "slot": "main", "event": "deliver_done", "detail": "课件自动完工交付！"}
-            ]
-            for ev in events:
-                self.wfile.write(f"data: {json.dumps(ev, ensure_ascii=False)}\n\n".encode("utf-8"))
-                self.wfile.flush()
-                time.sleep(1.2)
-            self.wfile.write(b"data: [DONE]\n\n")
-            self.wfile.flush()
         else:
             self._send_json(200, {"status": "Universal AI Hub Running", "path": path})
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
-
-        if path == "/api/orchestrator/start":
-            self._send_json(200, {"status": "ok", "msg": "编排器生成推演已启动"})
-            return
-        elif path == "/api/orchestrator/confirm":
-            self._send_json(200, {"status": "ok", "msg": "L2 节点确认已接收"})
-            return
-
-        # 保存渠道 key（网页渠道管理页填写）
-        if path.startswith("/api/channels/") and path.endswith("/key"):
-            cid = path.split("/")[3]
-            try:
-                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode("utf-8") or "{}")
-                key = body.get("key", "")
-                if not key or cid not in channels.CHANNELS:
-                    self._send_json(400, {"status": "err", "error": "无效渠道或空 key"})
-                    return
-                channels.save_channel_key(cid, key)
-                h = channels.channel_health(cid)
-                self._send_json(200, {"status": "ok", "name": channels.CHANNELS[cid]["name"],
-                                      "reachable": h["reachable"], "error": h.get("error", "")})
-            except Exception as e:  # noqa: BLE001
-                self._send_json(500, {"status": "err", "error": str(e)})
-            return
-
-        if path.startswith("/api/channels/") and path.endswith("/test"):
-            cid = path.split("/")[3]
-            ch = channels.CHANNELS.get(cid)
-            if not ch:
-                self._send_json(404, {"status": "err", "error": "未知渠道"})
-                return
-            if not channels.key_is_set(cid):
-                self._send_json(200, {"status": "err", "error": "该渠道未配置 key", "name": ch["name"]})
-                return
-            t0 = time.time()
-            try:
-                model = ch["default_model"]
-                resp = channels.chat_completion(cid, {"model": model,
-                                                      "messages": [{"role": "user", "content": "ping"}],
-                                                      "stream": False})
-                data = json.loads(resp.read().decode("utf-8", "ignore"))
-                reply = (data.get("choices", [{}])[0].get("message", {}).get("content", ""))[:120]
-                self._send_json(200, {"status": "ok", "name": ch["name"],
-                                      "latency_ms": int((time.time() - t0) * 1000), "reply": reply})
-            except Exception as e:  # noqa: BLE001
-                self._send_json(200, {"status": "err", "name": ch["name"],
-                                      "error": f"{type(e).__name__}: {str(e)[:120]}"})
-            return
 
         if path in ("/v1/chat/completions", "/chat/completions"):
             try:

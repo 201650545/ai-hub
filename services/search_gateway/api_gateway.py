@@ -59,6 +59,7 @@ except Exception:  # noqa: BLE001
 PORT = int(os.environ.get("API_GATEWAY_PORT", "3100"))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_JSON = os.path.join(channels.DATA_DIR, "api_state.json")
+EXPIRY_JSON = os.path.join(channels.DATA_DIR, "channel_expiry.json")
 
 
 def load_state():
@@ -96,6 +97,20 @@ def save_api_key(key):
     st = load_state()
     st["api_key"] = key
     _write_state(st)
+
+
+def load_expiry():
+    """读取渠道/模型有效期标注。"""
+    try:
+        with open(EXPIRY_JSON, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def save_expiry(data):
+    with open(EXPIRY_JSON, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def _needs_auth(path):
@@ -284,22 +299,25 @@ def route_completion(payload):
             log_entry["resolved_model"] = real_model
             log_entry["fallback_count"] = i
             resp = channels.chat_completion(cid, p2, route_info=dict(log_entry))
+            used_key = getattr(resp, '_key', '')  # P0-2：保存实际使用的 key，避免后续 reassign 丢失
             if not p2.get("stream"):
                 # 非流式：读入内存并做空壳检测（如 modelscope 返回 200+choices:null），
                 # 壳响应视为该渠道失败，继续尝试下一渠道
                 ctype = resp.getheader("Content-Type", "application/json") or "application/json"
                 raw = resp.read()
                 if _looks_like_shell(raw):
-                    channels.mark_shell_failure(cid, real_model)  # 合成 429 → 熔断提前跳过
+                    channels.mark_shell_failure(cid, real_model, used_key)  # 合成 429 → 熔断提前跳过
                     errors.append(cid + ": 空壳响应（choices 为空），已跳过")
                     log_entry["errors"] = list(errors)
                     continue
                 resp = _BufferedResponse(raw, ctype)
+                # 验证通过后记录成功（P0-1：延迟到 shell 检测后，避免 200 提前清零 consec429）
+                channels.record_channel_success(cid, real_model, used_key)
             else:
                 # 流式：首包验证（空流/错误事件 → 换下一渠道），通过则回放包装后透传
                 ok, head = _peek_stream(resp)
                 if not ok:
-                    channels.mark_shell_failure(cid, real_model)  # 合成 429 → 熔断提前跳过
+                    channels.mark_shell_failure(cid, real_model, used_key)  # 合成 429 → 熔断提前跳过
                     errors.append(cid + ": 流式首包为空壳/错误事件，已跳过")
                     log_entry["errors"] = list(errors)
                     try:
@@ -308,6 +326,8 @@ def route_completion(payload):
                         pass
                     continue
                 resp = _PrependResponse(head, resp)
+                # 验证通过后记录成功（P0-1：延迟到 peek 后，避免 200 提前清零 consec429）
+                channels.record_channel_success(cid, real_model, used_key)
             with _ROUTE_LOG_LOCK:
                 _ROUTE_LOG.append(dict(log_entry))
                 if len(_ROUTE_LOG) > _ROUTE_LOG_MAX:
@@ -554,6 +574,18 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             channels.set_hidden_models(hidden)
             self._send_json(200, {"status": "ok", "hidden": channels.load_model_overrides().get("hidden") or []})
             return
+        if path == "/api/expiry":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            # 合并写入：保留原有不在本次提交中的字段
+            existing = load_expiry()
+            existing.update(data)
+            save_expiry(existing)
+            self._send_json(200, {"status": "ok", "expiry": load_expiry()})
+            return
         self._send_json(404, {"error": "not found"})
 
     def _handle_images(self, payload):
@@ -716,6 +748,8 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             else:
                 self._send_json(200, {"channels": _rate_ledger(),
                                       "events": (_rate_events() or []) if _rate_events else []})
+        elif path == "/api/expiry":
+            self._send_json(200, load_expiry())
         elif path == "/api/gateway-info":
             self._send_json(200, gateway_info())
         elif path.startswith("/img/"):

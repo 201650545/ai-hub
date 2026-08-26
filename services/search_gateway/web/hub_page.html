@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Universal AI Hub — 手机/桌面全端无限画布控制台</title>
+<title>AI 搜索聚合 — 多引擎对比控制台</title>
 <style>
 :root {
   --bg-canvas: #f5f5f7;
@@ -423,38 +423,6 @@ html, body {
 }
 .canvas-locked .lock-badge { display: inline-block; }
 
-/* ---------- 编排监工 Widget 特殊样式 ---------- */
-.stepper-mini {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-.step-chip {
-  flex: 1;
-  font-size: 11px;
-  font-weight: 700;
-  text-align: center;
-  padding: 5px 2px;
-  border-radius: 6px;
-  background: var(--bg-canvas);
-  color: var(--text-muted);
-  transition: all 0.2s;
-}
-.step-chip.active { background: var(--primary); color: #fff; box-shadow: 0 0 10px rgba(0,82,204,0.3); }
-.step-chip.done { background: rgba(22, 163, 74, 0.12); color: var(--green); }
-
-.orch-logs-box {
-  background: #1d1d1f;
-  color: #f8fafc;
-  font-family: Consolas, monospace;
-  font-size: 11px;
-  border-radius: 8px;
-  padding: 10px;
-  height: 120px;
-  overflow-y: auto;
-  margin-top: 10px;
-}
-
 /* ---------- Modal 弹窗 ---------- */
 .modal-overlay {
   display: none;
@@ -476,6 +444,114 @@ html, body {
   .dock-toggle-btn { top: -32px; right: 16px; width: 32px; height: 32px; }
   .canvas-controls-toolbar { bottom: 10px; right: 10px; left: 10px; justify-content: space-between; }
 }
+
+/* ═════════ 多风格皮肤层 v1（规范见 D:\项目\services\THEME_GUIDE.md）═════════ */
+
+/* ── 华为商务：科技蓝 + 网格纹理 + 方正 ── */
+html[data-skin="huawei"]{
+  --bg-canvas:#e8eef7; --bg-glass:rgba(255,255,255,.92); --bg-card:#ffffff;
+  --primary:#007dff; --primary-hover:#0066cc; --accent:#007dff;
+  --accent-hover:#0066cc; --accent-subtle:#e3edff;
+  --card-border:#c5d3e8; --hairline:#c5d3e8;
+  --radius-lg:10px; --radius-md:8px;
+  --shadow-sm:0 1px 3px rgba(9,30,66,.14); --shadow-lg:0 14px 36px rgba(9,30,66,.22);
+}
+html[data-skin="huawei"] body{
+  background:linear-gradient(180deg,#dce7f5 0%,#edf3fa 260px,#e8eef7 100%);
+}
+html[data-skin="huawei"] body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(0,125,255,.05) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,125,255,.05) 1px,transparent 1px);
+  background-size:34px 34px;
+}
+html[data-skin="huawei"] .top-nav,
+html[data-skin="huawei"] .left-dock{background:rgba(255,255,255,.96)!important;border-radius:10px;}
+html[data-skin="huawei"] .brand{color:#00284d!important;font-weight:900;}
+html[data-skin="huawei"] .btn{background:#007dff!important;border-radius:8px;}
+html[data-skin="huawei"] .btn:hover{background:#0066cc!important;}
+
+/* ── 小米活力：暖白 + 橙 + 大圆角 ── */
+html[data-skin="xiaomi"]{
+  --bg-canvas:#fff7f0; --primary:#ff6900; --primary-hover:#e55e00; --accent:#ff6900;
+  --accent-subtle:#ffe8d9; --card-border:#ffd9bd; --radius-lg:20px; --radius-md:14px;
+}
+html[data-skin="xiaomi"] body{
+  background:
+    radial-gradient(900px 320px at 18% -8%,rgba(255,105,0,.14),transparent 60%),
+    radial-gradient(700px 300px at 88% -4%,rgba(255,180,80,.12),transparent 55%),
+    #fff7f0;
+}
+html[data-skin="xiaomi"] .top-nav,
+html[data-skin="xiaomi"] .left-dock{background:rgba(255,255,255,.95)!important;border-radius:20px;}
+html[data-skin="xiaomi"] .brand{color:#ff6900!important;font-weight:900;}
+html[data-skin="xiaomi"] .btn{background:linear-gradient(135deg,#ff8a2a,#ff6900)!important;border-radius:999px;}
+html[data-skin="xiaomi"] .btn:active{transform:scale(.94);}
+html[data-skin="xiaomi"] .global-search-box input:focus{box-shadow:0 0 0 3px rgba(255,105,0,.16);}
+
+/* ── 可爱动画：奶油粉紫 + 胖圆贴纸 ── */
+html[data-skin="kawaii"]{
+  --bg-canvas:#fdf0f5; --primary:#ff7eb6; --primary-hover:#f76aa8; --accent:#a78bfa;
+  --accent-subtle:#ffe3ef; --card-border:#ffc4dd; --radius-lg:24px; --radius-md:18px;
+}
+html[data-skin="kawaii"] body{
+  font-family:"Yuanti SC","YouYuan","幼圆","PingFang SC","Microsoft YaHei",sans-serif;
+  background:
+    radial-gradient(520px 380px at 12% 16%,rgba(167,139,250,.16),transparent 60%),
+    radial-gradient(620px 420px at 86% 10%,rgba(255,126,182,.18),transparent 58%),
+    radial-gradient(500px 400px at 70% 88%,rgba(110,231,183,.13),transparent 55%),
+    #fdf0f5;
+}
+html[data-skin="kawaii"] .top-nav,
+html[data-skin="kawaii"] .left-dock{
+  background:rgba(255,255,255,.93)!important;border-radius:24px;
+  border:2px solid #ffc4dd!important;box-shadow:0 6px 26px rgba(255,126,182,.18)!important;
+}
+html[data-skin="kawaii"] .brand{color:#ff5ca8!important;font-weight:900;}
+html[data-skin="kawaii"] .btn{
+  background:linear-gradient(135deg,#ff9ecb,#ff7eb6)!important;border-radius:999px;font-weight:800;
+}
+html[data-skin="kawaii"] .btn:hover{animation:kawaii-wiggle .45s ease-in-out;background:linear-gradient(135deg,#ff8ac2,#f76aa8)!important;}
+html[data-skin="kawaii"] .widget-head{background:linear-gradient(90deg,#fff0f7,#f5efff);}
+@keyframes kawaii-wiggle{
+  0%,100%{transform:rotate(0)}25%{transform:rotate(-3deg) scale(1.04)}75%{transform:rotate(3deg) scale(1.04)}
+}
+html[data-skin="kawaii"] .skin-heart{
+  position:fixed;z-index:9999;pointer-events:none;font-size:18px;
+  animation:kawaii-float 1s ease-out forwards;
+}
+@keyframes kawaii-float{
+  from{opacity:.95;transform:translateY(0) scale(.7)}
+  to{opacity:0;transform:translateY(-64px) scale(1.35)}
+}
+
+/* ── 切换器悬浮坞 ── */
+#skin-dock{position:fixed;right:16px;bottom:76px;z-index:200;display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+#skin-fab{
+  width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;font-size:20px;
+  background:rgba(255,255,255,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:var(--shadow-lg);transition:transform .15s;
+}
+#skin-fab:hover{transform:scale(1.1) rotate(12deg);}
+#skin-menu{
+  display:none;flex-direction:column;gap:6px;padding:10px;border-radius:16px;
+  background:rgba(255,255,255,.95);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border:1.5px solid var(--card-border);box-shadow:var(--shadow-lg);
+}
+#skin-menu.open{display:flex;}
+.skin-chip{
+  display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:11px;border:1.5px solid transparent;
+  background:transparent;cursor:pointer;font-size:13px;font-weight:700;color:var(--text-main);white-space:nowrap;
+}
+.skin-chip:hover{background:var(--accent-subtle);}
+.skin-chip.on{border-color:var(--primary);background:var(--accent-subtle);}
+#skin-toast{
+  position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);z-index:300;
+  padding:9px 20px;border-radius:999px;background:rgba(20,20,30,.86);color:#fff;
+  font-size:13px;font-weight:700;opacity:0;pointer-events:none;transition:all .25s;
+}
+#skin-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
@@ -484,12 +560,12 @@ html, body {
 <!-- 1. 顶部全域悬浮控制与搜索 Bar -->
 <header class="top-nav">
   <div class="brand">
-    🌐 Universal <b>AI Canvas</b> <span class="lock-badge" id="lock-badge-top">🔒 画布已锁定</span>
+    🌐 AI <b>搜索</b> <span class="lock-badge" id="lock-badge-top">🔒 画布已锁定</span>
   </div>
 
   <div class="global-search-box">
-    <input id="global-prompt-input" type="text" placeholder="输入问题或自动编排指令，发起对比与生成…" onkeydown="if(event.key==='Enter') triggerGlobalCanvasSearch()">
-    <button type="button" id="global-search-btn" class="btn" onclick="triggerGlobalCanvasSearch()">🚀 组合执行</button>
+    <input id="global-prompt-input" type="text" placeholder="输入问题，发起多引擎对比搜索…" onkeydown="if(event.key==='Enter') triggerGlobalCanvasSearch()">
+    <button type="button" id="global-search-btn" class="btn" onclick="triggerGlobalCanvasSearch()">🔍 搜索</button>
   </div>
 
   <div class="top-actions">
@@ -538,7 +614,7 @@ html, body {
   <button type="button" class="btn btn-secondary" style="padding:6px 10px;font-size:14px;" onclick="zoomCanvas(-0.1)" title="缩小视角">➖</button>
   <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="resetCanvasTransform()" title="重置视角">🎯 重置</button>
   <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="autoAlignWidgets()" title="整齐网格对齐">📐 整理</button>
-  <button type="button" class="btn" style="padding:6px 12px;font-size:12px;" onclick="addAllSearchEnginesToCanvas()" title="一键挂载全部 6 大 AI 搜索引擎卡片">⚡ 一键挂载全 AI 引擎</button>
+  <button type="button" class="btn" style="padding:6px 12px;font-size:12px;" onclick="addAllSearchEnginesToCanvas()" title="一键挂载全部 8 大 AI 搜索引擎卡片">⚡ 一键挂载全 AI 引擎</button>
 </div>
 
 <!-- 5. 组合视图预设 Modal 弹窗 -->
@@ -550,7 +626,7 @@ html, body {
     </div>
     <div class="widget-body" style="display:flex;flex-direction:column;gap:14px;padding:16px;">
       <div style="display:flex;gap:10px;">
-        <input id="preset-name-input" type="text" placeholder="输入新的组合视图名称（例如：我的课件工作台）" style="flex:1;padding:8px 12px;border:1.5px solid var(--card-border);border-radius:8px;font-size:13px;">
+        <input id="preset-name-input" type="text" placeholder="输入新的组合视图名称（例如：我的多引擎搜索台）" style="flex:1;padding:8px 12px;border:1.5px solid var(--card-border);border-radius:8px;font-size:13px;">
         <button type="button" class="btn" onclick="saveNewPreset()">💾 保存当前视图</button>
       </div>
       <div style="font-size:13px;font-weight:700;margin-top:6px;">📋 预设方案列表 (一键切换):</div>
@@ -581,31 +657,28 @@ html, body {
    ========================================================================== */
 
 const AVAILABLE_WIDGET_TYPES = {
-  "orchestrator_canvas": { id: "orchestrator_canvas", type: "tool", category: "html_gen", name: "AI 课件编排监工", icon: "🎬", badge: "全自动 HTML 课件生成与观察窗" },
   "yuanbao": { id: "yuanbao", type: "search", category: "search", name: "腾讯元宝 AI 搜", icon: "🐧", badge: "微信公众号 + 全网" },
   "doubao": { id: "doubao", type: "search", category: "search", name: "字节豆包 AI 搜", icon: "🧩", badge: "字节抖音全网实时" },
   "kimi": { id: "kimi", type: "search", category: "search", name: "月之暗面 Kimi", icon: "🌙", badge: "200万字长上下文" },
   "qianwen": { id: "qianwen", type: "search", category: "search", name: "通义千问智搜", icon: "🎈", badge: "阿里通义全网检索" },
+  "metaso": { id: "metaso", type: "search", category: "search", name: "秘塔AI搜索", icon: "🔬", badge: "无广告直达 · 全网/学术" },
   "grok": { id: "grok", type: "search", category: "search", name: "xAI Grok", icon: "🤖", badge: "Grok 实时全网智搜" },
   "perplexity": { id: "perplexity", type: "search", category: "search", name: "Perplexity 搜", icon: "🔍", badge: "Perplexity 深度检索" },
-  "zai": { id: "zai", type: "search", category: "search", name: "Z.ai 智搜", icon: "⚡", badge: "Z.ai 智能全网检索" },
-  "llm_chat": { id: "llm_chat", type: "tool", category: "api_relay", name: "多渠道对话 Box", icon: "💬", badge: "API 中转即时对话" },
-  "channel_status": { id: "channel_status", type: "tool", category: "api_relay", name: "中转站路由中心", icon: "📡", badge: "白嫖 API 路由监控" },
-  "memo_note": { id: "memo_note", type: "tool", category: "html_gen", name: "AI 灵感便签", icon: "📝", badge: "Markdown 随手记" }
+  "zai": { id: "zai", type: "search", category: "search", name: "Z.ai 智搜", icon: "⚡", badge: "Z.ai 智能全网检索" }
 };
 
-let activeWidgets = JSON.parse(localStorage.getItem('spatial_widgets_state_v4') || '[]');
-if (!activeWidgets || !activeWidgets.length) {
-  activeWidgets = ['yuanbao', 'doubao', 'kimi', 'qianwen', 'grok', 'perplexity'];
+let activeWidgets = JSON.parse(localStorage.getItem('spatial_widgets_state_v4') || '[]') || [];
+activeWidgets = activeWidgets.filter(id => AVAILABLE_WIDGET_TYPES[id]);  // 剔除已下架 widget 的残留 id
+if (!activeWidgets.length) {
+  activeWidgets = ['yuanbao', 'doubao', 'kimi', 'qianwen', 'metaso', 'grok', 'perplexity', 'zai'];
 }
+localStorage.setItem('spatial_widgets_state_v4', JSON.stringify(activeWidgets));  // 持久化清理结果
 let widgetPositions = JSON.parse(localStorage.getItem('spatial_widgets_pos_v4') || '{}');
 
 let canvasPanX = 40, canvasPanY = 90, canvasZoomScale = 1.0;
 let isPanning = false, startPanX = 0, startPanY = 0;
 let isHandMode = false, isSpacePressed = false, isCanvasLocked = false;
 let touchPinchStartDist = 0, initialTouchZoom = 1.0;
-let channelCache = {};
-let orchEventSource = null;
 
 /* ---------- 切换与锁定画布 ---------- */
 function toggleCanvasLock() {
@@ -756,15 +829,11 @@ function toggleDock() {
 }
 
 const WIDGET_CATEGORIES = [
-  { id: "search", title: "🔍 AI 全网搜索引擎", badge: "7大AI智搜" },
-  { id: "api_relay", title: "📡 API 中转与通道监控", badge: "中转与路由" },
-  { id: "html_gen", title: "🎬 HTML 课件生成与编排", badge: "生成与便签" }
+  { id: "search", title: "🔍 AI 全网搜索引擎", badge: "7大AI智搜" }
 ];
 
 let categoryExpandedState = {
-  search: true,
-  api_relay: true,
-  html_gen: true
+  search: true
 };
 
 function toggleCategoryGroup(catId) {
@@ -849,7 +918,7 @@ function renderCanvasWidgets() {
   canvas.innerHTML = '';
 
   if (activeWidgets.length === 0) {
-    activeWidgets = ["orchestrator_canvas", "yuanbao", "doubao", "channel_status"];
+    activeWidgets = ["yuanbao", "doubao", "kimi", "qianwen", "grok", "perplexity", "zai"];
     saveWidgetState();
   }
 
@@ -858,8 +927,8 @@ function renderCanvasWidgets() {
     const pos = widgetPositions[id] || {
       x: 30 + (idx % 3) * 440,
       y: 30 + Math.floor(idx / 3) * 430,
-      w: id === 'orchestrator_canvas' ? 840 : (id === 'channel_status' ? 840 : 420),
-      h: id === 'orchestrator_canvas' ? 440 : (id === 'channel_status' ? 380 : 400)
+      w: 420,
+      h: 400
     };
 
     const widget = document.createElement('div');
@@ -870,71 +939,6 @@ function renderCanvasWidgets() {
     let bodyHTML = '';
     if (info.type === 'search') {
       bodyHTML = `<div class="node-body" id="body-${id}">等待发起搜索…</div>`;
-    } else if (id === 'orchestrator_canvas') {
-      bodyHTML = `
-        <div style="display:flex;flex-direction:column;gap:10px;height:100%;">
-          <div class="stepper-mini" id="orch-stepper">
-            <div class="step-chip active" id="chip-framework">1. 框架生成</div>
-            <div class="step-chip" id="chip-scan">2. 槽位扫描</div>
-            <div class="step-chip" id="chip-asset_fill">3. 资产生图</div>
-            <div class="step-chip" id="chip-verify">4. 规则校验</div>
-            <div class="step-chip" id="chip-deliver">5. 交付完工</div>
-          </div>
-
-          <div style="display:flex;gap:10px;flex:1;overflow:hidden;">
-            <div id="orch-slot-grid" style="flex:1;display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;overflow-y:auto;background:var(--bg-canvas);border-radius:10px;padding:10px;">
-              <div style="font-size:12px;color:var(--text-muted);margin:auto;grid-column:span 2;">点击下方【🚀 发起 AI 课件自动编排】推演生图</div>
-            </div>
-            <div class="orch-logs-box" id="orch-logs-box" style="width:260px;">
-              <div style="font-weight:700;color:#3b82f6;margin-bottom:4px;">📡 编排器实时事件流:</div>
-            </div>
-          </div>
-
-          <div style="display:flex;align-items:center;justify-content:space-between;border-top:1.5px solid var(--card-border);padding-top:8px;">
-            <button type="button" class="btn" onclick="startOrchestratorPipeline()" style="background:var(--primary);font-size:12px;padding:6px 14px;">🚀 发起 AI 课件全自动编排</button>
-            <button type="button" class="btn btn-secondary" onclick="confirmL2Action()" style="font-size:12px;padding:6px 14px;">✓ L2 关键节点确认</button>
-          </div>
-        </div>
-      `;
-    } else if (id === 'llm_chat') {
-      bodyHTML = `
-        <div style="display:flex;flex-direction:column;gap:10px;height:100%;">
-          <div style="display:flex;gap:8px;">
-            <select id="chat-ch-sel" onchange="loadChannelModels()" style="flex:1;padding:8px;border:1.5px solid var(--hairline);border-radius:8px;font-size:13px;font-weight:600;"></select>
-            <select id="chat-md-sel" style="flex:1.2;padding:8px;border:1.5px solid var(--hairline);border-radius:8px;font-size:13px;font-weight:600;"></select>
-          </div>
-          <textarea id="chat-input" placeholder="输入提示词对话…" style="height:70px;padding:8px;border:1.5px solid var(--hairline);border-radius:8px;font-size:13px;font-weight:600;resize:none;">你好，用一句话介绍你自己</textarea>
-          <button type="button" class="btn" onclick="sendLlmChat()" style="padding:8px 16px;font-size:13px;">发送对话</button>
-          <div id="chat-reply" style="flex:1;background:var(--bg-canvas);border-radius:8px;padding:10px;font-size:13px;overflow-y:auto;white-space:pre-wrap;font-family:monospace;">等待发送…</div>
-        </div>
-      `;
-    } else if (id === 'channel_status') {
-      bodyHTML = `
-        <div style="display:flex;flex-direction:column;gap:10px;height:100%;overflow:hidden;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:13px;font-weight:700;">📡 聚合中转路由监控</span>
-            <button type="button" class="btn btn-secondary" onclick="refreshChannels()" style="padding:4px 10px;font-size:12px;">🔄 刷新状态</button>
-          </div>
-          <div style="flex:1;overflow-y:auto;">
-            <table style="width:100%;border-collapse:collapse;font-size:13px;">
-              <thead>
-                <tr style="background:var(--bg-canvas);border-bottom:1.5px solid var(--hairline);">
-                  <th style="padding:8px;text-align:left;">渠道与来源</th>
-                  <th style="padding:8px;text-align:left;">类型</th>
-                  <th style="padding:8px;text-align:left;">状态</th>
-                  <th style="padding:8px;text-align:left;">可用模型</th>
-                </tr>
-              </thead>
-              <tbody id="ch-tbody-canvas"></tbody>
-            </table>
-          </div>
-        </div>
-      `;
-    } else if (id === 'memo_note') {
-      bodyHTML = `
-        <textarea style="width:100%;height:100%;border:none;outline:none;resize:none;font-size:14px;line-height:1.7;font-family:inherit;background:transparent;" 
-                  placeholder="✍️ 随意记录您的 AI 灵感便签与思考…"></textarea>
-      `;
     }
 
     widget.innerHTML = `
@@ -971,81 +975,7 @@ function renderCanvasWidgets() {
 
   renderWidgetLibrary();
   updateCanvasTransform();
-  refreshChannels();
-  initOrchestratorStream();
   restoreCanvasSearchResults();
-}
-
-/* ---------- 编排监工 Widget SSE 消息处理 ---------- */
-function initOrchestratorStream() {
-  if (orchEventSource) return;
-  try {
-    orchEventSource = new EventSource('/api/orchestrator/stream');
-    orchEventSource.onmessage = (ev) => {
-      try {
-        const d = JSON.parse(ev.data);
-        handleOrchSSE(d);
-      } catch(e){}
-    };
-  } catch(e){}
-}
-
-function handleOrchSSE(data) {
-  const logBox = document.getElementById('orch-logs-box');
-  if (logBox) {
-    const line = document.createElement('div');
-    line.style.cssText = 'margin-bottom:4px;line-height:1.4;';
-    line.innerHTML = `<span style="color:#94a3b8;">[${data.ts||'14:00'}] ${data.phase}:</span> <b>${data.event}</b> ${data.detail||''}`;
-    logBox.appendChild(line);
-    logBox.scrollTop = logBox.scrollHeight;
-  }
-
-  const phases = ["framework", "scan", "asset_fill", "verify", "deliver"];
-  const currIdx = phases.indexOf(data.phase);
-  phases.forEach((p, idx) => {
-    const chip = document.getElementById('chip-' + p);
-    if (!chip) return;
-    chip.classList.remove('active', 'done');
-    if (idx < currIdx) chip.classList.add('done');
-    else if (idx === currIdx) chip.classList.add('active');
-  });
-
-  if (data.slot && data.slot !== 'main') {
-    const grid = document.getElementById('orch-slot-grid');
-    if (grid) {
-      let card = document.getElementById('slot-card-' + data.slot);
-      if (!card) {
-        card = document.createElement('div');
-        card.id = 'slot-card-' + data.slot;
-        card.style.cssText = 'background:#fff;border:1px solid var(--card-border);border-radius:8px;padding:8px;font-size:12px;display:flex;flex-direction:column;gap:4px;';
-        grid.appendChild(card);
-      }
-      let badge = '⏳ 待处理';
-      if (data.event === 'generating') badge = '🔄 生图中';
-      else if (data.event === 'done') badge = '✅ 完工';
-
-      card.innerHTML = `
-        <div style="display:flex;justify-content:space-between;font-weight:700;">
-          <span>#${data.slot}</span>
-          <span style="color:var(--primary);">${badge}</span>
-        </div>
-        <div style="font-size:11px;color:var(--text-muted);">${data.detail||'媒体槽位'}</div>
-        ${data.preview ? `<img src="${data.preview}" style="width:100%;height:70px;object-fit:cover;border-radius:6px;margin-top:4px;">` : ''}
-      `;
-    }
-  }
-}
-
-function startOrchestratorPipeline() {
-  fetch('/api/orchestrator/start', { method: 'POST' })
-    .then(r => r.json())
-    .then(d => alert('🚀 AI 课件全自动编排推演已成功启动！'));
-}
-
-function confirmL2Action() {
-  fetch('/api/orchestrator/confirm', { method: 'POST' })
-    .then(r => r.json())
-    .then(d => alert('✅ L2 节点人工确认通过，继续自治推进！'));
 }
 
 /* ---------- 拖拽组件 Card ---------- */
@@ -1147,7 +1077,7 @@ function addWidgetToCanvas(id) {
 }
 
 function addAllSearchEnginesToCanvas() {
-  const searchIds = ['yuanbao', 'doubao', 'kimi', 'qianwen', 'grok', 'perplexity', 'zai'];
+  const searchIds = ['yuanbao', 'doubao', 'kimi', 'qianwen', 'metaso', 'grok', 'perplexity', 'zai'];
   searchIds.forEach(id => {
     if (!activeWidgets.includes(id)) {
       activeWidgets.push(id);
@@ -1180,8 +1110,8 @@ function autoAlignWidgets() {
     widgetPositions[id] = {
       x: 30 + (idx % 3) * 440,
       y: 30 + Math.floor(idx / 3) * 430,
-      w: widgetPositions[id] ? widgetPositions[id].w : (id === 'orchestrator_canvas' ? 840 : (id === 'channel_status' ? 840 : 420)),
-      h: widgetPositions[id] ? widgetPositions[id].h : (id === 'orchestrator_canvas' ? 440 : (id === 'channel_status' ? 380 : 400))
+      w: widgetPositions[id] ? widgetPositions[id].w : 420,
+      h: widgetPositions[id] ? widgetPositions[id].h : 400
     };
   });
   saveWidgetPositions();
@@ -1204,24 +1134,8 @@ const BUILTIN_PRESETS = {
   "default_search": {
     id: "default_search",
     name: "🌐 多 AI 全域对比视图",
-    activeWidgets: ["yuanbao", "doubao", "kimi", "qianwen", "grok", "perplexity"],
+    activeWidgets: ["yuanbao", "doubao", "kimi", "qianwen", "grok", "perplexity", "zai"],
     zoomScale: 0.85,
-    panX: 40,
-    panY: 80
-  },
-  "courseware_monitor": {
-    id: "courseware_monitor",
-    name: "🎬 AI 自动化课件生成观察台",
-    activeWidgets: ["orchestrator_canvas", "yuanbao", "doubao", "channel_status"],
-    zoomScale: 0.9,
-    panX: 30,
-    panY: 70
-  },
-  "llm_workbench": {
-    id: "llm_workbench",
-    name: "💬 LLM 渠道对话与控制台视图",
-    activeWidgets: ["llm_chat", "channel_status", "memo_note"],
-    zoomScale: 1.0,
     panX: 40,
     panY: 80
   }
@@ -1319,11 +1233,11 @@ function loadCompositionPreset(presetId) {
 function triggerGlobalCanvasSearch() {
   const input = document.getElementById('global-prompt-input');
   const prompt = input ? input.value.trim() : '';
-  if (!prompt) { alert('请输入搜索或编排问题'); return; }
+  if (!prompt) { alert('请输入搜索问题'); return; }
 
   let searchEngineIds = activeWidgets.filter(id => AVAILABLE_WIDGET_TYPES[id] && AVAILABLE_WIDGET_TYPES[id].type === 'search');
   if (searchEngineIds.length === 0) {
-    const defaultSearchEngines = ['yuanbao', 'doubao', 'kimi', 'qianwen', 'grok', 'perplexity', 'zai'];
+    const defaultSearchEngines = ['yuanbao', 'doubao', 'kimi', 'qianwen', 'metaso', 'grok', 'perplexity', 'zai'];
     defaultSearchEngines.forEach(id => {
       if (!activeWidgets.includes(id)) activeWidgets.push(id);
     });
@@ -1360,26 +1274,35 @@ function triggerGlobalCanvasSearch() {
       }
       try {
         const d = JSON.parse(ev.data);
+        // #50: handle __summary__ event
+        if (d.id === '__summary__' && d.answer) {
+          renderSummaryCard(d.answer);
+          return;
+        }
         if (d.id && searchEngineIds.includes(d.id)) {
           const b = document.getElementById('body-' + d.id);
           const s = document.getElementById('status-' + d.id);
           if (d.status === 'progress' && b) {
             b.innerText = d.msg;
-          } else if (d.status === 'done' && b) {
-            const answerText = d.answer || d.text || '';
-            b.innerHTML = renderResultHTML(d.thinking, answerText, d.answer_html || '');
-            const statusText = d.refs ? `完成 · 引用 ${d.refs} 条` : '完成';
-            currentResults[d.id] = { answer: answerText, html: b.innerHTML, statusText: statusText };
-            if (s) s.innerText = statusText;
+          } else if (d.status === 'unconnected' && b) {
+            // #50: show unbound state
+            b.innerHTML = '<div style="text-align:center;padding:20px;color:#86868b;">⚪ 未绑定<br><span style="font-size:12px;">需 setup_engines.py 绑定 + 登录</span></div>';
+            if (s) s.innerText = '未绑定';
+            currentResults[d.id] = { answer: '', html: b.innerHTML, statusText: '未绑定' };
+          } else if ((d.status === 'done' || d.status === 'ok') && b) {
+            if (d.answer || d.thinking) {
+              const answerText = d.answer || d.text || '';
+              const refLinks = d.ref_links || [];
+              b.innerHTML = renderResultHTML(d.thinking, answerText, d.answer_html || '', refLinks, d.id);
+              const statusText = d.refs ? `完成 · 引用 ${d.refs} 条` : '完成';
+              currentResults[d.id] = { answer: answerText, html: b.innerHTML, statusText: statusText };
+              if (s) s.innerText = statusText;
+            }
           }
         }
       } catch(e){}
     };
     es.onerror = () => es.close();
-  }
-
-  if (activeWidgets.includes('orchestrator_canvas')) {
-    startOrchestratorPipeline();
   }
 }
 
@@ -1490,7 +1413,7 @@ function safeMarkdownParse(str) {
   return html;
 }
 
-function renderResultHTML(thinking, answer, answerHTML) {
+function renderResultHTML(thinking, answer, answerHTML, refLinks, engineId) {
   let html = '';
   if (thinking) {
     html += `<details style="background:#f8fafc;border:1px solid #e8e8ed;border-radius:8px;padding:8px 12px;margin-bottom:12px;">` +
@@ -1508,7 +1431,82 @@ function renderResultHTML(thinking, answer, answerHTML) {
   }
 
   html += `<div class="formatted-answer" style="color:#1d1d1f;font-size:14px;line-height:1.75;">${content}</div>`;
+
+  // #50: ref_links source chips
+  if (refLinks && refLinks.length > 0) {
+    html += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid #e8e8ed;">';
+    html += '<div style="font-size:11px;font-weight:700;color:#86868b;margin-bottom:6px;">🔗 引用来源</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+    for (var i = 0; i < refLinks.length; i++) {
+      var link = refLinks[i];
+      var title = link.title || link.url || '';
+      if (title.length > 40) title = title.slice(0, 37) + '...';
+      html += '<a href="' + (link.url || '#') + '" target="_blank" rel="noopener" style="display:inline-block;padding:3px 8px;border-radius:12px;background:#f0f4ff;border:1px solid #d0d8f0;color:#4a5a8a;font-size:11px;text-decoration:none;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + (link.title || link.url || '') + '">' + title + ' ↗</a>';
+    }
+    html += '</div></div>';
+  }
+
+  // #50: retry button
+  if (engineId) {
+    html += '<div style="margin-top:10px;text-align:right;">';
+    html += '<button type="button" onclick="retrySingleEngine('' + engineId + '')" style="padding:3px 10px;border-radius:8px;border:1px solid #d2d2d7;background:#f8fafc;cursor:pointer;font-size:11px;color:#1d1d1f;">🔄 重问</button>';
+    html += '</div>';
+  }
+
   return html;
+}
+
+function renderSummaryCard(summary) {
+  // #50: render __summary__ event as a summary card at top of canvas
+  var existing = document.getElementById('summary-card');
+  if (existing) existing.remove();
+
+  var card = document.createElement('div');
+  card.id = 'summary-card';
+  card.className = 'spatial-widget';
+  card.style.cssText = 'left:30px;top:30px;width:90%;max-width:700px;height:auto;min-height:80px;z-index:50;border:2px solid #0071e3;box-shadow:0 4px 20px rgba(0,113,227,0.15);';
+
+  card.innerHTML = '<div class="widget-head" style="cursor:default;background:linear-gradient(135deg,#0071e3,#005bb5);color:#fff;border-radius:10px 10px 0 0;">'
+    + '<div class="widget-title">🧊 综合摘要 <span style="font-size:11px;font-weight:400;opacity:0.8;">AI 多源汇总</span></div>'
+    + '<div class="widget-actions">'
+    + '<button type="button" class="icon-btn" onclick="this.closest(\'.spatial-widget\').remove()" style="color:#fff;opacity:0.8;" title="关闭综合卡">✕</button>'
+    + '</div></div>'
+    + '<div class="widget-body" style="padding:16px 20px;font-size:14px;line-height:1.75;color:#1d1d1f;">' + safeMarkdownParse(summary) + '</div>';
+
+  document.getElementById('spatial-canvas').prepend(card);
+}
+
+function retrySingleEngine(engineId) {
+  // #50: retry a single engine search
+  var prompt = document.getElementById('global-prompt-input').value.trim();
+  if (!prompt) return;
+
+  var body = document.getElementById('body-' + engineId);
+  var status = document.getElementById('status-' + engineId);
+  if (body) body.innerHTML = '正在重新检索…<span class="cursor-blink"></span>';
+  if (status) status.innerText = '检索中…';
+
+  var es = new EventSource('/api/unified_stream?prompt=' + encodeURIComponent(prompt) + '&engines=' + encodeURIComponent(engineId));
+  es.onmessage = function(ev) {
+    if (ev.data === '[DONE]') {
+      es.close();
+      var b = document.getElementById('body-' + engineId);
+      var c = b ? b.querySelector('.cursor-blink') : null;
+      if (c) c.remove();
+      return;
+    }
+    try {
+      var d = JSON.parse(ev.data);
+      if (d.id === engineId && (d.status === 'done' || d.status === 'ok') && body) {
+        if (d.answer || d.thinking) {
+          var refLinks = d.ref_links || [];
+          body.innerHTML = renderResultHTML(d.thinking, d.answer || d.text || '', d.answer_html || '', refLinks, engineId);
+          if (status) status.innerText = d.refs ? '完成 · 引用 ' + d.refs + ' 条' : '完成';
+        }
+      }
+    } catch(e) {}
+  };
+  es.onerror = function() { es.close(); };
 }
 
 function saveCanvasSearchResults(prompt, resultsMap) {
@@ -1542,70 +1540,6 @@ function restoreCanvasSearchResults() {
       });
     }
   } catch(e){}
-}
-
-async function refreshChannels() {
-  try {
-    const d = await (await fetch('/api/channels')).json();
-    channelCache = d.channels || {};
-    const csel = document.getElementById('chat-ch-sel');
-    if (csel) {
-      csel.innerHTML = '';
-      Object.entries(channelCache).forEach(([id, ch]) => {
-        const ok = ch.key_set && ch.reachable;
-        csel.innerHTML += `<option value="${id}">${ok ? '✓ ' : ''}${ch.name}${ok ? '' : '（待配置）'}</option>`;
-      });
-      loadChannelModels();
-    }
-    const tbody = document.getElementById('ch-tbody-canvas');
-    if (tbody) {
-      tbody.innerHTML = '';
-      Object.entries(channelCache).forEach(([id, ch]) => {
-        const ok = ch.key_set && ch.reachable;
-        const statusBadge = ok ? '<span style="color:var(--green);font-weight:700;">已连接</span>' : '<span style="color:var(--amber);font-weight:700;">待配置</span>';
-        const models = (ch.models && ch.models.length) ? ch.models.join(', ') : '—';
-        tbody.innerHTML += `
-          <tr style="border-bottom:1px solid var(--card-border);">
-            <td style="padding:8px;font-weight:700;">${ch.icon || '🔗'} ${ch.name}</td>
-            <td style="padding:8px;font-size:12px;">${ch.billing_tag || '免费'}</td>
-            <td style="padding:8px;">${statusBadge}</td>
-            <td style="padding:8px;font-size:12px;font-family:monospace;">${models}</td>
-          </tr>
-        `;
-      });
-    }
-  } catch(e){}
-}
-
-function loadChannelModels() {
-  const csel = document.getElementById('chat-ch-sel');
-  const msel = document.getElementById('chat-md-sel');
-  if (!csel || !msel) return;
-  const ch = channelCache[csel.value];
-  if (!ch) return;
-  msel.innerHTML = '';
-  const models = (ch.models && ch.models.length) ? ch.models : [ch.default_model || '—'];
-  models.forEach(m => msel.innerHTML += `<option value="${m}">${m}</option>`);
-}
-
-function sendLlmChat() {
-  const msel = document.getElementById('chat-md-sel');
-  const prompt = document.getElementById('chat-input').value;
-  const reply = document.getElementById('chat-reply');
-  if (!msel || !reply) return;
-  const model = msel.value;
-  reply.innerText = '请求 ' + model + ' 中…';
-  const es = new EventSource('/v1/sse?model=' + encodeURIComponent(model) + '&prompt=' + encodeURIComponent(prompt));
-  let buf = '';
-  es.onmessage = ev => {
-    if (ev.data === '[DONE]') { es.close(); return; }
-    try {
-      const o = JSON.parse(ev.data);
-      const c = o.choices[0].delta.content;
-      if (c) { buf += c; reply.innerText = buf; }
-    } catch(e){}
-  };
-  es.onerror = () => { es.close(); if(!buf) reply.innerText = '请求失败：渠道未就绪'; };
 }
 
 function openHistoryModal() {
@@ -1702,6 +1636,70 @@ window.onload = () => {
   renderCanvasWidgets();
   updateCanvasTransform();
 };
+</script>
+
+<!-- ═════════ 多风格皮肤切换器（规范见 D:\项目\services\THEME_GUIDE.md）═════════ -->
+<div id="skin-dock">
+  <div id="skin-menu"></div>
+  <button id="skin-fab" onclick="skinToggleMenu()" title="切换界面风格">🎨</button>
+</div>
+<div id="skin-toast"></div>
+<script id="skin-js">
+(function(){
+  const SKINS=[
+    {id:'apple', name:'苹果极简', icon:'🍎'},
+    {id:'huawei',name:'华为商务', icon:'🔵'},
+    {id:'xiaomi',name:'小米活力', icon:'🧡'},
+    {id:'kawaii',name:'可爱动画', icon:'🌸'},
+  ];
+  const KEY='hub-skin';
+  const menu=document.getElementById('skin-menu');
+  menu.innerHTML=SKINS.map(s=>
+    '<button class="skin-chip" data-skin="'+s.id+'" onclick="skinApply(\''+s.id+'\')">'+s.icon+' '+s.name+'</button>'
+  ).join('');
+
+  window.skinToggleMenu=function(){menu.classList.toggle('open');};
+
+  let _st=null;
+  window.skinToast=function(msg){
+    const t=document.getElementById('skin-toast');
+    t.textContent=msg;t.classList.add('show');
+    clearTimeout(_st);_st=setTimeout(()=>t.classList.remove('show'),1600);
+  };
+
+  window.skinApply=function(id){
+    document.documentElement.setAttribute('data-skin',id);
+    try{localStorage.setItem(KEY,id);}catch(e){}
+    menu.querySelectorAll('.skin-chip').forEach(c=>c.classList.toggle('on',c.dataset.skin===id));
+    const s=SKINS.find(x=>x.id===id);
+    skinToast((s?s.icon+' ':'')+'已切换：'+(s?s.name:id));
+    if(document.getElementById('skin-fab'))document.getElementById('skin-fab').textContent=id==='kawaii'?'🎀':(id==='xiuxian'?'☯':'🎨');
+  };
+
+  /* logo 彩蛋 */
+  const brand=document.querySelector('.brand');
+  if(brand)brand.addEventListener('click',()=>{
+    brand.style.transition='transform .6s cubic-bezier(.34,1.56,.64,1)';
+    brand.style.transform='rotate(360deg) scale(1.06)';
+    setTimeout(()=>{brand.style.transition='';brand.style.transform='';},620);
+  });
+
+  /* kawaii 点击爱心粒子 */
+  document.addEventListener('click',e=>{
+    if(document.documentElement.getAttribute('data-skin')!=='kawaii')return;
+    const h=document.createElement('span');
+    h.className='skin-heart';
+    h.textContent=['❤️','💖','🌸','✨'][Math.floor(Math.random()*4)];
+    h.style.left=(e.clientX-9)+'px';h.style.top=(e.clientY-14)+'px';
+    document.body.appendChild(h);
+    setTimeout(()=>h.remove(),1050);
+  });
+
+  /* 初始化（默认 apple） */
+  let cur='apple';
+  try{cur=localStorage.getItem(KEY)||'apple';}catch(e){}
+  window.skinApply(cur);
+})();
 </script>
 </body>
 </html>

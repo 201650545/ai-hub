@@ -47,19 +47,37 @@ CSS = "".join([
     "footer{color:#86868b;font-size:12px;text-align:center;margin:28px 0;border-top:1px solid #e8e8ed;padding-top:20px}",
 ])
 
-def _llm_summarize(question, merged):
-    """调网关 LLM 转发 API，把各引擎内容整理成一段综合结论（2026-08-15）。
-    用本机 :3000 的 /v1/chat/completions（DeepSeek 等渠道）；失败返回空串（不阻塞报告）。"""
+def llm_summarize(question, merged):
+    """调网关 LLM 转发 API，把各引擎内容整理成一段综合结论（2026-08-26）。
+    用本机 :3100 的 /v1/chat/completions（DeepSeek 等渠道）；失败返回空串（不阻塞报告）。
+    #49：ref_links 来源编号参入 prompt，输出末尾列来源编号对应 ref_links。"""
     ok = [r for r in merged if r.get("status") == "ok" and (r.get("answer") or r.get("thinking"))]
     if not ok:
         return ""
     parts = []
+    ref_map = {}  # 来源编号映射
+    ref_idx = 1
     for r in ok:
         txt = (r.get("answer") or r.get("thinking") or "")[:1500]
-        parts.append("【" + (r.get("name") or r.get("provider") or "") + "】\n" + txt)
+        name = r.get("name") or r.get("provider") or r.get("id", "?")
+        parts.append("【" + name + "】\n" + txt)
+        # 收集该引擎的引用链接
+        links = r.get("ref_links") or []
+        if links:
+            ref_map[name] = []
+            for link in links:
+                ref_map[name].append(f"[{ref_idx}] {link.get('title','')}: {link.get('url','')}")
+                ref_idx += 1
     contents = "\n\n".join(parts)
+    ref_section = ""
+    if ref_map:
+        lines = []
+        for eng_name, refs in ref_map.items():
+            lines.append(eng_name + " 来源：")
+            lines.extend("  " + r for r in refs)
+        ref_section = "\n\n引用来源：\n" + "\n".join(lines)
     prompt = ("以下是多个 AI 搜索引擎对同一个问题的回答。请综合它们，输出一段有条理的中文总结"
-              "（先给结论，再列各来源要点，标注共识与差异；300 字以内）：\n\n问题：" + question + "\n\n" + contents)
+              "（先给结论，再列各来源要点，标注共识与差异；300 字以内，末尾列来源编号对应引用）：\n\n问题：" + question + "\n\n" + contents + ref_section)
     payload = {
         "model": "deepseek-v4-flash",
         "messages": [{"role": "user", "content": prompt}],
@@ -141,7 +159,7 @@ def run_search(question, engine_ids=None):
         merged[r["provider"]]=r
     merged_list=list(merged.values())
     (run_dir/"merged.json").write_text(json.dumps(merged_list,ensure_ascii=False,indent=2),encoding="utf-8")
-    summary=_llm_summarize(question, merged_list)
+    summary=llm_summarize(question, merged_list)
     (run_dir/"summary.md").write_text(summary or "（无综合结论）",encoding="utf-8")
     report_path=run_dir/"report.html"
     report_path.write_text(_build_report(run_id, question, merged_list, summary),encoding="utf-8")
