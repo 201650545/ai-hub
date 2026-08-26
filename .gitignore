@@ -64,3 +64,6 @@ feishu-data-hub/
 
 # AI 搜索网关运行数据(每次搜索生成的 JSONL + HTML 报告)
 services/search_gateway/runs/
+
+# 网关调试脚本隔离区（不入库）
+services/search_gateway/_debug_quarantine/
