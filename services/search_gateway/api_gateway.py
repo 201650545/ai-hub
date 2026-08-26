@@ -171,8 +171,10 @@ def _looks_like_shell(raw):
 
 def _peek_stream(resp, limit=4096):
     """流式首包验证：读出首批字节检查是否空壳/错误事件。
-    返回 (是否通过, 已读字节)。判定保守——只看到明确 error、首事件即 [DONE]、
-    或完全读不到内容才判失败；半包 JSON / 心跳注释等无法判定时一律放行，避免误杀。"""
+    返回 (是否通过, 已读字节)。判定保守——半包 JSON / 心跳注释等无法判定时一律放行；
+    但「扫完首批、解析出了完整事件、却没有一个事件带 choices」视为错误载荷：
+    小红书等渠道把额度耗尽包在非 OpenAI 形状的 200 流里，旧逻辑兜底放行会把它当成功，
+    导致统一组每次重试都停在第一个成员上不切换（2026-08-26 fast 组故障转移 bug 根因）。"""
     try:
         buf = resp.read(limit)
     except Exception:  # noqa: BLE001
@@ -180,6 +182,8 @@ def _peek_stream(resp, limit=4096):
     if not buf:
         return False, buf
     text = buf.decode("utf-8", "ignore")
+    saw_choices = False
+    saw_event = False
     for line in text.splitlines():
         line = line.strip()
         if not line.startswith("data:"):
@@ -188,15 +192,22 @@ def _peek_stream(resp, limit=4096):
         if not data:
             continue
         if data == "[DONE]":
+            if saw_choices:
+                continue  # 内容已出现后正常收尾，继续看后续行
             return False, buf  # 首个事件即结束 = 空流
         try:
             obj = json.loads(data)
         except Exception:  # noqa: BLE001
             continue  # 半包判不了 → 看下一行
+        if not isinstance(obj, dict):
+            continue
+        saw_event = True
         if obj.get("error"):
             return False, buf
         if obj.get("choices"):
             return True, buf
+    if saw_event and not saw_choices:
+        return False, buf  # 完整事件但全无 choices → 错误/控制载荷（如额度尽提示）
     return True, buf
 
 
@@ -279,6 +290,7 @@ def route_completion(payload):
                 ctype = resp.getheader("Content-Type", "application/json") or "application/json"
                 raw = resp.read()
                 if _looks_like_shell(raw):
+                    channels.mark_shell_failure(cid, real_model)  # 合成 429 → 熔断提前跳过
                     errors.append(cid + ": 空壳响应（choices 为空），已跳过")
                     log_entry["errors"] = list(errors)
                     continue
@@ -287,6 +299,7 @@ def route_completion(payload):
                 # 流式：首包验证（空流/错误事件 → 换下一渠道），通过则回放包装后透传
                 ok, head = _peek_stream(resp)
                 if not ok:
+                    channels.mark_shell_failure(cid, real_model)  # 合成 429 → 熔断提前跳过
                     errors.append(cid + ": 流式首包为空壳/错误事件，已跳过")
                     log_entry["errors"] = list(errors)
                     try:

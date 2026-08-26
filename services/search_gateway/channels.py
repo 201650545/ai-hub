@@ -26,6 +26,7 @@ DATA_DIR = os.path.normpath(os.path.join(os.path.dirname(BASE_DIR), "..", "data"
 CHANNELS_JSON = os.path.join(DATA_DIR, "channels.json")
 ROUTING_JSON = os.path.join(DATA_DIR, "routing.json")
 MODEL_OVERRIDES_JSON = os.path.join(DATA_DIR, "model_overrides.json")
+PROMOS_JSON = os.path.join(DATA_DIR, "promos.json")
 
 # 本地额度统计（task_011）：调用成功后记录 quota.json，缺失时降级不记录
 GATEWAY_ID = os.environ.get("GATEWAY_ID", "ds_v4_cli")
@@ -67,7 +68,7 @@ CHANNELS = {
         "provider": "OpenRouter (openrouter.ai)",
         "billing_type": "free",
         "billing_tag": "🟢 0 扣费 (仅免费模型)",
-        "icon": "🛰️",
+        "icon": "/img/brand/openrouter.png",
         "base_url": "https://openrouter.ai/api/v1",
         "env_key": "OPENROUTER_API_KEY",
         "free": True,
@@ -82,7 +83,7 @@ CHANNELS = {
         "provider": "Groq (api.groq.com)",
         "billing_type": "free_quota",
         "billing_tag": "🟢 免费配额 (1000次/天)",
-        "icon": "⚡",
+        "icon": "/img/brand/groq.png",
         "base_url": "https://api.groq.com/openai/v1",
         "env_key": "",
         "free": True,
@@ -97,7 +98,7 @@ CHANNELS = {
         "provider": "硅基流动 (api.siliconflow.cn)",
         "billing_type": "free_quota",
         "billing_tag": "🟢 赠送额度 + 免费模型",
-        "icon": "💎",
+        "icon": "/img/brand/siliconflow.png",
         "base_url": "https://api.siliconflow.cn/v1",
         "env_key": "",
         "free": True,
@@ -142,7 +143,7 @@ CHANNELS = {
         "provider": "魔塔社区 (api-inference.modelscope.cn)",
         "billing_type": "free_quota",
         "billing_tag": "🟢 免费配额 (注册赠送)",
-        "icon": "🗼",
+        "icon": "/img/brand/modelscope.png",
         "base_url": "https://api-inference.modelscope.cn/v1",
         "env_key": "",
         "free": True,
@@ -157,7 +158,7 @@ CHANNELS = {
         "provider": "商汤 (token.sensenova.cn)",
         "billing_type": "free_quota",
         "billing_tag": "🟢 免费配额",
-        "icon": "🀄",
+        "icon": "/img/brand/sensetime.png",
         "base_url": "https://token.sensenova.cn/v1",
         "env_key": "",
         "free": True,
@@ -172,7 +173,7 @@ CHANNELS = {
         "provider": "火山引擎方舟 (ark.cn-beijing.volces.com)",
         "billing_type": "free_quota",
         "billing_tag": "🟢 开通赠送额度（模型需在方舟开通管理开通）",
-        "icon": "🌋",
+        "icon": "/img/brand/ark.png",
         "base_url": "https://ark.cn-beijing.volces.com/api/v3",
         "env_key": "",
         "free": True,
@@ -187,7 +188,7 @@ CHANNELS = {
         "provider": "AGNES (apihub.agnes-ai.com)",
         "billing_type": "free_quota",
         "billing_tag": "🟢 免费配额",
-        "icon": "🌀",
+        "icon": "/img/brand/agnes.png",
         "base_url": "https://apihub.agnes-ai.com/v1",
         "env_key": "",
         "free": True,
@@ -202,7 +203,7 @@ CHANNELS = {
         "provider": "小红书 (note3-prev-api.askdiandian.com)",
         "billing_type": "free",
         "billing_tag": "🟢 免费 (内测 API)",
-        "icon": "📕",
+        "icon": "/img/brand/xiaohongshu.png",
         "base_url": "https://note3-prev-api.askdiandian.com/v1",
         "env_key": "",
         "free": True,
@@ -217,7 +218,7 @@ CHANNELS = {
         "provider": "ZSCC (api.zscc.in)",
         "billing_type": "free_quota",
         "billing_tag": "🟢 免费配额",
-        "icon": "🔮",
+        "icon": "/img/brand/zscc.png",
         "base_url": "https://api.zscc.in/v1",
         "models_path": "/models",  # base_url 已含 /v1,/models 即 /v1/models
         "env_key": "",
@@ -233,7 +234,7 @@ CHANNELS = {
         "provider": "OpenCode Go (opencode.ai/zen/go)",
         "billing_type": "paid",
         "billing_tag": "🔴 付费扣费",
-        "icon": "💻",
+        "icon": "/img/brand/opencode.png",
         "base_url": "https://opencode.ai/zen/go/v1",
         "env_key": "OPENCODE_API_KEY",
         "free": False,
@@ -255,6 +256,29 @@ NO_TEST_CHANNELS = {"zscc"}
 # fallback 链（前端模型未匹配时按此顺序路由）
 DEFAULT_CHAIN = ["opencode", "modelscope", "sensetime", "agnes", "xiaohongshu", "zscc", "deepseek", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
 
+_json_mtime_cache = {}  # path -> {"mtime": float|None, "data": dict}
+
+
+def _cached_json(path):
+    """mtime 感知的 JSON 文件缓存：文件被外部改动后下次读取自动重载。
+    （2026-08-26 修复编排条目显示旧数据的 bug——原先各 loader「首次读取永久缓存」，
+    unified_models.json 被手改后运行中的网关永远看不到新增条目。）"""
+    ent = _json_mtime_cache.get(path)
+    try:
+        mt = os.path.getmtime(path)
+    except OSError:
+        mt = None
+    if ent is None or ent["mtime"] != mt:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:  # noqa: BLE001
+            data = {}
+        _json_mtime_cache[path] = {"mtime": mt, "data": data}
+        return data
+    return ent["data"]
+
+
 _config_cache = None
 
 # 多账号 key 池轮换状态（get_key 用；key 本体存 channels.json 的 key_pools 字段）
@@ -265,15 +289,8 @@ _POOL_LOCK = threading.Lock()
 # ---------------------------------------------------------------- 配置读写
 
 def _load_config():
-    """读 channels.json（网页填的 key）。"""
-    global _config_cache
-    if _config_cache is None:
-        try:
-            with open(CHANNELS_JSON, "r", encoding="utf-8") as f:
-                _config_cache = json.load(f)
-        except Exception:  # noqa: BLE001
-            _config_cache = {}
-    return _config_cache
+    """读 channels.json（网页填的 key）。mtime 感知缓存，外部改动自动重载。"""
+    return _cached_json(CHANNELS_JSON)
 
 
 def save_channel_key(channel_id, key):
@@ -459,15 +476,8 @@ _routing_cache = None
 
 
 def load_routing():
-    """读取 routing.json（每模型手动渠道顺序）。缓存模式同 channels.json。"""
-    global _routing_cache
-    if _routing_cache is None:
-        try:
-            with open(ROUTING_JSON, "r", encoding="utf-8") as f:
-                _routing_cache = json.load(f)
-        except Exception:
-            _routing_cache = {}
-    return _routing_cache
+    """读取 routing.json（每模型手动渠道顺序）。mtime 感知缓存，外部改动自动重载。"""
+    return _cached_json(ROUTING_JSON)
 
 
 def save_routing(model, order=None, disabled=None):
@@ -516,15 +526,9 @@ _overrides_cache = None
 def load_model_overrides():
     """读取 model_overrides.json：{custom:[{name,channel,model}], hidden:[模型名]}。
     custom = 自定义模型别名（公开模型名 → 指定渠道+上游实际模型名）；
-    hidden = 从模型列表隐藏的自动发现模型（路由仍可用，只是不展示）。缓存模式同 routing.json。"""
-    global _overrides_cache
-    if _overrides_cache is None:
-        try:
-            with open(MODEL_OVERRIDES_JSON, "r", encoding="utf-8") as f:
-                _overrides_cache = json.load(f)
-        except Exception:  # noqa: BLE001
-            _overrides_cache = {}
-    return _overrides_cache
+    hidden = 从模型列表隐藏的自动发现模型（路由仍可用，只是不展示）。
+    mtime 感知缓存，外部改动自动重载。"""
+    return _cached_json(MODEL_OVERRIDES_JSON)
 
 
 def save_model_overrides(cfg):
@@ -596,15 +600,9 @@ def normalize_model_name(name):
 
 def load_unified():
     """读取 unified_models.json：{统一名: {display?, members:{渠道id: 上游模型名}}}。
-    统一名 = 我的 API 对外唯一模型名；members = 各渠道实际转发的上游真实模型名。缓存模式同 routing.json。"""
-    global _unified_cache
-    if _unified_cache is None:
-        try:
-            with open(UNIFIED_JSON, "r", encoding="utf-8") as f:
-                _unified_cache = json.load(f)
-        except Exception:  # noqa: BLE001
-            _unified_cache = {}
-    return _unified_cache
+    统一名 = 我的 API 对外唯一模型名；members = 各渠道实际转发的上游真实模型名。
+    mtime 感知缓存，外部改动自动重载（编排条目 3/5 显示 bug 根因修复）。"""
+    return _cached_json(UNIFIED_JSON)
 
 
 def save_unified(cfg):
@@ -713,15 +711,9 @@ _channel_models_cache = None
 
 def load_channel_models():
     """读取 channel_models.json：{渠道id: {selected:[模型名,...]}}。
-    渠道无条目 = 未策展，对外暴露全量模型；有条目 = 只暴露已选（详情页仍可看全量、按名调用不受限）。"""
-    global _channel_models_cache
-    if _channel_models_cache is None:
-        try:
-            with open(CHANNEL_MODELS_JSON, "r", encoding="utf-8") as f:
-                _channel_models_cache = json.load(f)
-        except Exception:  # noqa: BLE001
-            _channel_models_cache = {}
-    return _channel_models_cache
+    渠道无条目 = 未策展，对外暴露全量模型；有条目 = 只暴露已选（详情页仍可看全量、按名调用不受限）。
+    mtime 感知缓存，外部改动自动重载。"""
+    return _cached_json(CHANNEL_MODELS_JSON)
 
 
 def save_channel_models(cfg):
@@ -923,6 +915,10 @@ def _augment_health(cid, st):
     st["custom"] = cid in _custom_channels()
     sel = get_channel_selection(cid)
     st["sel_count"] = len(sel) if sel is not None else None
+    ch = CHANNELS.get(cid, {})
+    promos = _cached_json(PROMOS_JSON)
+    st["promo"] = promos.get(cid) or ch.get("promo") or ""
+    st["free_models"] = ch.get("free_models") or []
     return st
 
 
@@ -1208,6 +1204,21 @@ def chat_completion(channel_id, payload, route_info=None):
         raise _rate_limit.RateLimitSkip(
             f"{ch['name']} 触发限流保护（95% 提前切换），本轮跳过")
     raise RuntimeError(f"{ch['name']} 无可用请求")
+
+
+def mark_shell_failure(channel_id, model):
+    """上游以 HTTP 200 返回空壳/错误载荷时由 api_gateway 回填：按合成 429 记入限流台账，
+    触发指数退避熔断，让后续请求 try_acquire 直接跳过该渠道（否则统一组每次重试
+    都会先撞一遍这个死渠道再 failover，客户端侧表现为反复重启不换渠道）。
+    连续失败按 BACKOFF_STEPS 15s→300s 升级；成功请求照常清零计数。"""
+    if _rate_limit is None:
+        return
+    try:
+        key = get_key(channel_id)
+        if key:
+            _rate_limit.record_result(channel_id, model, key, 429)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def model_to_chain(model):
