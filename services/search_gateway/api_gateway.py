@@ -47,6 +47,11 @@ try:
 except Exception:  # noqa: BLE001
     _get_usage = None
 
+try:
+    from rate_limit import ledger as _rate_ledger
+except Exception:  # noqa: BLE001
+    _rate_ledger = None
+
 PORT = int(os.environ.get("API_GATEWAY_PORT", "3100"))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_JSON = os.path.join(channels.DATA_DIR, "api_state.json")
@@ -215,6 +220,15 @@ class _PrependResponse:
         except Exception:  # noqa: BLE001
             pass
 
+    def force_finalize(self):
+        """透传兜底记账到内层 _QuotaResponse（客户端提前断开时 read 循环不再触发记录）。"""
+        f = getattr(self._resp, "force_finalize", None)
+        if f:
+            try:
+                f()
+            except Exception:  # noqa: BLE001
+                pass
+
 
 def route_completion(payload):
     """按模型路由到渠道候选链，逐个尝试，返回 (渠道id, response, log_entry) 或 (None, errors, log_entry)。
@@ -323,12 +337,23 @@ def stream_openai_passthrough(handler, upstream):
             break
         if not chunk:
             break
-        handler.wfile.write(chunk)
-        handler.wfile.flush()
+        try:
+            handler.wfile.write(chunk)
+            handler.wfile.flush()
+        except Exception:  # noqa: BLE001
+            # 客户端提前断开：退出前兜底记账，否则这次调用永远不进用量
+            break
         tail = (tail + chunk)[-8192:]
         if b"[DONE]" in tail:
             done = True
             break
+    # 兜底记账（幂等）：正常 EOF 已由 read() 记过；中断路径在这里补记
+    f = getattr(upstream, "force_finalize", None)
+    if f:
+        try:
+            f()
+        except Exception:  # noqa: BLE001
+            pass
     if not done:
         try:
             handler.wfile.write(b'data: {"error": {"message": "upstream stream interrupted", "type": "upstream_error"}}\n\n')
@@ -510,6 +535,56 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             return
         self._send_json(404, {"error": "not found"})
 
+    def _handle_images(self, payload):
+        """生图转发：/v1/images/generations。模型→渠道路由：
+        seedream/seededit → ark（火山方舟）；sensenova-u1* → sensetime（商汤日日新）。"""
+        model = (payload.get("model") or "").strip()
+        if not model:
+            self._send_json(400, {"error": "model 必填"})
+            return
+        m = model.lower()
+        if "seedream" in m or "seededit" in m:
+            cid = "ark"
+        elif m.startswith("sensenova-u1"):
+            cid = "sensetime"
+        else:
+            self._send_json(400, {"error": "未支持的生图模型: " + model +
+                                          "（当前支持 seedream*/seededit*→ark，sensenova-u1*→sensetime）"})
+            return
+        key = channels.get_key(cid)
+        if not key:
+            self._send_json(400, {"error": "渠道 " + cid + " 未配置 key"})
+            return
+        url = channels.CHANNELS[cid]["base_url"].rstrip("/") + "/images/generations"
+        req = urllib.request.Request(
+            url, data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "Authorization": "Bearer " + key,
+                     "User-Agent": channels.CHANNELS[cid].get("ua", "unified-ai-gateway/1.0")},
+            method="POST")
+        try:
+            resp = urllib.request.urlopen(req, timeout=300)
+            raw = resp.read()
+            self.send_response(resp.status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("X-Resolved-Channel", cid)
+            self.send_header("X-Resolved-Model", model)
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+            try:
+                quota.record_call("api_gateway", cid, model, 0, 0, True)
+            except Exception:  # noqa: BLE001
+                pass
+        except urllib.error.HTTPError as he:
+            try:
+                body = json.loads(he.read().decode("utf-8", "ignore") or "{}")
+            except Exception:  # noqa: BLE001
+                body = {"error": {"message": "upstream HTTP " + str(he.code)}}
+            self._send_json(he.code, body)
+        except Exception as e:  # noqa: BLE001
+            self._send_json(502, {"error": str(e)[:200]})
+
     def do_DELETE(self):
         parsed = urllib.parse.urlparse(self.path)
         path, query = parsed.path, urllib.parse.parse_qs(parsed.query)
@@ -613,6 +688,12 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json(503, {"error": "quota 模块不可用"})
             else:
                 self._send_json(200, usage_summary())
+        elif path == "/api/rate-limits":
+            # 渠道限流台账（task_044，记录阶段）：调研上限 + 滑动窗口实测
+            if _rate_ledger is None:
+                self._send_json(503, {"error": "rate_limit 模块不可用"})
+            else:
+                self._send_json(200, {"channels": _rate_ledger()})
         elif path == "/api/gateway-info":
             self._send_json(200, gateway_info())
         elif path.startswith("/img/"):
@@ -687,6 +768,12 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
         if path in ("/v1/chat/completions", "/chat/completions"):
             try:
                 self._handle_chat(json.loads(body.decode("utf-8-sig") or "{}"))
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+            return
+        if path in ("/v1/images/generations", "/images/generations"):
+            try:
+                self._handle_images(json.loads(body.decode("utf-8-sig") or "{}"))
             except Exception:  # noqa: BLE001
                 self._send_json(400, {"error": "请求体不是合法 JSON"})
             return
