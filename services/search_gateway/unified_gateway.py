@@ -2,13 +2,14 @@
 """
 统一 AI 聚合网关 (Unified AI Gateway) v2.1 —— 单一 :3000 入口
 ============================================================
-专注 **AI 搜索聚合**：7 大 AI 搜索引擎并发检索 + 内容池汇总 + OpenAI 兼容 API 转发。
+专注 **AI 搜索聚合**：8 大 AI 搜索引擎并发检索 + 内容池汇总 + OpenAI 兼容 API 转发。
 渠道管理/路由编排/用量记账在 :3100 api_gateway，课件编排在 :8791 canvas_orchestrator。
 
-- GET  /                    → 无限画布 AI 搜索页（7 引擎卡片对比）
+- GET  /                    → 无限画布 AI 搜索页（8 引擎卡片对比）
 - GET  /aggregate           → 多引擎聚合报告交付页
-- GET  /api/unified_stream  → AI 搜索 SSE（7 引擎并发，未连接引擎不阻塞）
+- GET  /api/unified_stream  → AI 搜索 SSE（8 引擎并发，未连接引擎不阻塞）
 - GET  /api/search_aggregate→ 内容池聚合（内部调 /v1/chat/completions 做汇总）
+- GET  /api/search_json     → 同步 JSON 版聚合（DSH hub-web-search 插件调用方）
 - GET  /api/health          → 引擎会话 + LLM 渠道健康
 - GET  /api/history         → 搜索历史
 - GET  /api/quota           → 用量记账
@@ -421,6 +422,26 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                     "report": report_path,
                     "engines": [{ "provider": r["provider"], "status": r["status"],
                                   "elapsed": round(r.get("elapsed", 0), 1) } for r in records],
+                })
+            except Exception as ex:  # noqa: BLE001
+                self._send_json(500, {"status": "err", "error": str(ex)[:200]})
+        elif path == "/api/search_json":
+            # 同步 JSON 版聚合搜索（供 DSH hub-web-search 插件等机器调用方使用）：
+            # 与 /api/search_aggregate 同源，但把各引擎回答正文内联返回，免二次读文件
+            import content_pool
+            q = query.get("q", [""])[0] or query.get("prompt", [""])[0]
+            if not q:
+                self._send_json(400, {"error": "q 必填"})
+                return
+            req_e = query.get("engines", [""])[0]
+            eids = [e.strip() for e in req_e.split(",") if e.strip()] if req_e else None
+            try:
+                run_id, report_path, records = content_pool.run_search(q, engine_ids=eids)
+                self._send_json(200, {
+                    "status": "ok", "run_id": run_id, "report": report_path,
+                    "records": [{"provider": r["provider"], "status": r["status"],
+                                 "answer": r.get("answer") or "",
+                                 "elapsed": round(r.get("elapsed", 0), 1)} for r in records],
                 })
             except Exception as ex:  # noqa: BLE001
                 self._send_json(500, {"status": "err", "error": str(ex)[:200]})
