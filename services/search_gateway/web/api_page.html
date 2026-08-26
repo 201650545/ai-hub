@@ -1068,8 +1068,12 @@ td .d{color:var(--t2)}
       <div class="stat glass"><div class="chip-ic ic" style="background:var(--green-bg)">💾</div><div><div class="v" id="u-total-tokens">0</div><div class="l">累计 Token</div></div></div>
     </div>
     <div class="ep-tbl glass"><table>
-      <thead><tr><th>渠道</th><th>今日调用</th><th>今日 Token</th><th>累计调用</th><th>累计 Token</th><th>错误</th></tr></thead>
+      <thead><tr><th>渠道</th><th>今日调用</th><th>今日 Token</th><th>累计调用</th><th>累计 Token</th><th>累计错误</th></tr></thead>
       <tbody id="usage-tbody"><tr><td colspan="6" class="u-empty">加载中…</td></tr></tbody>
+    </table></div>
+    <div class="ep-tbl glass" style="margin-top:12px"><table>
+      <thead><tr><th>限流台账 · 渠道</th><th>上限/分</th><th>近 1 分钟</th><th>近 1 小时</th><th>用量比</th><th>依据</th></tr></thead>
+      <tbody id="rate-tbody"><tr><td colspan="6" class="u-empty">加载中…</td></tr></tbody>
     </table></div>
   </div>
 </div>
@@ -2181,7 +2185,7 @@ async function loadRouteLog(){
     document.getElementById('route-log-tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--red)">加载失败</td></tr>';
   }
 }
-function fmtTok(n){n=+n||0;return n>=1000?(n/1000).toFixed(1)+'k':String(n);}
+function fmtTok(n){n=+n||0;const u=['','K','M','B','T'];let i=0;while(n>=1000&&i<u.length-1){n/=1000;i++;}if(!i)return String(Math.round(n));const s=n>=100?n.toFixed(0):n.toFixed(1);return s.replace(/\.0$/,'')+u[i];}
 async function loadUsage(){
   try{
     const r=await fetch('/api/usage',{cache:'no-store'});
@@ -2189,6 +2193,29 @@ async function loadUsage(){
   }catch(e){
     const tb=document.getElementById('usage-tbody');
     if(tb)tb.innerHTML='<tr><td colspan="6" class="u-empty">用量加载失败</td></tr>';
+  }
+  loadRateLimits();
+}
+async function loadRateLimits(){
+  const tb=document.getElementById('rate-tbody');
+  if(!tb)return;
+  try{
+    const r=await fetch('/api/rate-limits',{cache:'no-store'});
+    const d=await r.json();
+    const rows=(d.channels||{});
+    const SRC={doc:'官方文档',est:'估计·待核实',unknown:'观测中',obs:'实测'};
+    tb.innerHTML=Object.keys(rows).map(cid=>{
+      const v=rows[cid]||{};
+      const pct=v.pct_1m==null?'—':(v.pct_1m+'%');
+      const hot=(v.pct_1m!=null&&v.pct_1m>=80)?' style="color:var(--red,#e05252);font-weight:700"':'';
+      return '<tr><td><code>'+esc(cid)+'</code></td>'+
+        '<td>'+(v.limit_rpm!=null?v.limit_rpm+' 次':'待定')+'</td>'+
+        '<td'+hot+'>'+v.used_1m+'</td><td>'+v.used_1h+'</td>'+
+        '<td'+hot+'>'+pct+'</td>'+
+        '<td style="font-size:12.5px;color:var(--t3)" title="'+esc(v.note||'')+'">'+esc(SRC[v.source]||v.source||'—')+'</td></tr>';
+    }).join('');
+  }catch(e){
+    tb.innerHTML='<tr><td colspan="6" class="u-empty">台账加载失败</td></tr>';
   }
 }
 function renderUsage(d){
@@ -2206,7 +2233,7 @@ function renderUsage(d){
     return '<tr><td><code>'+esc(cid)+'</code></td>'+
       '<td>'+(+t.calls||0)+'</td><td>'+fmtTok((+t.input_tokens||0)+(+t.output_tokens||0))+'</td>'+
       '<td>'+(+c.calls||0)+'</td><td>'+fmtTok((+c.input_tokens||0)+(+c.output_tokens||0))+'</td>'+
-      '<td>'+((+t.errors||0)+(+c.errors||0))+'</td></tr>';
+      '<td>'+(+c.errors||0)+'</td></tr>';
   });
   const tb=document.getElementById('usage-tbody');
   tb.innerHTML=rows.length?rows.join(''):'<tr><td colspan="6" class="u-empty">暂无用量</td></tr>';
@@ -2311,9 +2338,14 @@ async function toggleHide(name){
 load(); loadSwitch();
 render();
 buildPalette();
+/* 轮询：页面可见时用量/路由日志 4s 一拍（近实时），隐藏时暂停；模型架等重数据仍 20s */
+function tickFast(){
+  if(document.visibilityState!=='visible')return;
+  loadUsage();loadRouteLog();loadHome();
+}
+setInterval(tickFast,4000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')tickFast();});
 setInterval(load,20000);
-setInterval(loadUsage,15000);
-setInterval(loadRouteLog,20000);
 setInterval(()=>{if(document.getElementById('view-channels').classList.contains('on'))loadChannels();},30000);
 
 /* ═══ 液态玻璃交互引擎（liquid 风格）：指针光斑 / 边缘高光朝向 / 弹簧回正；静止零开销 ═══ */
