@@ -48,9 +48,13 @@ except Exception:  # noqa: BLE001
     _get_usage = None
 
 try:
-    from rate_limit import ledger as _rate_ledger
+    from rate_limit import ledger as _rate_ledger, events as _rate_events, RateLimitSkip
 except Exception:  # noqa: BLE001
     _rate_ledger = None
+    _rate_events = None
+
+    class RateLimitSkip(Exception):
+        """占位：rate_limit 模块不可用时保持 except 分支可解析。"""
 
 PORT = int(os.environ.get("API_GATEWAY_PORT", "3100"))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -299,6 +303,10 @@ def route_completion(payload):
         except urllib.error.HTTPError as he:
             detail = he.read().decode("utf-8", "ignore")[:200]
             errors.append(cid + ": HTTP " + str(he.code) + " " + detail)
+        except RateLimitSkip as rle:
+            # 95% 提前切换（task_045）：该渠道配额桶满/熔断，走用户顺序里的下一渠道
+            errors.append(cid + ": " + str(rle))
+            log_entry["errors"] = list(errors)
         except Exception as e:  # noqa: BLE001
             errors.append(cid + ": " + str(e)[:120])
 
@@ -689,11 +697,12 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             else:
                 self._send_json(200, usage_summary())
         elif path == "/api/rate-limits":
-            # 渠道限流台账（task_044，记录阶段）：调研上限 + 滑动窗口实测
+            # 渠道限流准入台账（task_045 v2）：调研上限 + 实测 + 状态机 + 翻转事件
             if _rate_ledger is None:
                 self._send_json(503, {"error": "rate_limit 模块不可用"})
             else:
-                self._send_json(200, {"channels": _rate_ledger()})
+                self._send_json(200, {"channels": _rate_ledger(),
+                                      "events": (_rate_events() or []) if _rate_events else []})
         elif path == "/api/gateway-info":
             self._send_json(200, gateway_info())
         elif path.startswith("/img/"):

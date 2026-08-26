@@ -1072,8 +1072,9 @@ td .d{color:var(--t2)}
       <tbody id="usage-tbody"><tr><td colspan="6" class="u-empty">加载中…</td></tr></tbody>
     </table></div>
     <div class="ep-tbl glass" style="margin-top:12px"><table>
-      <thead><tr><th>限流台账 · 渠道</th><th>上限/分</th><th>近 1 分钟</th><th>近 1 小时</th><th>用量比</th><th>依据</th></tr></thead>
-      <tbody id="rate-tbody"><tr><td colspan="6" class="u-empty">加载中…</td></tr></tbody>
+      <thead><tr><th>限流台账 · 渠道</th><th>上限/分</th><th>今日上限</th><th>近 1 分钟</th><th>近 1 小时</th><th>用量比</th><th>状态</th><th>依据</th></tr></thead>
+      <tbody id="rate-tbody"><tr><td colspan="8" class="u-empty">加载中…</td></tr></tbody>
+      <tfoot id="rate-events" style="display:none"></tfoot>
     </table></div>
   </div>
 </div>
@@ -2203,19 +2204,42 @@ async function loadRateLimits(){
     const r=await fetch('/api/rate-limits',{cache:'no-store'});
     const d=await r.json();
     const rows=(d.channels||{});
-    const SRC={doc:'官方文档',est:'估计·待核实',unknown:'观测中',obs:'实测'};
+    const SRC={doc:'官方文档',est:'估计·待核实',unknown:'观测中',obs:'实测',runtime:'运行时'};
+    const ST={open:['OPEN','var(--green,#3a9e63)'],throttled:['THROTTLED','var(--orange,#d98a1f)'],blocked:['BLOCKED','var(--red,#e05252)']};
     tb.innerHTML=Object.keys(rows).map(cid=>{
       const v=rows[cid]||{};
       const pct=v.pct_1m==null?'—':(v.pct_1m+'%');
       const hot=(v.pct_1m!=null&&v.pct_1m>=80)?' style="color:var(--red,#e05252);font-weight:700"':'';
-      return '<tr><td><code>'+esc(cid)+'</code></td>'+
+      const st=ST[v.state]||ST.open;
+      let stHtml='<span style="font-weight:700;font-size:11.5px;color:'+st[1]+'">'+st[0]+'</span>';
+      if(v.state==='blocked'&&v.blocked_in!=null)stHtml+='<div style="font-size:11px;color:var(--t3)">解封 '+v.blocked_in+'s</div>';
+      else if(v.state==='throttled')stHtml+='<div style="font-size:11px;color:var(--t3)">窗口滑空自动恢复</div>';
+      if(v.skipped>0)stHtml+='<div style="font-size:11px;color:var(--t3)" title="因限流被跳过的请求累计">已让行 '+v.skipped+'</div>';
+      const dayCol=v.limit_day!=null
+        ?((v.pct_day!=null&&v.pct_day>=80)
+          ?'<span style="color:var(--red,#e05252);font-weight:700">'+(v.used_day||0)+'/'+v.limit_day+'</span>'
+          :(v.used_day||0)+'/'+v.limit_day)
+        :'—';
+      const keysTip=(v.keys&&v.keys.length)?' title="'+esc(v.keys.map(k=>'key '+k.tag.slice(0,4)+'…('+k.pool+') '+k.used_1m+'次/'+k.state).join('\n'))+'"':'';
+      return '<tr'+keysTip+'><td><code>'+esc(cid)+'</code></td>'+
         '<td>'+(v.limit_rpm!=null?v.limit_rpm+' 次':'待定')+'</td>'+
+        '<td>'+dayCol+'</td>'+
         '<td'+hot+'>'+v.used_1m+'</td><td>'+v.used_1h+'</td>'+
         '<td'+hot+'>'+pct+'</td>'+
+        '<td>'+stHtml+'</td>'+
         '<td style="font-size:12.5px;color:var(--t3)" title="'+esc(v.note||'')+'">'+esc(SRC[v.source]||v.source||'—')+'</td></tr>';
     }).join('');
+    const evs=(d.events||[]).slice(0,5);
+    const ft=document.getElementById('rate-events');
+    if(ft){
+      if(evs.length){
+        ft.style.display='';
+        ft.innerHTML='<tr><td colspan="8" style="font-size:12px;color:var(--t3);padding-top:10px">'+
+          '近期状态翻转：'+evs.map(e=>'<span style="margin-right:14px;white-space:nowrap"><b>'+esc(e.ts)+'</b> '+esc(e.bucket.replace('|free','·free'))+' '+esc(e.event)+(e.detail?'（'+esc(e.detail)+'）':'')+'</span>').join('')+'</td></tr>';
+      }else{ft.style.display='none';ft.innerHTML='';}
+    }
   }catch(e){
-    tb.innerHTML='<tr><td colspan="6" class="u-empty">台账加载失败</td></tr>';
+    tb.innerHTML='<tr><td colspan="8" class="u-empty">台账加载失败</td></tr>';
   }
 }
 function renderUsage(d){

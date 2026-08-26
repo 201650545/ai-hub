@@ -1,50 +1,56 @@
-# Fast 渠道 95% 提前切换策略（设计方案 v1 · 待评审）
+# Fast 渠道 95% 提前切换策略（v2 · 已实施）
 
-> 状态：**草案，未实施**。本文档先交外部 AI（ChatGPT）评审优化，再动手实现。
-> 关联代码：`rate_limit.py`（台账，已上线）、`api_gateway.py`（转发入口）、`channels.py`（渠道与编排）。
+> 状态：**已实施（2026-08-26）**。v1 草案经 ChatGPT Extended 评审后推翻核心实现方式，
+> 按 v2「原子准入闸门」落地。关联代码：`rate_limit.py`（admission gate）、
+> `api_gateway.py`（路由捕获 RateLimitSkip）、`channels.py`（每次 HTTP attempt 预占）。
 
 ## 1. 背景
 
-`:3100` 是本地 API 转发网关：DSH / Cherry Studio 等客户端把请求发进来，网关按**用户排定的渠道顺序**逐个尝试转发。部分渠道的 Fast/免费模型有明确的每分钟请求数上限（rpm），打满会吃 429，转发就断。
+`:3100` 按用户排定的渠道顺序逐个尝试转发。部分渠道 Fast/免费模型有 rpm/rpd 上限，
+打满吃 429。task_044 先上了纯记录台账；本任务把它升级为准入控制器。
 
-现状台账（已上线，只记录不干预）：
+## 2. GPT Extended 评审结论（2026-08-26，六问压缩）
 
-```python
-# rate_limit.py —— 每渠道两层数据
-LIMITS = {  # 调研上限；source: doc=官方文档 / est=估计待核实 / unknown=未公开
-    "xiaohongshu": {"rpm": 60, "rph": None, "source": "est", ...},
-    "openrouter":  {"rpm": 20, "rph": None, "source": "doc", ...},  # :free 模型
-    "zenmux"/"modelscope"/"sensetime"/"agnes"/"zscc"/"opencode": {"rpm": None, "source": "unknown", ...},
-}
-def hit(channel_id)            # 转发入口打点（无论成败）
-def ledger() -> {"channels": {id: {limit_rpm, used_1m, used_1h, pct_1m, ...}}}
-                               # GET /api/rate-limits 已暴露
-```
+| 问题 | 结论 |
+|---|---|
+| Q1 抖动 | 用滞后区间不用固定冷却；且用整数门槛 trip=ceil(95%)、resume=floor(85%)（20→19/17，70% 对低 RPM 渠道闲置太多） |
+| Q2 口径 | 不搞死板 channel×model 两级；policy 声明 scope+match。OpenRouter free 是**账号级共享池**（20/min + 50/day total），不按模型各自算 |
+| Q3 unknown 自适应 | **429 只学 cooldown 不学永久 RPM**（偶发拥堵会被学成错误上限）；Retry-After 优先，否则指数退避 15/30/60/120/300s，成功清零 = 轻量熔断器 |
+| Q4 并发 | 「先查再打点」会穿透（10 线程同读 94% 全打入）；必须原子 try_acquire（锁内 prune→判断→预占），deque+Lock 够，不需要 token bucket；锁内绝无 IO/HTTP |
+| Q5 与 key 池关系 | 分层：共享配额 gate 在 key 轮换之外；**每个真实 HTTP attempt 都要预占一次**（轮一圈 key = N 次上游请求）；同 quota 池内换 key 无意义、free 层失败请求也烧日额度 |
+| Q6 rpd | 必须纳入——50/day 比 20/min 更需要保护；rolling 24h 起步（比猜错的 calendar reset 安全）；**day 计数要跨重启持久化**，1m/1h 纯内存即可 |
 
-实测观察（2026-08-26）：小红书 1h=844 次、峰值分钟 5%；商汤 31 次/h；其余空闲。
+另纠正：OpenRouter 日限额语义是「曾购 $10 credits 则 1000/day」一次性门槛，非余额恒 ≥$10。
 
-## 2. 目标
+## 3. 最终实现（rate_limit.py v2）
 
-某渠道用量达到其 rpm 上限的 **95%** 时，**新请求提前切到用户顺序里的下一个可用渠道**，让转发不断；原渠道恢复后自动回归正常顺序。
+- **try_acquire(cid, model, key)**：路由关键路径唯一决策入口。一把 `threading.Lock`
+  内完成 清窗口→判断→预占，30 线程并发实测精确放行 trip_at=19 个（v1 会穿透到 28）。
+- **滞后状态机**：`trip_at=ceil(limit*0.95)` 触发 THROTTLED；全部规则窗口回落到
+  `floor(limit*0.85)` 才回 OPEN；`blocked_until`（429 熔断）优先于一切。
+- **record_result()**：429 → Retry-After 优先、否则指数退避设 blocked_until；
+  2xx → 连续 429 计数清零（不清封禁，到点自然解除）。unknown 渠道无静态阈值但同享熔断。
+- **scope**：xiaohongshu=channel 整渠道一桶；openrouter=credential 每 key 一桶
+  （池内三把 key 是三个独立账号，free 额度各算各的，不乘也不共享）。
+  free 池与非 free 请求再分桶（`|free` 后缀），付费模型不被 free 阈值误伤。
+- **记账粒度**：channels.chat_completion 的 key 循环内**每次真实 HTTP attempt 前
+  try_acquire**；某把 key 被拒只跳该 key，全部被拒才抛 `RateLimitSkip` →
+  route_completion 记一条错误、走下一渠道（用户顺序永不重排）。
+- **持久化**：24h 日额度时间戳落盘 `data/search_gateway/rate_limit_day.json`
+  （tmp+rename 原子替换，锁内 ~1KB 写无感知延迟）；1m/1h 重启即失，可接受。
+- **事件日志**：只在 OPEN⇄THROTTLED / 熔断触发时记一条（deque maxlen=50），
+  skip 走累计计数防刷屏；`GET /api/rate-limits` 返回 `{channels, events}`。
 
-## 3. 初步设计（待评审推翻）
+## 4. 边界与约束（沿用）
 
-1. **判定点**：`chat_completion()` 入口选渠道时，先 `ledger()` 口径查 `pct_1m >= 95` 的渠道，本轮跳过（不硬编码进路由，只在选择时过滤）。
-2. **恢复条件**：滑动窗口自然滑出（60s 后 pct 回落 <95%）即自动回到用户顺序——需要防抖吗？
-3. **unknown 渠道**：无 rpm 数字的不参与提前切换，维持现有「429 才换下一家」逻辑。
-4. **记账**：每次触发提前切换写一条事件日志（时间/渠道/pct/切到谁），在用量页可见。
+- 不改变用户排定的渠道顺序——提前切换只是临时跳过。
+- zscc 渠道禁主动压测；台账数字只能被动观测。
+- 本地/网络异常不回滚预占（无法确认请求是否发出，保守多占一个窗口位）。
+- 时间轴用墙钟而非 monotonic：日窗口要跨重启落盘，NTP 微调影响可忽略。
+- 单进程 threading.Lock 够用；若未来换 gunicorn 多 worker 需改 Redis（现在不上）。
 
-## 4. 请评审的问题
+## 5. 验证记录（2026-08-26）
 
-1. **抖动**：95% 切走 → 60s 后窗口滑空 → 切回 → 又打满 → 再切走。需要滞后区间（如 ≥95% 切走、<70% 才切回）还是冷却期（切走后固定冷却 N 分钟）？哪种更简单可靠？
-2. **口径**：按渠道整体限流够不够？OpenRouter 的 20/min 是「每个 ：free 模型」各自 20 还是共享？小红书 60/min 是全渠道共享。要不要支持 per-channel×model 两级 LIMITS 键？
-3. **unknown 渠道的自适应**：值不值得做「从实际 429 响应里学上限」（比如连续 429 时反推 rpm 并写入台账）？还是永远靠人工调研补数字？
-4. **并发正确性**：hit() 与判定之间有天然竞态（10 个并发同时查都是 94% 就都打进去了）。可接受（95% 只是软目标）还是要原子配额（token bucket / 计数器预扣）？
-5. **与现有重试的关系**：OpenRouter 渠道已有「429 自动换池内下一把 key 重试一圈」逻辑；key 池轮换和渠道级提前切换的先后顺序怎么摆才不打架？
-6. **rph 要不要一起管**：OpenRouter 免费档还有「余额<$10 时 50 次/天」。日限额要不要纳入同一套机制（跨天窗口）？
-
-## 5. 边界与约束
-
-- 不改变用户排定的渠道顺序语义——提前切换只是**临时跳过**，不是重排。
-- zscc 渠道禁主动压测（镜像站接口），台账数字只能被动观测。
-- 实现必须线程安全（网关是多线程 Flask），且不能给每请求增加可感知延迟。
+仿真 6 场景全过：①30 并发放行恰 19+throttled+skipped 11；②滑空自动恢复；
+③Retry-After 熔断生效；④free 双 key 各自 19、paid 同 key 全放行（分桶正确）；
+⑤unknown 渠道一次 429 即熔断；⑥事件只记翻转 + day 落盘重建。

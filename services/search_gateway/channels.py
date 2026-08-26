@@ -34,6 +34,12 @@ try:
 except Exception:  # noqa: BLE001
     _record_call = None
 
+# 渠道限流准入闸门（task_045，v2）：try_acquire 原子预占 + 429 熔断，触发即提前切换
+try:
+    import rate_limit as _rate_limit
+except Exception:  # noqa: BLE001
+    _rate_limit = None
+
 # ---------------------------------------------------------------- 渠道注册表
 
 # ---------------------------------------------------------------- 渠道注册表
@@ -161,6 +167,21 @@ CHANNELS = {
         "models": ["deepseek-v4-flash", "glm-5.2", "sensenova-6.8-flash-lite"],
         "note": "商汤日日新 SenseNova（Cherry Studio 已配置 key，2026-08-16 收录）。",
     },
+    "ark": {
+        "name": "火山方舟 ARK",
+        "provider": "火山引擎方舟 (ark.cn-beijing.volces.com)",
+        "billing_type": "free_quota",
+        "billing_tag": "🟢 开通赠送额度（模型需在方舟开通管理开通）",
+        "icon": "🌋",
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "env_key": "",
+        "free": True,
+
+        "speed": "fast",
+        "default_model": "doubao-seed-2-0-lite-260428",
+        "models": ["doubao-seedream-5-0-260128", "doubao-seedream-4-5-251128", "doubao-seed-2-0-lite-260428"],
+        "note": "火山方舟 ARK（用户 2026-08-25 提供 key）：chat + /v1/images/generations 生图（seedream/seededit）；另有 Seedance 视频、Seed3D/Hyper3D 3D 资产、Seed-Character 角色一致性；模型目录动态拉取并过滤已下线。",
+    },
     "agnes": {
         "name": "AGNES AI",
         "provider": "AGNES (apihub.agnes-ai.com)",
@@ -225,7 +246,7 @@ CHANNELS = {
     },
 }
 
-CHANNEL_ORDER = ["opencode", "modelscope", "sensetime", "agnes", "xiaohongshu", "zscc", "deepseek", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
+CHANNEL_ORDER = ["opencode", "modelscope", "sensetime", "ark", "agnes", "xiaohongshu", "zscc", "deepseek", "openrouter", "groq", "siliconflow", "dashscope", "zhipu"]
 
 # 禁测渠道（用户 2026-08-16 指定）：这些渠道很贵，禁止发起任何测试/探测请求。
 # - zscc：用户明确「很贵，能用就行，禁止测试」
@@ -332,6 +353,104 @@ def invalidate_channel_cache(channel_id=None):
             _health_cache.pop(channel_id, None)
         else:
             _health_cache.clear()
+
+
+def _save_config(cfg):
+    """合并后的配置整体写回 channels.json（新渠道/隐藏/启停共用），并即时生效。"""
+    global _config_cache
+    with open(CHANNELS_JSON, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    _config_cache = cfg
+    _merge_custom_into_globals()
+
+
+# ---------------------------------------------------------------- 自定义渠道 + 隐藏渠道
+
+def _custom_channels():
+    """channels.json 里登记的自定义渠道（网页新增，免改代码、免重启）。"""
+    return _load_config().get("custom_channels", {}) or {}
+
+
+def _merge_custom_into_globals():
+    """把自定义渠道并入运行时 CHANNELS / CHANNEL_ORDER（in-place，免重启生效）。
+    硬编码渠道同名以硬编码为准；自定义只补新增渠道 id。"""
+    for cid, d in _custom_channels().items():
+        if not isinstance(d, dict) or not d.get("base_url"):
+            continue
+        CHANNELS.setdefault(cid, d)
+        if cid not in CHANNEL_ORDER:
+            CHANNEL_ORDER.append(cid)
+
+
+def get_hidden_channels():
+    """被隐藏的渠道 id 列表（隐藏≠删除，配置与 key 全保留，随时可恢复）。"""
+    hs = _load_config().get("hidden_channels") or []
+    return [c for c in hs if isinstance(c, str) and c]
+
+
+def set_hidden_channel(channel_id, hidden):
+    """隐藏/恢复渠道。隐藏后从列表/模型/路由聚合里消失；内置与自定义渠道均可隐藏。"""
+    cfg = _load_config()
+    hs = set(get_hidden_channels())
+    if hidden:
+        hs.add(channel_id)
+    else:
+        hs.discard(channel_id)
+    if hs:
+        cfg["hidden_channels"] = sorted(hs)
+    else:
+        cfg.pop("hidden_channels", None)
+    _save_config(cfg)
+    invalidate_channel_cache(channel_id)
+
+
+def save_custom_channel(channel_id, definition):
+    """新增/覆盖自定义渠道。definition 必含 base_url；其余字段按 CHANNELS 惯例。"""
+    cfg = _load_config()
+    cc = dict(cfg.get("custom_channels", {}) or {})
+    cc[channel_id] = definition
+    cfg["custom_channels"] = cc
+    _save_config(cfg)
+
+
+def delete_custom_channel(channel_id):
+    """删除自定义渠道（内置渠道不可删）。返回 True=已删，False=不存在或属内置。"""
+    cc = dict(_custom_channels())
+    if channel_id not in cc:
+        return False
+    cfg = _load_config()
+    newcc = {k: v for k, v in cc.items() if k != channel_id}
+    if newcc:
+        cfg["custom_channels"] = newcc
+    else:
+        cfg.pop("custom_channels", None)
+    # 清掉该渠道的 key / key_pools / 启停 / 隐藏，避免残留
+    for sec in ("keys", "key_pools", "channel_enabled"):
+        if isinstance(cfg.get(sec), dict) and channel_id in cfg[sec]:
+            del cfg[sec][channel_id]
+    if channel_id in (cfg.get("hidden_channels") or []):
+        cfg["hidden_channels"] = [x for x in cfg["hidden_channels"] if x != channel_id]
+        if not cfg["hidden_channels"]:
+            cfg.pop("hidden_channels", None)
+    # 从运行时全局移除
+    CHANNELS.pop(channel_id, None)
+    if channel_id in CHANNEL_ORDER:
+        CHANNEL_ORDER.remove(channel_id)
+    _save_config(cfg)
+    invalidate_channel_cache(channel_id)
+    return True
+
+
+def ordered_channels():
+    """可见渠道展示顺序：硬编码顺序 + 自定义追加，剔除隐藏。"""
+    hidden = set(get_hidden_channels())
+    return [c for c in CHANNEL_ORDER if c not in hidden]
+
+
+def hidden_channels_meta():
+    """已隐藏渠道的轻量元数据（不探测、不碰网络），供前端「已隐藏」折叠区展示。"""
+    return [{"id": cid, "name": CHANNELS.get(cid, {}).get("name", cid),
+             "icon": CHANNELS.get(cid, {}).get("icon", "🤖")} for cid in get_hidden_channels()]
 
 
 # ---------------------------------------------------------------- 手动路由编排（"搭积木"）
@@ -512,6 +631,7 @@ def set_unified_model(name, members, display=None):
         entry["display"] = display.strip()
     cfg[nm] = entry
     save_unified(cfg)
+    sync_dsh_models()
     return entry
 
 
@@ -521,6 +641,50 @@ def delete_unified_model(name):
     if nm in cfg:
         cfg.pop(nm, None)
         save_unified(cfg)
+        sync_dsh_models()
+
+
+# ---------------------------------------------------------------- DSH 同步（统一编排 → ~/.dsh/settings.yaml）
+
+DSH_SETTINGS = os.path.expanduser("~/.dsh/settings.yaml")
+
+
+def sync_dsh_models():
+    """把统一模型组同步为 DSH 选择器清单（settings.yaml 热重载，免重启）。
+    只改 llm-pi-ai.providers.local-gateway.models（统一名=对外 id，display=显示名）；
+    默认模型若被删则回落到第一项；其余字段原样保留。任何失败不影响网关自身。"""
+    try:
+        import yaml
+        unified = load_unified()
+        entries = []
+        for gname, g in unified.items():
+            mid = normalize_model_name(gname)
+            if not mid:
+                continue
+            m = {"id": mid}
+            if (g.get("display") or "").strip():
+                m["name"] = g["display"].strip()
+            entries.append(m)
+        if not entries:
+            return  # 全删空时不清空 DSH，保留最后一份可用清单
+        with open(DSH_SETTINGS, "r", encoding="utf-8") as f:
+            doc = yaml.safe_load(f) or {}
+        providers = ((doc.get("llm-pi-ai") or {}).get("providers") or {})
+        prov = providers.get("local-gateway")
+        if not isinstance(prov, dict):
+            return  # 本机没有 local-gateway 路由，不同步
+        prov["models"] = entries
+        adm = doc.get("agent-default-model")
+        ids = [m["id"] for m in entries]
+        if isinstance(adm, dict) and adm.get("provider") == "local-gateway" \
+                and adm.get("model") not in ids:
+            adm["model"] = ids[0]
+        tmp = DSH_SETTINGS + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            yaml.safe_dump(doc, f, allow_unicode=True, sort_keys=False)
+        os.replace(tmp, DSH_SETTINGS)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def unified_suggest(q, limit=60):
@@ -530,7 +694,7 @@ def unified_suggest(q, limit=60):
         return {}
     h = cached_health_all()
     out = {}
-    for cid in CHANNEL_ORDER:
+    for cid in ordered_channels():
         st = h.get(cid, {})
         if not st.get("enabled", True) or not st.get("key_set"):
             continue
@@ -691,7 +855,8 @@ def channel_health(channel_id):
     billing_type = ch.get("billing_type", "free")
 
     if not key:
-        return {"id": channel_id, "name": name, "icon": icon, "key_set": False, "reachable": False, "models": [],
+        return {"id": channel_id, "name": name, "icon": icon, "key_set": False, "reachable": False,
+                "models": list(ch.get("models") or []),  # 未填 key 也回退到硬编码目录，供渠道详情页展示
                 "error": "待填 key（网页渠道管理页填入）", "can_fill": can_fill,
                 "provider": provider, "billing_tag": billing_tag, "billing_type": billing_type,
                 "balance": "未配置 Key"}
@@ -711,6 +876,14 @@ def channel_health(channel_id):
             return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": True, "models": models,
                     "error": "", "can_fill": can_fill, "provider": provider,
                     "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
+        if channel_id == "ark":
+            # 方舟目录带 status 字段：滤掉 Shutdown/Retiring，只留可用模型
+            data = _get_json(base + "/models", key, timeout=12, ua=ch.get("ua", "unified-ai-gateway/1.0"), channel_id=channel_id)
+            models = sorted({m["id"] for m in (data.get("data") or [])
+                             if m.get("id") and m.get("status") not in ("Shutdown", "Retiring")})
+            return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": True, "models": models,
+                    "error": "", "can_fill": can_fill, "provider": provider,
+                    "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
         models_path = ch.get("models_path", "/models")
         data = _get_json(base + models_path, key, timeout=8, ua=ch.get("ua", "unified-ai-gateway/1.0"), channel_id=channel_id)
         models = [m.get("id") for m in (data.get("data") or []) if m.get("id")]
@@ -721,17 +894,19 @@ def channel_health(channel_id):
                 "error": "", "can_fill": can_fill, "provider": provider,
                 "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
     except urllib.error.HTTPError as e:
-        return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": False, "models": [],
+        return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": False,
+                "models": list(ch.get("models") or []),  # 探测失败回退硬编码目录，避免「渠道有模型却显示 0」
                 "error": f"HTTP {e.code}", "can_fill": can_fill, "provider": provider,
                 "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
     except Exception as e:  # noqa: BLE001
-        return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": False, "models": [],
+        return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": False,
+                "models": list(ch.get("models") or []),  # 同上：异常也回退硬编码目录
                 "error": str(e)[:120], "can_fill": can_fill, "provider": provider,
                 "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
 
 
 def health_all():
-    return {cid: channel_health(cid) for cid in CHANNEL_ORDER}
+    return {cid: channel_health(cid) for cid in ordered_channels()}
 
 
 # ---------------------------------------------------------------- 健康缓存（避免每次请求都打 7 家 API）
@@ -745,6 +920,7 @@ def _augment_health(cid, st):
     st = dict(st)
     st["enabled"] = get_channel_enabled(cid)
     st["key_pool"] = get_key_pool_size(cid)
+    st["custom"] = cid in _custom_channels()
     sel = get_channel_selection(cid)
     st["sel_count"] = len(sel) if sel is not None else None
     return st
@@ -756,7 +932,7 @@ def cached_health_all(ttl=60):
     out = {}
     stale = []
     with _cache_lock:
-        for cid in CHANNEL_ORDER:
+        for cid in ordered_channels():
             hit = _health_cache.get(cid)
             if hit and now - hit[0] < ttl:
                 out[cid] = _augment_health(cid, hit[1])
@@ -848,10 +1024,41 @@ def _sse_usage(text):
     return (int(pt.group(1)) if pt else 0), (int(ct.group(1)) if ct else 0)
 
 
+def _sse_content_chars(text):
+    """累加 SSE 流里所有 delta.content 的字符数（流式估算输出 token 用）。"""
+    n = 0
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("data:"):
+            continue
+        body = line[5:].strip()
+        if not body or body == "[DONE]":
+            continue
+        try:
+            obj = json.loads(body)
+        except Exception:  # noqa: BLE001
+            continue
+        for c in (obj.get("choices") or []):
+            d = c.get("delta") or {}
+            v = d.get("content")
+            if isinstance(v, str):
+                n += len(v)
+            elif isinstance(v, list):
+                for part in v:
+                    if isinstance(part, dict):
+                        n += len(part.get("text") or "")
+    return n
+
+
+def _est_tokens(text):
+    """上游不返回 usage 时的粗估：≈3 字符/token（中英混合量级参考，非精确值）。"""
+    return max(1, round(len(text) / 3)) if text else 0
+
+
 class _QuotaResponse:
     """包装 urllib response：响应成功时记录本地额度（task_011）。接口与 urllib response 兼容。"""
 
-    def __init__(self, channel_id, model, is_stream, upstream, route_info=None):
+    def __init__(self, channel_id, model, is_stream, upstream, route_info=None, req_text=""):
         self._channel = channel_id
         self._model = model
         self._is_stream = is_stream
@@ -859,6 +1066,8 @@ class _QuotaResponse:
         self._recorded = False
         self._stream_buf = bytearray()
         self._route_info = route_info or {}
+        # 上游不返回 usage 时的输入 token 粗估基准（请求 messages 序列化文本）
+        self._req_est = _est_tokens(req_text)
 
     def _record(self, success, input_tokens=0, output_tokens=0):
         if self._recorded:
@@ -900,20 +1109,36 @@ class _QuotaResponse:
                 self._record(False)
                 return
             usage = obj.get("usage", {}) or {}
-            self._record(True,
-                         input_tokens=usage.get("prompt_tokens", 0),
-                         output_tokens=usage.get("completion_tokens", 0))
+            it, ot = int(usage.get("prompt_tokens", 0) or 0), int(usage.get("completion_tokens", 0) or 0)
+            if it == 0 and ot == 0:
+                # 上游没回 usage（如 modelscope 免费档）：按响应正文长度粗估输出，输入用请求基准
+                it = self._req_est
+                ot = _est_tokens(json.dumps(obj.get("choices", ""), ensure_ascii=False))
+            self._record(True, input_tokens=it, output_tokens=ot)
         except Exception:  # noqa: BLE001
             self._record(False)
 
     def _finalize_stream(self):
-        # 从 SSE 尾部尝试解析 usage（尽力而为）
+        # 从 SSE 尾部尝试解析 usage（尽力而为）；没有 usage 就按 delta 内容长度粗估
         try:
             text = bytes(self._stream_buf).decode("utf-8", "ignore")
-            data = _sse_usage(text)
-            self._record(True, input_tokens=data[0], output_tokens=data[1])
+            it, ot = _sse_usage(text)
+            if it == 0 and ot == 0:
+                it = self._req_est
+                ot = _est_tokens(_sse_content_chars(text) * "x")
+            self._record(True, input_tokens=it, output_tokens=ot)
         except Exception:  # noqa: BLE001
             self._record(True)
+
+    def force_finalize(self):
+        """客户端提前断开等场景的兜底记账：流没读到 EOF 时 read 循环不会再触发
+        _finalize_stream，这里主动补记一次（幂等，_recorded 防重）。非流式交给 read。"""
+        if self._recorded or not self._is_stream:
+            return
+        try:
+            self._finalize_stream()
+        except Exception:  # noqa: BLE001
+            pass
 
     def close(self):
         try:
@@ -925,7 +1150,10 @@ class _QuotaResponse:
 def chat_completion(channel_id, payload, route_info=None):
     """转发 chat/completions 到指定渠道。返回 _QuotaResponse（urllib 兼容 + 记录额度）。
     route_info 可选，透传路由决策信息供响应头使用。
-    配置了 key_pools 时，遇 429（账号级限流）自动换下一把 key 重试，最多轮完一圈。"""
+    配置了 key_pools 时，遇 429 自动换下一把 key 重试，最多轮完一圈。
+    限流准入（task_045）：每次真实 HTTP attempt 前原子 try_acquire 预占配额——
+    key 池轮一圈是 N 次上游请求就预占 N 次；某把 key 的桶满/熔断只跳过该 key，
+    全部 key 被拒才抛 RateLimitSkip 让上层走下一渠道（用户顺序不变）。"""
     ch = CHANNELS[channel_id]
     primary = get_key(channel_id)
     if not primary:
@@ -935,14 +1163,19 @@ def chat_completion(channel_id, payload, route_info=None):
     for m in req_payload.get("messages", []):
         if m.get("role") == "developer":
             m["role"] = "system"
+    model = req_payload.get("model") or ch.get("default_model", "")
     ua = ch.get("ua", "unified-ai-gateway/1.0")
     url = ch["base_url"].rstrip("/") + "/chat/completions"
     body = json.dumps(req_payload).encode("utf-8")
 
     attempts = max(1, get_key_pool_size(channel_id))
     last_err = None
+    acquired_any = False
     for i in range(attempts):
         key = get_key(channel_id)  # 每圈取下一把（get_key 内部轮换）
+        if _rate_limit is not None and not _rate_limit.try_acquire(channel_id, model, key):
+            continue  # 该 key 的配额桶满/429 熔断中 → 换下一把（不同账号仍有容量）
+        acquired_any = True
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {key}",
@@ -954,14 +1187,27 @@ def chat_completion(channel_id, payload, route_info=None):
         try:
             resp = _urlopen(req, timeout=120, channel_id=channel_id)
         except urllib.error.HTTPError as he:
+            if _rate_limit is not None:
+                ra = (he.headers or {}).get("Retry-After") if he.headers else None
+                _rate_limit.record_result(channel_id, model, key, he.code, retry_after=ra)
             if he.code == 429 and i < attempts - 1:
                 he.read()  # 消费 body 便于连接复用
                 last_err = he
                 continue  # 换下一把 key 再试
             raise
-        model = req_payload.get("model") or ch.get("default_model", "")
-        return _QuotaResponse(channel_id, model, req_payload.get("stream"), resp, route_info=route_info)
-    raise last_err  # 全部 key 都 429
+        except Exception:  # noqa: BLE001
+            # 本地/网络异常：无法确认请求是否已发出，保守不回滚预占（最多多占一个窗口位）
+            raise
+        if _rate_limit is not None:
+            _rate_limit.record_result(channel_id, model, key, 200)
+        return _QuotaResponse(channel_id, model, req_payload.get("stream"), resp, route_info=route_info,
+                              req_text=json.dumps(req_payload.get("messages", ""), ensure_ascii=False))
+    if last_err is not None:
+        raise last_err  # 全部 key 都 429
+    if not acquired_any and _rate_limit is not None:
+        raise _rate_limit.RateLimitSkip(
+            f"{ch['name']} 触发限流保护（95% 提前切换），本轮跳过")
+    raise RuntimeError(f"{ch['name']} 无可用请求")
 
 
 def model_to_chain(model):
@@ -1022,7 +1268,7 @@ def all_models():
     h = cached_health_all()
     sel_map = load_channel_models()
     model_map = {}  # model_name -> {providers: []}
-    for cid in CHANNEL_ORDER:
+    for cid in ordered_channels():
         st = h.get(cid, {})
         if not st.get("enabled", True) or not st.get("key_set") or not st.get("reachable"):
             continue
@@ -1103,7 +1349,7 @@ def model_providers(model_name, full=False):
         return members if full else _apply_routing_rule(members, model_name)
     h = cached_health_all()
     matched = []
-    for cid in CHANNEL_ORDER:
+    for cid in ordered_channels():
         st = h.get(cid, {})
         if not st.get("enabled", True) or not st.get("key_set"):
             continue
@@ -1147,4 +1393,8 @@ def model_providers(model_name, full=False):
         return matched  # 编辑态原始列表：不应用路由、不过滤 disabled
     # 手动路由规则（"搭积木"）：有规则则重排，无规则保持智能顺序
     return _apply_routing_rule(matched, model_name)
+
+
+# ---- 启动时并入自定义渠道（网页新增的渠道免重启生效，进程重启后从 channels.json 恢复）
+_merge_custom_into_globals()
 
