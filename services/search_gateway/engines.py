@@ -244,10 +244,58 @@ def _modern_extract_js(candidates, exclude_host, noise_patterns=None, refs_regex
         .replace("__FAILTEXTS__", fail_js)
 
 
-METASO_EXTRACT_JS = _modern_extract_js(
-    [".markdown-body", "[class*=answer] [class*=markdown]", "[class*=summary]"],
-    "metaso.cn",
-    noise_patterns=["^\\d{1,2}:\\d{2}$"])  # 视频时间戳行
+METASO_EXTRACT_JS = """(function(){
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  var best='';
+  var sels=['.markdown-body','[class*=answer] [class*=markdown]','[class*=summary]'];
+  for(var i=0;i<sels.length;i++){
+    var els=document.querySelectorAll(sels[i]);
+    for(var j=els.length-1;j>=0;j--){
+      var t=textOf(els[j]);
+      if(t.length>best.length) best=t;
+    }
+    if(best.length>=15) break;
+  }
+  if(best.length<15){
+    var nodes=document.querySelectorAll('main p,main li');
+    var buf=[];
+    for(var k=0;k<nodes.length;k++){var t2=textOf(nodes[k]);if(t2.length>1)buf.push(t2);}
+    best=buf.join('\\n');
+  }
+  /* 过滤视频时间戳行 */
+  var lines=best.split('\\n');var keep=[];
+  for(var L=0;L<lines.length;L++){ if(/^\\d{1,2}:\\d{2}$/.test(lines[L].trim())) continue; keep.push(lines[L]); }
+  best=keep.join('\\n').replace(/\\n{3,}/g,'\\n\\n').trim();
+  if(!best) return JSON.stringify({found:false});
+  /* 来源卡片：找到「来源」页签向上两层取面板文本，解析出卡片标题行 */
+  var srcs=[];var seen={};
+  try{
+    var hits=document.querySelectorAll('div,span,h2,h3');
+    var anchor=null;
+    for(var m=0;m<hits.length;m++){
+      if((hits[m].textContent||'').trim()==='来源'){anchor=hits[m];break;}
+    }
+    if(anchor){
+      /* 向上找第一个文本行数≥4 的祖先（页签容器只有「来源/脑图/大纲」三行，卡片列表在其外层） */
+      var panel=anchor.parentElement;
+      for(var up=0;up<5&&panel;up++){
+        if(((panel.innerText||'').split('\\n').length)>=4) break;
+        panel=panel.parentElement;
+      }
+      var pt=panel?(panel.innerText||''):'';
+      var skip=/^(来源|脑图|大纲|深度研究|互动网页|内容由AI生成[\\s\\S]*)$/;
+      var plines=pt.split('\\n');
+      for(var q=0;q<plines.length&&srcs.length<12;q++){
+        var s=plines[q].trim();
+        if(!s||skip.test(s)||seen[s]) continue;
+        if(s.length<6||s.indexOf('2026')===-1&&s.length>60) continue;
+        seen[s]=1;srcs.push(s);
+      }
+    }
+  }catch(e){}
+  return JSON.stringify({found:true,thinking:'',answer:best,refs:srcs.length,
+    ref_links:srcs.map(function(x){return {title:x.slice(0,70),url:''};})});
+})()"""
 
 GROK_EXTRACT_JS = _modern_extract_js(
     ['[class*=response-content-markdown]', ".message-bubble", "[class*=assistant]"],
@@ -262,15 +310,67 @@ GROK_EXTRACT_JS = _modern_extract_js(
     refs_regex="(\\d+)\\s*sources?",
     fail_texts=["under heavy usage"])
 
-PERPLEXITY_EXTRACT_JS = _modern_extract_js(
-    ['[data-testid="ai-markdown-result"]', ".prose", "[id*=answer]",
-     "[class*=answer] [class*=markdown]"],
-    "perplexity.ai")
+PERPLEXITY_EXTRACT_JS = """(function(){
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  var el=null;
+  var sels=['[data-testid="ai-markdown-result"]','.prose','[id*=answer]'];
+  for(var i=0;i<sels.length;i++){
+    var els=document.querySelectorAll(sels[i]);
+    if(els.length){ el=els[els.length-1]; break; }
+  }
+  if(!el) return JSON.stringify({found:false});
+  /* 引用芯片 .citation：文本形如 'huggingface\\n+1'，抓域名做来源（面板里无真实 URL） */
+  var doms=[];var seen={};
+  try{
+    var chips=el.querySelectorAll('.citation');
+    for(var c=0;c<chips.length;c++){
+      var first=textOf(chips[c]).split('\\n')[0].trim();
+      if(first&&first!=='+1'&&!seen[first]){seen[first]=1;doms.push(first);}
+      if(doms.length>=15) break;
+    }
+  }catch(e){}
+  var clone=el.cloneNode(true);
+  var kill=clone.querySelectorAll('.citation,.citation-nbsp');
+  for(var k=0;k<kill.length;k++){ if(kill[k].parentNode) kill[k].parentNode.removeChild(kill[k]); }
+  var best=textOf(clone).replace(/\\n{3,}/g,'\\n\\n').trim();
+  var lines=best.split('\\n');var keep=[];
+  for(var L=0;L<lines.length;L++){ if(/^\\+1$/.test(lines[L].trim())) continue; keep.push(lines[L]); }
+  best=keep.join('\\n').trim();
+  if(!best) return JSON.stringify({found:false});
+  return JSON.stringify({found:true,thinking:'',answer:best,refs:doms.length,
+    ref_links:doms.map(function(x){return {title:x,url:''};})});
+})()"""
 
-ZAI_EXTRACT_JS = _modern_extract_js(
-    [".chat-assistant", "[class*=markdown-prose]", "[class*=assistant]"],
-    "z.ai",
-    noise_patterns=["^\\+\\d+$", "^思考过程$", "^正在思考[\\s\\S]{0,10}$"])
+ZAI_EXTRACT_JS = """(function(){
+  function textOf(e){ return e ? (e.innerText||'').trim() : ''; }
+  /* zai 2026-08-27 实测：正文 .chat-assistant 内嵌思考折叠区（detailsSubContainer/blockquote/截断头行），
+     直接取 innerText 会把英文思考流混进答案。策略：克隆节点剥掉思考区再取文本。 */
+  var cas=document.querySelectorAll('.chat-assistant');
+  var last=cas.length?cas[cas.length-1]:null;
+  var best='';
+  if(last){
+    var clone=last.cloneNode(true);
+    var kill=clone.querySelectorAll('[class*=detailsSubContainer],blockquote,[class*=truncate],[class*=headShadow]');
+    for(var i=0;i<kill.length;i++){ if(kill[i].parentNode) kill[i].parentNode.removeChild(kill[i]); }
+    best=textOf(clone).replace(/\\n{3,}/g,'\\n\\n');
+  }
+  /* 不做「最长文本」兜底：会误抓旧气泡的未剥壳长文本，导致基线比对错乱；宁可本轮 found:false 继续等 */
+  if(best.length<15) return JSON.stringify({found:false});
+  var out=[],seen={};
+  try{
+    var as=last?last.querySelectorAll('a[href]'):document.querySelectorAll('a[href]');
+    for(var k=0;k<as.length;k++){
+      var u=as[k].getAttribute('href')||'';
+      if(u.indexOf('http')!==0||u.indexOf('z.ai')>-1) continue;
+      if(seen[u]) continue; seen[u]=1;
+      var t2=textOf(as[k]).replace(/\\s+/g,' ').trim();
+      if(t2.length>70) t2=t2.slice(0,67)+'…';
+      out.push({title:t2,url:u});
+      if(out.length>=20) break;
+    }
+  }catch(e){}
+  return JSON.stringify({found:true,thinking:'',answer:best,refs:out.length,ref_links:out});
+})()"""
 
 # ---------------------------------------------------------------- Engine registry
 
@@ -393,6 +493,8 @@ ENGINES = {
         "session": "zai",
         "site_url": "https://chat.z.ai/",
         "site_host": "z.ai",
+        # 发问前回到全新会话首页：在旧会话里提问会变「追问」，且旧气泡长文本会干扰基线比对
+        "fresh_start_url": "https://chat.z.ai/",
         # 2026-08-26 实测：输入框 id=chat-input（textarea）
         "fill_selector": "#chat-input",
         "fill_nth": 0,
@@ -405,15 +507,21 @@ ENGINES = {
             # 会话是否真的开始：离开首页 hero（URL 变 /c/<id> 或 hero 文案消失）
             "verify_js": "(function(){return location.href.indexOf('/c/')>-1||document.body.innerText.indexOf('我能为你创造什么')<0;})()",
         },
-        # 发送前检查：深度思考若在高档位会拖到分钟级超时——检测到就点开下拉关掉；
-        # 两段式：先点开下拉，间隔后再点 role=switch 关闭（菜单渲染需要时间）
+        # 发送前关深度思考（最高档要思考 4 分钟+才出答案）。实测：胶囊控件文本两行
+        # 「深度思考/档位」；下拉菜单项是 font-medium 小 span（低/高/最高）；React Switch 的
+        # element.click() 与 CDP 坐标点击均无效，必须派发完整 pointerdown/up+click 事件序列。
+        # 三步：点开下拉 → 完整事件点「低」 → 验证胶囊档位，失败由 ask_engine 重试
         "pre_send": [
-            "(function(){var els=document.querySelectorAll('button,div[role=button],span');for(var i=0;i<els.length;i++){var t=(els[i].innerText||'').trim();if(/深度思考\\s*(最高|高)/.test(t)){els[i].click();return 'dropdown-opened';}}return 'dt-off';})()",
-            "(function(){var sw=document.querySelectorAll('[role=switch]');var n=0;for(var i=0;i<sw.length;i++){if(sw[i].getBoundingClientRect().width>0){sw[i].click();n++;}}if(n){document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));return 'switch-off:'+n;}return 'no-switch';})()",
+            "(function(){var els=document.querySelectorAll('span,div');for(var i=0;i<els.length;i++){var t=(els[i].innerText||'').replace(/\\s+/g,'');if(t==='最高'){(els[i].parentElement||els[i]).click();return 'opened';}}for(var j=0;j<els.length;j++){var s=(els[j].innerText||'').replace(/\\s+/g,'');if(/^深度思考(最高|高)$/.test(s)){els[j].click();return 'opened-cmb';}}var sp=document.querySelectorAll('span');for(var k=0;k<sp.length;k++){if((sp[k].innerText||'').trim()==='深度思考'){var up=sp[k].parentElement;if(up)up.click();return 'opened-blank';}}return 'no-target';})()",
+            "(function(){function fc(el){var r=el.getBoundingClientRect();var o={bubbles:true,cancelable:true,view:window,clientX:r.x+r.width/2,clientY:r.y+r.height/2,button:0};['pointerdown','mousedown'].forEach(function(t){try{el.dispatchEvent(new PointerEvent(t,o));}catch(e){el.dispatchEvent(new MouseEvent(t,o));}});['pointerup','mouseup','click'].forEach(function(t){el.dispatchEvent(new MouseEvent(t,o));});}var els=document.querySelectorAll('span');for(var i=0;i<els.length;i++){var el=els[i];if((el.innerText||'').trim()!=='低')continue;var r=el.getBoundingClientRect();if(r.width<10||r.width>200||r.height<5)continue;fc(el);if(el.parentElement)fc(el.parentElement);document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));return 'clicked-low';}return 'no-low';})()",
         ],
+        # 通过条件：屏幕上可见的「深度思考…」小胶囊（取 x 最靠右下、宽<220 者）档位不含 高/最高；
+        # 未水合或菜单没弹开时判定不过 → 重试整段流程
+        "pre_send_verify_js": "(function(){function norm(s){return (s||'').replace(/[\\s\\n]+/g,'');}var best=null;var els=document.querySelectorAll('div,span');for(var i=0;i<els.length;i++){var n=norm(els[i].innerText);if(n.indexOf('深度思考')===0&&n.length<=8){var r=els[i].getBoundingClientRect();if(r.width>0&&r.width<220&&r.height>0&&r.height<50){if(!best||r.x+r.y>best.x+best.y||(r.x+r.y===best.x+best.y&&n.length>best.n.length))best={x:r.x,y:r.y,n:n};}}}if(!best)return false;return best.n.indexOf('最高')===-1&&best.n.indexOf('高')===-1;})()",
         "probe_js": "(function(){return !!(document.querySelector('#chat-input')||document.querySelector('textarea'));})()",
         "extract_js": ZAI_EXTRACT_JS,
-        "timeout": 150,
+        # 低档深度思考实测也可能 >4 分钟才出正文（服务端排队），超时给足；提取器已能精确剥离思考区
+        "timeout": 300,
     },
 }
 
@@ -491,14 +599,24 @@ def engine_health(engine_id, auto_recover=True):
     url = _parse_state_url(st["stdout"])
     connected = eng["site_host"] in url
 
-    # 若检测到掉线或停留在 about:blank，自动进行打开网页自愈重连
+    # 若检测到掉线或停留在 about:blank，自动进行打开网页自愈重连。
+    # 关键：React 站点打开后 DOM 水合要几秒~十几秒，只等 2.5s 会导致随后 fill 匹配 0 个元素，
+    # 所以这里轮询 probe_js 直到输入框出现（最多约 3 轮 × 18s），URL 命中且输入框就绪才算自愈成功
     if not connected and auto_recover and eng.get("site_url"):
-        run_cli(["browser", sess, "open", eng["site_url"]], timeout=40)
-        time.sleep(2.5)
-        st = run_cli(["browser", sess, "state"])
-        if st["ok"]:
-            url = _parse_state_url(st["stdout"])
+        for _attempt in range(3):
+            run_cli(["browser", sess, "open", eng["site_url"]], timeout=40)
+            for _wait in range(9):
+                time.sleep(2)
+                p = run_cli(["browser", sess, "eval", eng["probe_js"]], timeout=30)
+                if p["ok"] and p["stdout"].strip() == "true":
+                    break
+            st = run_cli(["browser", sess, "state"])
+            url = _parse_state_url(st["stdout"]) if st["ok"] else ""
             connected = eng["site_host"] in url
+            input_found = bool(p["ok"] and p["stdout"].strip() == "true") if connected else False
+            if connected and input_found:
+                return {"id": engine_id, "session": sess, "connected": True,
+                        "url": url, "input_found": True, "error": ""}
 
     input_found = False
     if connected:
@@ -562,10 +680,24 @@ def ask_engine(engine_id, prompt, baseline=None, progress=None):
     if progress:
         progress(f"连接 {eng['name']}…")
 
+    # 发问前回到全新会话首页（避免旧会话追问干扰基线与提取，如 zai）
+    if eng.get("fresh_start_url"):
+        run_cli(["browser", sess, "open", eng["fresh_start_url"]], timeout=40)
+        time.sleep(3.0)
+
     # 发送前预处理（如 zai 关深度思考：点开下拉 → 间隔 → 点 switch，两段式执行）
-    for pre_js in eng.get("pre_send", []) or []:
-        run_cli(["browser", sess, "eval", pre_js], timeout=30)
-        time.sleep(1.0)
+    # 可选 verify_js 验证终态（控件水合慢时首轮脚本会空转），未通过则整段重试（最多 3 轮）
+    for _attempt in range(3):
+        for pre_js in eng.get("pre_send", []) or []:
+            run_cli(["browser", sess, "eval", pre_js], timeout=30)
+            time.sleep(1.0)
+        vjs = eng.get("pre_send_verify_js")
+        if not vjs:
+            break
+        v = run_cli(["browser", sess, "eval", vjs], timeout=30)
+        if "true" in (v.get("stdout") or ""):
+            break
+        time.sleep(1.5)
 
     input_method = eng.get("input_method", "fill")
     if input_method == "type":
