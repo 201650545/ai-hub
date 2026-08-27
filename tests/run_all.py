@@ -56,6 +56,7 @@ def main() -> None:
         ("test_orchestrator", "编排器"),
         ("test_video_embed", "视频组件"),
         ("test_lesson_framework", "课件骨架"),
+        ("test_search_gateway_routing", ":3100 网关路由不变量"),
     ]
 
     all_results = []
