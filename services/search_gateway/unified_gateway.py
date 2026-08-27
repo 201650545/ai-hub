@@ -10,7 +10,7 @@
 - GET  /api/unified_stream  → AI 搜索 SSE（8 引擎并发，未连接引擎不阻塞）
 - GET  /api/search_aggregate→ 内容池聚合（内部调 /v1/chat/completions 做汇总）
 - GET  /api/search_json     → 同步 JSON 版聚合（DSH hub-web-search 插件调用方）
-- GET  /api/health          → 引擎会话 + LLM 渠道健康
+- GET  /api/health          → 引擎会话 + LLM 渠道健康（60s TTL 缓存，?refresh=1 强制重探）
 - GET  /api/history         → 搜索历史
 - GET  /api/quota           → 用量记账
 - GET  /v1/models           → 聚合各渠道可用模型
@@ -47,6 +47,32 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 数据与代码分离：运行数据统一在 仓库根/data/search_gateway/
 DATA_DIR = os.path.normpath(os.path.join(os.path.dirname(BASE_DIR), "..", "data", "search_gateway"))
 HISTORY_FILE = Path(DATA_DIR) / "history.json"
+
+# ---------------------------------------------------------------- /api/health TTL 缓存
+# 全量探测（engines.health_all 8 引擎 opencli 子进程探测）单次 ~24s，前端/监控轮询频繁时
+# 直接打爆。默认 60s TTL 内存缓存，?refresh=1 强制绕过；返回体带 cache 字段标明命中与年龄。
+HEALTH_TTL = float(os.environ.get("HEALTH_CACHE_TTL", "60"))
+_health_cache = {"t": 0.0, "data": None}
+_health_cache_lock = threading.Lock()
+
+
+def cached_api_health(force=False):
+    """带 TTL 缓存的 /api/health 载荷。miss 时并发全量探测一次；命中直接回放并刷新 time。"""
+    now = time.time()
+    if not force and _health_cache["data"] is not None and now - _health_cache["t"] < HEALTH_TTL:
+        d = dict(_health_cache["data"])
+        d["time"] = time.strftime("%H:%M:%S")
+        d["cache"] = {"hit": True, "age_s": round(now - _health_cache["t"], 1), "ttl": HEALTH_TTL}
+        return d
+    data = {
+        "engines": engines.health_all(),
+        "llm": channels.cached_health_all(),
+        "time": time.strftime("%H:%M:%S"),
+    }
+    with _health_cache_lock:
+        _health_cache["t"] = time.time()
+        _health_cache["data"] = data
+    return data
 
 try:  # task_010：对话历史持久化模块（03_共享组件），缺失时降级
     _SHARED = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "03_共享组件"))
@@ -373,11 +399,9 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             # 统一健康检查（Monorepo runtime 约定）
             self._send_json(200, {"status": "ok", "service": "search_gateway", "version": "1.0"})
         elif path == "/api/health":
-            self._send_json(200, {
-                "engines": engines.health_all(),
-                "llm": channels.cached_health_all(),
-                "time": time.strftime("%H:%M:%S"),
-            })
+            # TTL 缓存版（60s）；?refresh=1 强制全量重探
+            force_refresh = query.get("refresh", [""])[0] in ("1", "true")
+            self._send_json(200, cached_api_health(force=force_refresh))
         elif path == "/api/history":
             # task_010：支持 engine=/limit= 查询参数；未传参则返回旧的搜索历史（兼容）
             if query.get("engine") or query.get("limit"):

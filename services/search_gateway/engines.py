@@ -31,7 +31,7 @@ YUANBAO_EXTRACT_JS = """(function(){
   function htmlOf(e){ return e ? (e.innerHTML||'').trim() : ''; }
   var cc = document.getElementById('chat-content') || document.body;
 
-  // 新选择器：查找所有气泡，取最后一个AI气泡
+  /* 气泡选择器：查找所有气泡，取最后一个AI气泡（勿用行注释——run_cli 折叠换行后会被吞） */
   var bubbles = Array.from(cc.querySelectorAll('.agent-chat__bubble'));
   var lastBubble = null;
   for(var i=bubbles.length-1; i>=0; i--){
@@ -46,12 +46,10 @@ YUANBAO_EXTRACT_JS = """(function(){
   var answer_html = '';
   if(lastBubble){
     var rawText = textOf(lastBubble);
-    // 移除"Deep thinking completed..."等系统消息
     answer = rawText.replace(/Deep thinking completed[^\n]*/g, '').trim();
     answer_html = lastBubble.innerHTML;
   }
 
-  // 思考过程：从 bubble 文本中提取
   var thinking = '';
   if(lastBubble){
     var t = lastBubble.innerText || '';
@@ -59,10 +57,10 @@ YUANBAO_EXTRACT_JS = """(function(){
     if(thinkMatch) thinking = thinkMatch[0];
   }
 
-  // 兜底：查找 markdown 容器
+  /* 兜底：从末尾取最新 markdown 块（首个块是旧消息，恒等于 baseline 会致轮询超时） */
   if(!answer){
     var els = Array.from(cc.querySelectorAll('.hyc-common-markdown-style, .agent-chat__conv--ai__speech_show'));
-    for(var i=0; i<els.length; i++){
+    for(var i=els.length-1; i>=0; i--){
       var t = textOf(els[i]);
       if(t.length > 15 && answer.indexOf(t) === -1){
         answer = t;
@@ -98,7 +96,7 @@ DOUBAO_EXTRACT_JS = """(function(){
   function textOf(e){ return (e.innerText||'').trim(); }
   var thinking = '';
   var answers = [];
-  // 收集所有带 thinking box 的行(排除用户消息/侧栏)
+  /* 收集所有带 thinking box 的行(排除用户消息/侧栏) */
   var rows = Array.from(document.querySelectorAll('.v_list_row, [data-thinking-box], [class*=thinking]'));
   var seen = {};
   for(var i=0; i<rows.length; i++){
@@ -108,14 +106,12 @@ DOUBAO_EXTRACT_JS = """(function(){
       var tt = textOf(th);
       if(tt.length > 2 && tt.indexOf('已思考') === -1 && !seen[tt.slice(0,20)]) { seen[tt.slice(0,20)] = 1; thinking += (thinking ? '\n' : '') + tt; }
     }
-    // 本行的 markdown 正文
     var mds = Array.from(r.querySelectorAll('.md-box-root, [class*=md-box], [class*=markdown]'));
     for(var j=0; j<mds.length; j++){
       var t = textOf(mds[j]);
       if(t.length > 2 && t !== '已思考' && answers.indexOf(t) === -1) answers.push(t);
     }
   }
-  // 兜底:全页遍历 md-box
   if(!answers.length){
     var allMds = Array.from(document.querySelectorAll('.md-box-root, [class*=md-box], [class*=markdown]'));
     for(var k=0; k<allMds.length; k++){
@@ -123,7 +119,7 @@ DOUBAO_EXTRACT_JS = """(function(){
       if(t2.length > 2 && t2 !== '已思考' && answers.indexOf(t2) === -1) answers.push(t2);
     }
   }
-  // 取最后一条,过滤常见噪声前缀
+  /* 取最后一条,过滤常见噪声前缀 */
   var answer = '';
   for(var m=answers.length-1; m>=0; m--){
     var a = answers[m];
