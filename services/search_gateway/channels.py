@@ -1357,6 +1357,30 @@ def all_models():
     return out
 
 
+def _resolve_prefixed_model(q):
+    """解析 "provider:model" 形式的模型 id（Claude Code / Cherry Studio 自定义模型格式）。
+    返回 (真实模型名, 钉定渠道或 None)。规则：
+    - 冒号前部分恰好是网关渠道 id（如 opencode:deepseek-v4-flash）→ 剥前缀并钉定该渠道；
+    - 或是已知的 Cherry Studio provider uuid（sync_cherry.CHERRY_MAP 反查，如
+      3f3af7c6-…:deepseek-v4-flash-vision-exp）→ 映射回对应渠道；
+    - 其余含冒号模型名（如 openrouter 的 z-ai/glm-5.2:free）不匹配任何前缀，原样返回，
+      避免误伤上游真实带冒号的变体名。"""
+    if ":" not in q:
+        return q, None
+    head, tail = q.split(":", 1)
+    if head in CHANNELS:
+        return tail, head
+    try:
+        from sync_cherry import CHERRY_MAP as _CHERRY_MAP  # 同目录懒加载，避免循环 import
+        rev = {pid: cid for cid, pid in _CHERRY_MAP.items()}
+        cid = rev.get(head)
+        if cid and cid in CHANNELS:
+            return tail, cid
+    except Exception:  # noqa: BLE001
+        pass
+    return q, None
+
+
 def model_providers(model_name, full=False):
     """反查支持某模型的所有渠道（包含搜索），返回按智能排序的 provider 列表。
     包含搜索：渠道模型名包含 query 即算支持（不区分大小写）。
@@ -1364,6 +1388,14 @@ def model_providers(model_name, full=False):
     供前端编辑态展示全部匹配渠道（含已排除的）。"""
     q = (model_name or "").strip().lower()
     if not q:
+        return []
+    # "provider:model" 前缀解析（Claude Code/Cherry Studio 自定义模型）：命中即单渠到钉定
+    real, pinned = _resolve_prefixed_model(q)
+    if pinned is not None:
+        h = cached_health_all()
+        st = h.get(pinned, {})
+        if st.get("enabled", True) and st.get("key_set"):
+            return [_custom_provider_entry(pinned, real, h)]
         return []
     # 统一模型组：精确命中归一名 → 只用显式成员（转发时按渠道改写为上游真实名），不参与包含搜索
     uni = load_unified().get(normalize_model_name(q))
