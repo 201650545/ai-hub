@@ -34,14 +34,20 @@ NON_BREAKER_TYPES = {Outcome.MODEL_UNAVAILABLE, Outcome.PROTOCOL_ERROR, Outcome.
 # 归一化失败 → 限流台账用的合成状态码（熔断走 429 指数退避）
 BREAKER_STATUS = 429
 
-_QUOTA_HINTS = ("quota", "balance", "limit", "exhaust", "额度", "次数", "用完",
-                "insufficient", "credits", "rate_limit", "rate limit")
-_AUTH_HINTS = ("auth", "key", "token", "unauthorized", "forbidden", "invalid api",
-               "401", "403", "密钥", "鉴权")
+# 高置信短语（语义明确，可触发熔断）——裸词 limit/key/token 过宽，已在 2026-08-27 GPT
+# Extended 评审后移除："context length limit exceeded" 曾因 limit 误判 QUOTA → 错误熔断健康渠道。
+_QUOTA_HINTS = ("quota", "insufficient_quota", "insufficient credits", "quota exceeded",
+                "额度", "余额不足", "次数用完", "用完", "exhaust", "credits")
+_AUTH_HINTS = ("unauthorized", "forbidden", "invalid api key", "invalid_api_key",
+               "authentication failed", "鉴权失败", "密钥无效", "401", "403")
 _MODEL_HINTS = ("model not found", "not found", "model_not", "不存在", "no model",
                 "unknown model", "unavailable model")
-_OVERLOAD_HINTS = ("overload", "busy", "503", "502", "504", "繁忙", "过载",
-                   "try again later", "temporarily")
+_OVERLOAD_HINTS = ("overloaded", "overload", "server busy", "service unavailable",
+                   "繁忙", "过载", "try again later", "temporarily", "502", "503", "504")
+# 请求级/协议级错误显式排除：命中即 PROTOCOL_ERROR，不进 QUOTA/AUTH 熔断
+# （context length / max token 是请求本身超限，渠道本身健康，熔断会误杀好渠道）
+_REQUEST_LEVEL_HINTS = ("context length", "maximum context", "max token",
+                        "tokenizer", "token limit", "invalid request", "请求参数")
 
 
 def classify_http_status(code, body_text=""):
@@ -94,8 +100,15 @@ def classify_exception(exc):
 
 
 def _classify_text(text):
-    """关键词匹配失败类型（小写文本）。"""
+    """关键词匹配失败类型（小写文本）。三层：
+    1) 请求级错误显式排除（context length / max token 等 → PROTOCOL_ERROR，不熔断）；
+    2) 高置信短语分类（quota/unauthorized 等语义明确的才进熔断）；
+    3) 判不出 → None（由调用方兜底 PROTOCOL_ERROR）。
+    注意：RATE_LIMIT 只来自 HTTP 429（classify_http_status），文本不判定 rate_limit，
+    避免 "token limit" 之类误触发。"""
     t = (text or "").lower()
+    if any(h in t for h in _REQUEST_LEVEL_HINTS):
+        return Outcome.PROTOCOL_ERROR
     if any(h in t for h in _QUOTA_HINTS):
         return Outcome.QUOTA
     if any(h in t for h in _AUTH_HINTS):
