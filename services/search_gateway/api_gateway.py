@@ -37,6 +37,8 @@ import urllib.parse
 import urllib.request
 import re
 
+import upstream_outcome
+
 # :3100 独立记账，与 :3000 搜索网关的 quota 分开（在 import channels 前设环境变量）
 os.environ.setdefault("GATEWAY_ID", "api_gateway")
 
@@ -301,9 +303,11 @@ def route_completion(payload):
         "resolved_model": None,
         "fallback_count": 0,
         "errors": [],
+        "failures": [],
     }
 
     errors = []
+    failures = []
     for i, (cid, real_model) in enumerate(chain):
         if not channels.key_is_set(cid):
             errors.append(cid + ": 未配置 key")
@@ -321,10 +325,16 @@ def route_completion(payload):
                 # 壳响应视为该渠道失败，继续尝试下一渠道
                 ctype = resp.getheader("Content-Type", "application/json") or "application/json"
                 raw = resp.read()
-                if _looks_like_shell(raw):
-                    channels.mark_shell_failure(cid, real_model, used_key)  # 合成 429 → 熔断提前跳过
-                    errors.append(cid + ": 空壳响应（choices 为空），已跳过")
+                outcome = upstream_outcome.classify_shell(raw)
+                if outcome != upstream_outcome.Outcome.SUCCESS:
+                    # 归一化失败：breaker 类型熔断（合成 429），非 breaker 只记录不惩罚
+                    if upstream_outcome.is_breaker(outcome):
+                        channels.mark_shell_failure(cid, real_model, used_key)
+                    failures.append({"channel": cid, "outcome": outcome.value,
+                                     "detail": "空壳/错误载荷"})
+                    errors.append(cid + ": " + outcome.value + "（空壳/错误载荷）")
                     log_entry["errors"] = list(errors)
+                    log_entry["failures"] = list(failures)
                     continue
                 resp = _BufferedResponse(raw, ctype)
                 # 验证通过后记录成功（P0-1：延迟到 shell 检测后，避免 200 提前清零 consec429）
@@ -333,9 +343,14 @@ def route_completion(payload):
                 # 流式：首包验证（空流/错误事件 → 换下一渠道），通过则回放包装后透传
                 ok, head = _peek_stream(resp)
                 if not ok:
-                    channels.mark_shell_failure(cid, real_model, used_key)  # 合成 429 → 熔断提前跳过
-                    errors.append(cid + ": 流式首包为空壳/错误事件，已跳过")
+                    outcome = upstream_outcome.classify_shell(head)
+                    if upstream_outcome.is_breaker(outcome):
+                        channels.mark_shell_failure(cid, real_model, used_key)
+                    failures.append({"channel": cid, "outcome": outcome.value,
+                                     "detail": "流式首包为空壳/错误事件"})
+                    errors.append(cid + ": " + outcome.value + "（流式首包空壳/错误）")
                     log_entry["errors"] = list(errors)
+                    log_entry["failures"] = list(failures)
                     try:
                         resp.close()
                     except Exception:  # noqa: BLE001
@@ -351,20 +366,83 @@ def route_completion(payload):
             return cid, resp, log_entry
         except urllib.error.HTTPError as he:
             detail = he.read().decode("utf-8", "ignore")[:200]
-            errors.append(cid + ": HTTP " + str(he.code) + " " + detail)
+            outcome = upstream_outcome.classify_http_status(he.code, detail)
+            if upstream_outcome.is_breaker(outcome) and he.code != 429:
+                # 非 429 的 breaker（401/403/503 等）也触发熔断，避免反复撞死渠道
+                channels.mark_shell_failure(cid, real_model, channels.get_key(cid))
+            failures.append({"channel": cid, "outcome": outcome.value,
+                             "detail": "HTTP " + str(he.code)})
+            errors.append(cid + ": HTTP " + str(he.code) + " [" + outcome.value + "] " + detail)
+            log_entry["errors"] = list(errors)
+            log_entry["failures"] = list(failures)
         except RateLimitSkip as rle:
             # 95% 提前切换（task_045）：该渠道配额桶满/熔断，走用户顺序里的下一渠道
+            failures.append({"channel": cid, "outcome": upstream_outcome.Outcome.RATE_LIMIT.value,
+                             "detail": str(rle)})
             errors.append(cid + ": " + str(rle))
             log_entry["errors"] = list(errors)
+            log_entry["failures"] = list(failures)
         except Exception as e:  # noqa: BLE001
-            errors.append(cid + ": " + str(e)[:120])
+            outcome = upstream_outcome.classify_exception(e)
+            failures.append({"channel": cid, "outcome": outcome.value,
+                             "detail": str(e)[:120]})
+            errors.append(cid + ": " + outcome.value + " " + str(e)[:120])
+            log_entry["errors"] = list(errors)
+            log_entry["failures"] = list(failures)
 
     log_entry["errors"] = errors
+    log_entry["failures"] = failures
     with _ROUTE_LOG_LOCK:
         _ROUTE_LOG.append(dict(log_entry))
         if len(_ROUTE_LOG) > _ROUTE_LOG_MAX:
             del _ROUTE_LOG[:len(_ROUTE_LOG) - _ROUTE_LOG_MAX]
     return None, errors, log_entry
+
+
+def build_route_plan(model):
+    """路由决策可观测接口（Phase 1）：返回候选链 + 每个候选的 eligibility 原因。
+    只读，不预占配额、不触发上游请求。排障时不用猜"为什么没走第二家"。"""
+    providers = channels.model_providers(model)
+    if providers:
+        chain = [(p["id"], (p.get("matched_models") or [model])[0]) for p in providers]
+    else:
+        chain = [(cid, model) for cid in channels.model_to_chain(model)]
+    if not chain:
+        chain = [(cid, channels.CHANNELS[cid].get("default_model", model))
+                 for cid in channels.DEFAULT_CHAIN if channels.get_channel_enabled(cid)]
+
+    health = channels.cached_health_all()
+    ledger = _rate_ledger() if _rate_ledger else {}
+
+    candidates = []
+    for cid, real_model in chain:
+        st = health.get(cid, {})
+        row = ledger.get(cid, {})
+        entry = {
+            "channel": cid,
+            "model": real_model,
+            "enabled": st.get("enabled", True),
+            "key_set": st.get("key_set", False),
+            "reachable": st.get("reachable", False),
+            "eligible": True,
+            "reason": None,
+            "used_1m": row.get("used_1m"),
+            "limit_1m": row.get("limit_rpm"),
+            "state": row.get("state", "open"),
+            "blocked_in": row.get("blocked_in"),
+        }
+        if not st.get("enabled", True):
+            entry["eligible"], entry["reason"] = False, "disabled"
+        elif not st.get("key_set", False):
+            entry["eligible"], entry["reason"] = False, "no_key"
+        elif not st.get("reachable", False):
+            entry["eligible"], entry["reason"] = False, "unreachable"
+        elif row.get("state") == "blocked":
+            entry["eligible"], entry["reason"] = False, "blocked"
+        elif row.get("state") == "throttled":
+            entry["eligible"], entry["reason"] = False, "quota"
+        candidates.append(entry)
+    return {"model": model, "candidates": candidates}
 
 
 def aggregate_models():
@@ -378,7 +456,11 @@ def aggregate_models():
 
 def stream_openai_passthrough(handler, upstream):
     """把上游 SSE 流原样转发给客户端。收到 [DONE] 即结束（防上游 keep-alive 挂起）；
-    上游中途断开（未见 [DONE]）时补发 error 事件 + [DONE]，避免客户端无声截断。"""
+    上游中途断开（未见 [DONE]）时补发 error 事件 + [DONE]，避免客户端无声截断。
+
+    commit point invariant（Phase 1）：failover 只允许发生在 response commit 前——
+    首包验证（_peek_stream）通过即 commit，此后不得换上游继续输出，否则两个模型的
+    输出会拼在同一条 assistant response 里。中途断流只能结束本响应、由客户端重试。"""
     handler.send_response(200)
     handler.send_header("Content-Type", "text/event-stream")
     handler.send_header("Cache-Control", "no-cache")
@@ -742,6 +824,9 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             model = query.get("model", [""])[0]
             full = query.get("full", ["0"])[0] in ("1", "true", "yes")
             self._send_json(200, {"model": model, "providers": channels.model_providers(model, full=full)})
+        elif path == "/api/route-plan":
+            model = query.get("model", [""])[0]
+            self._send_json(200, build_route_plan(model))
         elif path == "/api/routing":
             self._send_json(200, {"routing": channels.load_routing().get("routing", {})})
         elif path == "/api/switch":
