@@ -88,15 +88,15 @@ def upsert_provider(cur, pid, name, base_url, key, enabled, now):
         )
 
 
-def upsert_model(cur, pid, model_id, display_name, group, enabled, now):
+def upsert_model(cur, pid, model_id, display_name, group, enabled, now, hidden=0):
     mid = f"{pid}::{model_id}"
     exists = cur.execute("SELECT 1 FROM user_model WHERE id=?", (mid,)).fetchone()
     if exists:
         cur.execute(
             """UPDATE user_model SET
-               name=?, "group"=?, is_enabled=?, updated_at=?
+               name=?, "group"=?, is_enabled=?, is_hidden=?, updated_at=?
                WHERE id=?""",
-            (display_name, group, enabled, now, mid),
+            (display_name, group, enabled, hidden, now, mid),
         )
     else:
         cur.execute(
@@ -105,7 +105,7 @@ def upsert_model(cur, pid, model_id, display_name, group, enabled, now):
                 is_enabled, is_hidden, is_deprecated, order_key, created_at, updated_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (mid, pid, model_id, display_name, group, "[]", 1,
-             enabled, 0, 0, _gen_order_key(cur), now, now),
+             enabled, hidden, 0, _gen_order_key(cur), now, now),
         )
 
 
@@ -114,6 +114,12 @@ def run_sync(dry=False):
     now = int(time.time() * 1000)
     hidden = set(channels.get_hidden_channels())
     sel_map = channels.load_channel_models()
+    # 斩杀线以下（tier=fast 统一组）的上游模型名 → Cherry Studio 里标记隐藏
+    fast_models = set()
+    for gname, g in channels.load_unified().items():
+        if (g.get("tier") or "main") == "fast":
+            for up in (g.get("members") or {}).values():
+                fast_models.add(up)
 
     con = sqlite3.connect(CHERRY_DB)
     cur = con.cursor()
@@ -145,9 +151,10 @@ def run_sync(dry=False):
             sset = set(sel)
             models = [m for m in models if m in sset]
         for m in models:
+            m_hidden = 1 if m in fast_models else 0
             if not dry:
-                upsert_model(cur, pid, m, m, cid, enabled, now)
-            synced_models.append((pid, m, cid))
+                upsert_model(cur, pid, m, m, cid, enabled, now, m_hidden)
+            synced_models.append((pid, m, cid, m_hidden))
 
     # ---- 2. 统一模型组不直接同步为模型名 ----
     # 统一模型名（如 fast / deepseek-v4-flash）是网关层抽象，各成员渠道的上游真实模型名不同
@@ -174,8 +181,9 @@ def main():
     for cid, pid, name, enabled in res["providers"]:
         print(f"  [{cid}] -> Cherry provider [{pid}] {name} enabled={enabled}")
     print(f"同步模型 {len(res['models'])} 条:")
-    for pid, m, cid in res["models"]:
-        print(f"  {pid}::{m}  (来自 {cid})")
+    for pid, m, cid, m_hidden in res["models"]:
+        hid = " [隐藏]" if m_hidden else ""
+        print(f"  {pid}::{m}  (来自 {cid}){hid}")
 
 
 if __name__ == "__main__":

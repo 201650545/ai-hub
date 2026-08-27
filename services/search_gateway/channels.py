@@ -243,7 +243,7 @@ CHANNELS = {
         
         "speed": "fast",
         "default_model": "deepseek-v4-flash",
-        "models": ["deepseek-v4-flash", "deepseek-v4-pro"],
+        "models": ["deepseek-v4-flash", "deepseek-v4-pro", "hy3"],
         "note": "OpenCode Go 渠道（用户 2026-08-15 提供），优先转发 DeepSeek V4 Flash。",
         "ua": "openai-completions/pi-ai",  # Cloudflare 1010: 必须用该 UA 才放行
     },

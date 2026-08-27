@@ -1553,11 +1553,15 @@ function renderPillExpiry(groupName){
 }
 function renderUnifiedStrip(){
   const el=document.getElementById('ug-strip');if(!el)return;
-  let html=Object.keys(UNIFIED).map(n=>{
+  const keys=Object.keys(UNIFIED);
+  const mains=keys.filter(n=>(UNIFIED[n]||{}).tier!=='fast');
+  const fasts=keys.filter(n=>(UNIFIED[n]||{}).tier==='fast');
+  let html=mains.concat(fasts).map(n=>{
     const u=UNIFIED[n]||{},cnt=Object.keys(u.members||{}).length;
     const nm=esc(n).replace(/'/g,"\\'");
+    const tag=(u.tier==='fast')?'<span class="tag fast" style="margin-left:6px">⚡快速补充</span>':'';
     return '<div class="ug-pill'+(selModel===n?' sel':'')+'" onclick="pickModel(\''+nm+'\')">'+
-      '<span class="uico">✨</span>'+esc(u.display||n)+
+      '<span class="uico">✨</span>'+esc(u.display||n)+tag+
       '<span class="ucnt">'+cnt+' 渠道</span>'+
       '<span class="ug-exp">'+renderPillExpiry(n)+'</span>'+
       '<button class="upill-x" title="删除统一模型" onclick="event.stopPropagation();delUnified(\''+nm+'\')">🗑</button></div>';
