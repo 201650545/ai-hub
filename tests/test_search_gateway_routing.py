@@ -16,7 +16,7 @@ Phase 1 路由不变量固化测试（P1.1，GPT Extended 评审定稿 2026-08-2
 JSON 解析失败 → PROTOCOL_ERROR（非 breaker，failover 但不熔断）。
 RATE_LIMIT 只来自 HTTP 429；"rate limit exceeded" 文本不判 RATE_LIMIT。
 
-验证令牌（供 GPT Extended 在 GitHub 上核验真读）：P11-TOKEN=7K3F-AX92-QM05-V2-LOCKED
+验证令牌（供 GPT Extended 在 GitHub 上核验真读）：P11-TOKEN=QM05-V2-LOCKED
 """
 import io
 import json
