@@ -888,9 +888,13 @@ def channel_health(channel_id):
                 "error": "", "can_fill": can_fill, "provider": provider,
                 "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
     except urllib.error.HTTPError as e:
-        return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": False,
+        # 与下方通用 Exception 分支一致：health_fallback_ok=true 时，即使目录接口
+        # 返回 HTTP 错误（如 Cloudflare 的 /models 返回 405 GET not supported），
+        # 只要 chat 接口可用（配置了硬编码目录），也标记为可达，避免被路由跳过。
+        fb_ok = bool(ch.get("health_fallback_ok"))
+        return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": fb_ok,
                 "models": list(ch.get("models") or []),  # 探测失败回退硬编码目录，避免「渠道有模型却显示 0」
-                "error": f"HTTP {e.code}", "can_fill": can_fill, "provider": provider,
+                "error": "" if fb_ok else f"HTTP {e.code}", "can_fill": can_fill, "provider": provider,
                 "billing_tag": billing_tag, "billing_type": billing_type, "balance": balance}
     except Exception as e:  # noqa: BLE001
         # health_fallback_ok：/models 探测失败（如限流超时）时回退硬编码目录并标记可达，
