@@ -38,6 +38,7 @@ import urllib.request
 import re
 
 import upstream_outcome
+import capabilities
 
 # :3100 独立记账，与 :3000 搜索网关的 quota 分开（在 import channels 前设环境变量）
 os.environ.setdefault("GATEWAY_ID", "api_gateway")
@@ -308,7 +309,23 @@ def route_completion(payload):
 
     errors = []
     failures = []
+    required_caps = capabilities.required_capabilities(payload)
     for i, (cid, real_model) in enumerate(chain):
+        # capability admission（PR #2）：任何上游访问/key/配额之前的最前置本地判定。
+        # mismatch = 本地 routing decision，不是上游 failure：不调 chat_completion、
+        # 不耗 key、不碰 try_acquire/breaker/mark_shell_failure。
+        cap = capabilities.check_candidate(cid, real_model, payload)
+        if not cap["eligible"]:
+            failures.append({"channel": cid, "outcome": "capability_mismatch",
+                             "detail": "missing capabilities: " + ",".join(cap["mismatch"]),
+                             "capability_mismatch": {"required": cap["required"],
+                                                     "unsupported": cap["mismatch"],
+                                                     "unknown": cap["unknown"],
+                                                     "source": cap["source"]}})
+            errors.append(cid + ": capability_mismatch " + ",".join(cap["mismatch"]))
+            log_entry["errors"] = list(errors)
+            log_entry["failures"] = list(failures)
+            continue
         if not channels.key_is_set(cid):
             errors.append(cid + ": 未配置 key")
             continue
@@ -399,9 +416,11 @@ def route_completion(payload):
     return None, errors, log_entry
 
 
-def build_route_plan(model):
-    """路由决策可观测接口（Phase 1）：返回候选链 + 每个候选的 eligibility 原因。
-    只读，不预占配额、不触发上游请求。排障时不用猜"为什么没走第二家"。"""
+def build_route_plan(model, payload=None):
+    """路由决策可观测接口（Phase 1 + PR#2 capability）：返回候选链 + 每个候选的 eligibility 原因。
+    只读，不预占配额、不触发上游请求。排障时不用猜"为什么没走第二家"。
+    payload 提供时按请求硬能力验算 capability_mismatch（与 route_completion 同一判定）。"""
+    payload = payload or {"model": model}
     providers = channels.model_providers(model)
     if providers:
         chain = [(p["id"], (p.get("matched_models") or [model])[0]) for p in providers]
@@ -431,18 +450,26 @@ def build_route_plan(model):
             "state": row.get("state", "open"),
             "blocked_in": row.get("blocked_in"),
         }
+        cap = capabilities.check_candidate(cid, real_model, payload)
+        entry["capability_mismatch"] = {"required": cap["required"],
+                                         "unsupported": cap["mismatch"],
+                                         "unknown": cap["unknown"],
+                                         "source": cap["source"]}
         if not st.get("enabled", True):
             entry["eligible"], entry["reason"] = False, "disabled"
         elif not st.get("key_set", False):
             entry["eligible"], entry["reason"] = False, "no_key"
         elif not st.get("reachable", False):
             entry["eligible"], entry["reason"] = False, "unreachable"
+        elif cap["mismatch"]:
+            entry["eligible"], entry["reason"] = False, "capability_mismatch"
         elif row.get("state") == "blocked":
             entry["eligible"], entry["reason"] = False, "blocked"
         elif row.get("state") == "throttled":
             entry["eligible"], entry["reason"] = False, "quota"
         candidates.append(entry)
-    return {"model": model, "candidates": candidates}
+    return {"model": model, "required_capabilities": sorted(capabilities.required_capabilities(payload)),
+            "candidates": candidates}
 
 
 def aggregate_models():
@@ -826,7 +853,14 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(200, {"model": model, "providers": channels.model_providers(model, full=full)})
         elif path == "/api/route-plan":
             model = query.get("model", [""])[0]
-            self._send_json(200, build_route_plan(model))
+            payload_q = query.get("payload", [None])[0]
+            payload = None
+            if payload_q:
+                try:
+                    payload = json.loads(urllib.parse.unquote(payload_q))
+                except Exception:  # noqa: BLE001
+                    payload = None
+            self._send_json(200, build_route_plan(model, payload=payload))
         elif path == "/api/routing":
             self._send_json(200, {"routing": channels.load_routing().get("routing", {})})
         elif path == "/api/switch":
@@ -876,6 +910,14 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             return
         length = int(self.headers.get("Content-Length", 0) or 0)
         body = self.rfile.read(length) if length else b""
+        if path == "/api/route-plan":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception as e:  # noqa: BLE001
+                self._send_json(400, {"error": "invalid JSON: " + str(e)[:100]})
+                return
+            self._send_json(200, build_route_plan(data.get("model", ""), payload=data))
+            return
         if path.startswith("/api/channels/") and path.endswith("/key"):
             cid = path[len("/api/channels/"):-len("/key")]
             try:

@@ -143,8 +143,12 @@ def _reset_state():
     rate_limit._buckets.clear()
     rate_limit._events.clear()
     visited.update({"c1": 0, "c2": 0})
+    if "empero" in visited:
+        visited["empero"] = 0
     scenario.clear()
     stream_mode.update({"c1": False, "c2": False})
+    if "empero" in stream_mode:
+        stream_mode["empero"] = False
 
 
 # ============================================================
@@ -519,11 +523,180 @@ def test_stream_commit():
     return res
 
 
+# ============================================================
+# 组5：capability-aware routing（PR #2 / P1.5，GPT Extended 设计 2026-08-27）
+# 验收令牌（供 GPT Extended 在 GitHub 上核验真读）：P15-TOKEN=CAP5-WILL-VERIFY-9H2K
+# ============================================================
+
+def test_capability_routing():
+    res = []
+    import capabilities
+
+    def case(name, fn):
+        try:
+            fn()
+            res.append(Result(name, Result.PASS))
+        except AssertionError as e:
+            res.append(Result(name, Result.FAIL, str(e)))
+        except Exception as e:  # noqa: BLE001
+            res.append(Result(name, Result.FAIL, "异常: %s" % e))
+
+    def t_req_basic():
+        assert capabilities.required_capabilities({"model": "x", "messages": [{"role": "user", "content": "hi"}]}) == frozenset({"chat"})
+
+    def t_req_stream():
+        assert "stream" in capabilities.required_capabilities({"model": "x", "messages": [], "stream": True})
+
+    def t_req_tools():
+        p = {"model": "x", "messages": [], "tools": [{"type": "function", "function": {"name": "f"}}]}
+        assert "tools" in capabilities.required_capabilities(p)
+        p2 = {"model": "x", "messages": [], "tool_choice": "auto"}
+        assert "tools" in capabilities.required_capabilities(p2)
+        p3 = {"model": "x", "messages": [], "tool_choice": "none"}
+        assert "tools" not in capabilities.required_capabilities(p3)
+
+    def t_req_vision():
+        p = {"model": "x", "messages": [{"role": "user", "content": [
+            {"type": "text", "text": "看图"},
+            {"type": "image_url", "image_url": {"url": "https://x/y.png"}}]}]}
+        assert "vision" in capabilities.required_capabilities(p)
+
+    def t_req_json():
+        assert "json_object" in capabilities.required_capabilities(
+            {"model": "x", "messages": [], "response_format": {"type": "json_object"}})
+        assert "json_schema" in capabilities.required_capabilities(
+            {"model": "x", "messages": [], "response_format": {"type": "json_schema"}})
+
+    def t_mismatch_false_only():
+        # empero/glm-5.3-flash 在 model_capabilities.json 里 tools=false → mismatch
+        m = capabilities.capability_mismatch("empero", "glm-5.3-flash", frozenset({"chat", "tools"}))
+        assert m == ["tools"], m
+        # 未声明能力（cerebras 未登记）→ 不阻断
+        assert capabilities.capability_mismatch("cerebras", "whatever", frozenset({"chat", "tools"})) == []
+
+    def t_tri_state():
+        info = capabilities.model_capabilities("empero", "glm-5.3-flash")
+        assert info["known"] is True and info["source"] == "model"
+        assert info["capabilities"]["tools"] is False
+        info2 = capabilities.model_capabilities("cerebras", "nope")
+        assert info2["known"] is False and info2["capabilities"]["tools"] is None
+
+    def _prep_failover_mocks():
+        _install_mocks()
+        channels.chat_completion = _fake_chat_completion
+        visited.setdefault("empero", 0)
+        stream_mode.setdefault("empero", False)
+
+    def t_skip_and_fallback():
+        # 候选1 empero 不支持 tools → 本地 skip（零访问）→ 候选2 支持
+        _reset_state()
+        _prep_failover_mocks()
+        try:
+            chain = [("empero", "glm-5.3-flash"), ("c2", "m2")]
+            orig = channels.model_providers
+            channels.model_providers = lambda model: [
+                {"id": "empero", "name": "E", "matched_models": ["glm-5.3-flash"], "reachable": True},
+                {"id": "c2", "name": "C2", "matched_models": ["m2"], "reachable": True}]
+            payload = {"model": "test-model", "stream": False,
+                       "messages": [{"role": "user", "content": "hi"}],
+                       "tools": [{"type": "function", "function": {"name": "f"}}]}
+            cid, resp, log = api_gateway.route_completion(payload)
+            assert cid == "c2", "resolved=%s" % cid
+            assert visited["empero"] == 0, "empero visited=%d 应零访问" % visited.get("empero", 0)
+            f0 = log["failures"][0]
+            assert f0["outcome"] == "capability_mismatch", f0
+            assert set(f0.keys()) >= {"channel", "outcome", "detail"}
+            assert f0["capability_mismatch"]["unsupported"] == ["tools"]
+        finally:
+            channels.model_providers = orig
+            _restore_mocks()
+
+    def t_no_breaker_sideeffect():
+        # mismatch 不触发 breaker/配额桶变化
+        _reset_state()
+        _prep_failover_mocks()
+        try:
+            orig = channels.model_providers
+            channels.model_providers = lambda model: [
+                {"id": "empero", "name": "E", "matched_models": ["glm-5.3-flash"], "reachable": True}]
+            payload = {"model": "test-model", "stream": False,
+                       "messages": [{"role": "user", "content": "hi"}],
+                       "tools": [{"type": "function", "function": {"name": "f"}}]}
+            cid, resp, log = api_gateway.route_completion(payload)
+            assert cid is None  # 唯一候选被跳过
+            assert rate_limit.ledger().get("empero", {}).get("used_1m", 0) == 0
+            assert rate_limit._buckets.get("empero") is None  # 桶都未创建
+        finally:
+            channels.model_providers = orig
+            _restore_mocks()
+
+    def t_unknown_not_blocking():
+        # 未登记渠道（c2）+ tools 请求 → 仍按旧行为路由（unknown 不阻断）
+        _reset_state()
+        _prep_failover_mocks()
+        try:
+            payload = {"model": "test-model", "stream": False,
+                       "messages": [{"role": "user", "content": "hi"}],
+                       "tools": [{"type": "function", "function": {"name": "f"}}]}
+            cid, resp, log = api_gateway.route_completion(payload)
+            assert cid == "c1", cid  # c1 未登记 → unknown 放行 → 成功
+            body = resp.read()
+            assert b"OK" in body
+        finally:
+            _restore_mocks()
+
+    def t_route_plan_consistency():
+        # build_route_plan(model, payload) 与 route_completion 共享同一 capabilities.check_candidate：
+        # 健康缓存为空时（测试环境无真实渠道），reason 会先报 unreachable/no_key（基础状态优先），
+        # 但 capability_mismatch 子对象必须已经正确标出 unsupported=["tools"]——这就是一致性证据。
+        _reset_state()
+        _prep_failover_mocks()
+        try:
+            orig = channels.model_providers
+            channels.model_providers = lambda model: [
+                {"id": "empero", "name": "E", "matched_models": ["glm-5.3-flash"], "reachable": True},
+                {"id": "c2", "name": "C2", "matched_models": ["m2"], "reachable": True}]
+            payload = {"model": "test-model", "stream": False,
+                       "messages": [{"role": "user", "content": "hi"}],
+                       "tools": [{"type": "function", "function": {"name": "f"}}]}
+            plan = api_gateway.build_route_plan("test-model", payload=payload)
+            byc = {c["channel"]: c for c in plan["candidates"]}
+            assert byc["empero"]["capability_mismatch"]["unsupported"] == ["tools"], byc["empero"]
+            assert byc["c2"]["capability_mismatch"]["unsupported"] == []  # unknown 不算 mismatch
+            assert byc["c2"]["capability_mismatch"]["unknown"] == ["chat", "tools"]
+            assert plan["required_capabilities"] == ["chat", "tools"]
+            # 与 route_completion 同一判定入口：
+            cap = capabilities.check_candidate("empero", "glm-5.3-flash", payload)
+            assert cap["eligible"] is False and cap["mismatch"] == ["tools"]
+            cap2 = capabilities.check_candidate("c2", "m2", payload)
+            assert cap2["eligible"] is True  # unknown 放行
+            # GET 兼容（无 payload）：只有 chat 需求 → empero 不 mismatch
+            plan2 = api_gateway.build_route_plan("test-model")
+            byc2 = {c["channel"]: c for c in plan2["candidates"]}
+            assert byc2["empero"]["capability_mismatch"]["unsupported"] == []
+        finally:
+            channels.model_providers = orig
+            _restore_mocks()
+
+    case("cap: 基础 chat 需求", t_req_basic)
+    case("cap: stream 需求", t_req_stream)
+    case("cap: tools/tool_choice 需求", t_req_tools)
+    case("cap: vision image_url 需求", t_req_vision)
+    case("cap: json_object/json_schema 需求", t_req_json)
+    case("cap: 仅 false 才 mismatch", t_mismatch_false_only)
+    case("cap: tri-state 语义", t_tri_state)
+    case("cap: mismatch 本地 skip 零访问 + fallback", t_skip_and_fallback)
+    case("cap: 不碰 breaker/配额桶", t_no_breaker_sideeffect)
+    case("cap: unknown 不阻断向后兼容", t_unknown_not_blocking)
+    case("cap: route-plan 与 route_completion 判定一致", t_route_plan_consistency)
+    return res
+
+
 def run_all():
     print()
     print("===== :3100 网关路由不变量（P1.1）=====")
     out = []
-    for group in (test_upstream_outcome, test_rate_limit, test_failover, test_stream_commit):
+    for group in (test_upstream_outcome, test_rate_limit, test_failover, test_stream_commit, test_capability_routing):
         out.extend(group())
     for r in out:
         print(" ", r)
