@@ -11,8 +11,12 @@ import json
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CAP_FILE = os.environ.get("MODEL_CAPABILITIES_FILE") or os.path.normpath(
-    os.path.join(BASE_DIR, "..", "..", "data", "search_gateway", "model_capabilities.json"))
+# 读取优先级：环境变量 > data/ 运行时文件（热重载）> 随仓库分发的 default 初始表
+CAP_FILE = (os.environ.get("MODEL_CAPABILITIES_FILE")
+            or os.path.normpath(os.path.join(BASE_DIR, "..", "..", "data", "search_gateway",
+                                             "model_capabilities.json"))
+            or os.path.join(BASE_DIR, "model_capabilities.default.json"))
+DEFAULT_FILE = os.path.join(BASE_DIR, "model_capabilities.default.json")
 
 CAP_CHAT = "chat"
 CAP_STREAM = "stream"
@@ -29,17 +33,21 @@ _cache = {"mtime": None, "data": {"version": 1, "channels": {}}}
 
 
 def load_model_capabilities():
-    """mtime-aware 读取 model_capabilities.json；读取/解析失败返回空配置。"""
+    """mtime-aware 读取能力表（运行时文件优先，缺失回落 default 随仓文件）；失败返回空配置。"""
+    path = CAP_FILE if os.path.exists(CAP_FILE) else DEFAULT_FILE
     try:
-        mtime = os.path.getmtime(CAP_FILE)
+        mtime = os.path.getmtime(path)
     except OSError:
         _cache["mtime"] = None
         _cache["data"] = {"version": 1, "channels": {}}
         return _cache["data"]
+    if _cache.get("path") != path and _cache["mtime"] is not None:
+        _cache["mtime"] = None  # 文件切换，强制重读
+    _cache["path"] = path
     if _cache["mtime"] == mtime:
         return _cache["data"]
     try:
-        with open(CAP_FILE, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         if not isinstance(data, dict):
             raise ValueError("not a dict")

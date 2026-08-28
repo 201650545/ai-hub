@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "channels": {
+    "empero": {
+      "defaults": {
+        "chat": true,
+        "stream": true
+      },
+      "models": {
+        "glm-5.3-flash": {
+          "tools": false,
+          "vision": false,
+          "json_object": false,
+          "json_schema": false
+        }
+      }
+    },
+    "xiaohongshu": {
+      "defaults": {
+        "chat": true,
+        "stream": true,
+        "vision": false,
+        "tools": false,
+        "json_object": false,
+        "json_schema": false
+      },
+      "models": {
+        "dots3-note-prev": {
+          "tools": false,
+          "vision": false
+        }
+      }
+    },
+    "modelscope": {
+      "defaults": {
+        "chat": true,
+        "stream": true
+      },
+      "models": {
+        "deepseek-ai/DeepSeek-V4-Flash-0731": {
+          "tools": false,
+          "vision": false,
+          "json_object": true,
+          "json_schema": false
+        }
+      }
+    },
+    "openrouter": {
+      "defaults": {
+        "chat": true,
+        "stream": true
+      },
+      "models": {
+        "example/model": {
+          "tools": true,
+          "vision": true,
+          "json_object": true,
+          "json_schema": true
+        }
+      }
+    }
+  }
+}
