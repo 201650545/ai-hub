@@ -525,7 +525,7 @@ def test_stream_commit():
 
 # ============================================================
 # 组5：capability-aware routing（PR #2 / P1.5，GPT Extended 设计 2026-08-27）
-# 验收令牌（供 GPT Extended 在 GitHub 上核验真读）：P15-TOKEN=CAP5-WILL-VERIFY-9H2K
+# 验收令牌（供 GPT Extended 在 GitHub 上核验真读）：P15-TOKEN=***
 # ============================================================
 
 def test_capability_routing():
