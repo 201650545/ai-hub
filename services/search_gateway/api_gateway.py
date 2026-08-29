@@ -36,6 +36,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import re
+import ipaddress
 
 import upstream_outcome
 import capabilities
@@ -65,8 +66,28 @@ except Exception:  # noqa: BLE001
         """占位：rate_limit 模块不可用时保持 except 分支可解析。"""
 
 PORT = int(os.environ.get("API_GATEWAY_PORT", "3100"))
-# 绑定地址默认仅本机（GPT R1 建议安全收窄）；如需局域网接入用 API_GATEWAY_BIND=0.0.0.0 覆盖
-BIND_HOST = os.environ.get("API_GATEWAY_BIND", "127.0.0.1")
+# 绑定地址（GPT R2 裁定 R2-GW-BIND-NARROW-2026-0829 + Claude 评审发现项）：
+# - 默认 127.0.0.1 仅本机；空值/空白必须回退本机（空串会被 Python 解释为 INADDR_ANY 意外全接口绑定 → fail closed）
+# - 全接口/wildcard 地址（0.0.0.0、:: 及其展开形式 0:0:0:0:0:0:0:0、IPv4 映射 ::ffff:0.0.0.0）
+#   需 API_GATEWAY_ALLOW_WILDCARD=1 显式授权，否则拒绝启动（fail closed）
+BIND_RAW = (os.environ.get("API_GATEWAY_BIND") or "").strip()
+BIND_HOST = BIND_RAW or "127.0.0.1"
+
+
+def _is_wildcard_addr(addr):
+    """判断是否为全接口监听地址（含 IPv6 展开/映射形式，Claude 评审发现项）。"""
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    if ip.version == 4:
+        return ip == ipaddress.IPv4Address("0.0.0.0")
+    return ip.is_unspecified or (
+        ip.ipv4_mapped is not None and ip.ipv4_mapped == ipaddress.IPv4Address("0.0.0.0")
+    )
+
+
+BIND_WILDCARD_UNAUTHORIZED = _is_wildcard_addr(BIND_RAW) and os.environ.get("API_GATEWAY_ALLOW_WILDCARD") != "1"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_JSON = os.path.join(channels.DATA_DIR, "api_state.json")
 EXPIRY_JSON = os.path.join(channels.DATA_DIR, "channel_expiry.json")
@@ -173,7 +194,7 @@ def usage_summary():
 # ---------------------------------------------------------------- 路由日志（线程安全）
 _ROUTE_LOG = []
 _ROUTE_LOG_LOCK = threading.Lock()
-_ROUTE_LOG_MAX = 50  # 最多保留 50 条
+_ROUTE_LOG_MAX = 200  # 最多保留 200 条（用户 2026-08-29 要求扩大可见范围）
 
 
 def _log_route(entry):
@@ -1226,9 +1247,10 @@ def _bind_server(port, handler):
         return None
 
 
-# 服务模式退出码约定（NSSM 按码配置恢复策略：Default=Restart；3102/3103=Exit 不循环）
+# 服务模式退出码约定（NSSM 按码配置恢复策略：Default=Restart；3102/3103/3104=Exit 不循环）
 PORT_BIND_FAILED_EXIT = 3102
 STORAGE_NOT_READY_EXIT = 3103
+CONFIG_ERROR_EXIT = 3104
 
 
 def _readiness_preflight():
@@ -1260,6 +1282,11 @@ if __name__ == "__main__":
     if pre:
         print("❌ " + pre, flush=True)
         sys.exit(STORAGE_NOT_READY_EXIT)
+    if BIND_WILDCARD_UNAUTHORIZED:
+        print("[FAIL-CLOSED] API_GATEWAY_BIND=%r 请求全接口监听但未显式授权："
+              "需设 API_GATEWAY_ALLOW_WILDCARD=1 才允许 wildcard 地址（0.0.0.0/:: 及其展开/映射形式）。拒绝启动。"
+              % BIND_RAW, flush=True)
+        sys.exit(CONFIG_ERROR_EXIT)
     print("🌐 [API 转发网关] http://" + BIND_HOST + ":" + str(PORT))
     channels.warm_start()
     print("LLM 渠道：")

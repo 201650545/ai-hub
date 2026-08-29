@@ -57,6 +57,7 @@ def main() -> None:
         ("test_video_embed", "视频组件"),
         ("test_lesson_framework", "课件骨架"),
         ("test_search_gateway_routing", ":3100 网关路由不变量"),
+        ("test_gateway_bind", ":3100 绑定地址 fail-closed 单测"),
     ]
 
     all_results = []
