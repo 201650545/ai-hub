@@ -41,6 +41,12 @@ import ipaddress
 import upstream_outcome
 import capabilities
 
+# P4.2 资源控制平面（可选依赖）：模块缺失/损坏时网关按"无资源配置"运行，不阻断主链路。
+try:
+    import resource_config as _rcfg
+except Exception:  # noqa: BLE001
+    _rcfg = None
+
 # :3100 独立记账，与 :3000 搜索网关的 quota 分开（在 import channels 前设环境变量）
 os.environ.setdefault("GATEWAY_ID", "api_gateway")
 
@@ -155,10 +161,37 @@ def save_expiry(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def _resource_block(cid, client_model, upstream_model=None):
+    """P4.2 资源控制平面 gating：按 (channel, unified_model) 精确配对封禁。
+    资源表登记的是客户端可见模型名，故以 client_model 为主键匹配；上游名兜底
+    （防止资源表登记上游名时漏判）。返回 None（放行）或 (reason, resource_id)。
+    模块缺失/异常一律放行，不阻断主链路。"""
+    if _rcfg is None:
+        return None
+    try:
+        rb = _rcfg.channel_block(cid, client_model)
+        if rb is None and upstream_model and upstream_model != client_model:
+            rb = _rcfg.channel_block(cid, upstream_model)
+        return rb
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _resource_status():
+    """资源配置热加载状态（只读运行元数据，不含配置内容/密钥）。"""
+    if _rcfg is None:
+        return {"loaded": False, "last_reload_status": "module_unavailable"}
+    try:
+        return _rcfg.status_payload()
+    except Exception as exc:  # noqa: BLE001
+        return {"loaded": False, "last_reload_status": "error", "error": str(exc)[:200]}
+
+
 def _needs_auth(path):
     # 页面本体与静态图不保护；/api/* 与 /v1/* 全部纳入鉴权范围
     # /healthz 为免鉴权存活探针（不暴露任何渠道数据，供服务健康检查用）
-    if path in ("/", "/index.html", "/healthz"):
+    # /api/resource-config/status 只读健康/观测端点（仅含加载状态元数据，无配置无密钥），免鉴权
+    if path in ("/", "/index.html", "/healthz", "/api/resource-config/status"):
         return False
     if path.startswith("/img/"):
         return False
@@ -350,6 +383,16 @@ def route_completion(payload):
             log_entry["errors"] = list(errors)
             log_entry["failures"] = list(failures)
             continue
+        # 资源控制平面 gating（P4.2）：capability 之后、key/配额之前的本地判定。
+        # 按 (channel, unified_model) 精确配对封禁；未覆盖 = 放行（fail-open 只针对"无配置"）。
+        rb = _resource_block(cid, model, real_model)
+        if rb is not None:
+            failures.append({"channel": cid, "outcome": rb[0],
+                             "detail": "resource-config: " + rb[1]})
+            errors.append(cid + ": " + rb[0] + "（" + rb[1] + "）")
+            log_entry["errors"] = list(errors)
+            log_entry["failures"] = list(failures)
+            continue
         if not channels.key_is_set(cid):
             errors.append(cid + ": 未配置 key")
             continue
@@ -479,12 +522,16 @@ def build_route_plan(model, payload=None):
                                          "unsupported": cap["mismatch"],
                                          "unknown": cap["unknown"],
                                          "source": cap["source"]}
+        rb = _resource_block(cid, model, real_model)
+        entry["resource_block"] = ({"reason": rb[0], "resource_id": rb[1]} if rb else None)
         if not st.get("enabled", True):
             entry["eligible"], entry["reason"] = False, "disabled"
         elif not st.get("key_set", False):
             entry["eligible"], entry["reason"] = False, "no_key"
         elif not st.get("reachable", False):
             entry["eligible"], entry["reason"] = False, "unreachable"
+        elif rb is not None:
+            entry["eligible"], entry["reason"] = False, rb[0]
         elif cap["mismatch"]:
             entry["eligible"], entry["reason"] = False, "capability_mismatch"
         elif row.get("state") == "blocked":
@@ -842,6 +889,9 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                        extra_headers={"Cache-Control": "no-cache"})
         elif path == "/healthz":
             self._send_json(200, {"ok": True})
+        elif path == "/api/resource-config/status":
+            # P4.2：资源配置热加载状态（发布方 ACK 轮询 + 排障用，免鉴权只读）
+            self._send_json(200, _resource_status())
         elif path == "/api/health":
             self._send_json(200, {"llm": channels.cached_health_all(),
                                   "hidden": channels.hidden_channels_meta(),

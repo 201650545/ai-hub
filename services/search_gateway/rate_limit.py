@@ -30,6 +30,23 @@ import threading
 import time
 from collections import deque
 
+# P4.2 资源控制平面（可选依赖）：external 优先级时用聚合规则覆盖静态 POLICIES；
+# shadow/静态优先级返回 None，行为与旧版完全一致。
+try:
+    import resource_config as _rcfg
+except Exception:  # noqa: BLE001
+    _rcfg = None
+
+
+def _external_policy(cid):
+    if _rcfg is None:
+        return None
+    try:
+        return _rcfg.external_policy(cid)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.normpath(os.path.join(os.path.dirname(BASE_DIR), "..", "data", "search_gateway"))
 DAY_FILE = os.path.join(DATA_DIR, "rate_limit_day.json")
@@ -99,6 +116,9 @@ def _resolve(cid, model, key):
     credential 粒度下 free 池与非 free 请求分桶（后缀 |free）：20/min+50/day 只属于
     free 模型，付费模型不占 free 桶，也不被 free 阈值误伤。"""
     pol = POLICIES.get(cid)
+    ext = _external_policy(cid)  # P4.2：external 优先级时为资源面渠道级聚合规则；否则 None
+    if ext is not None:
+        pol = ext
     if pol and pol["scope"] == "credential":
         match_free = pol.get("match") == "free"
         has_static = not (match_free and not _is_free_model(model))

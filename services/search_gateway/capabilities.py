@@ -10,6 +10,23 @@
 import json
 import os
 
+# P4.2 资源控制平面（可选依赖）：external 优先级且资源覆盖该 (channel, model) 时，
+# 能力声明以资源面为准；其余情况返回 None，走静态声明链路。
+try:
+    import resource_config as _rcfg
+except Exception:  # noqa: BLE001
+    _rcfg = None
+
+
+def _external_capabilities(channel_id, model):
+    if _rcfg is None:
+        return None
+    try:
+        return _rcfg.external_capabilities(channel_id, model)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 读取优先级：环境变量 > data/ 运行时文件（热重载）> 随仓库分发的 default 初始表
 CAP_FILE = (os.environ.get("MODEL_CAPABILITIES_FILE")
@@ -104,6 +121,9 @@ def model_capabilities(channel_id, model):
     返回 {"known": bool, "capabilities": {cap: True|False|None}, "source": str}。
     None = 未声明，不等同 False。
     """
+    ext = _external_capabilities(channel_id, model)
+    if ext is not None:
+        return ext
     cfg = load_model_capabilities()
     caps = {c: None for c in ALL_CAPABILITIES}
     source = "unknown"
