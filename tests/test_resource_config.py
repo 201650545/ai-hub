@@ -266,6 +266,14 @@ class ResourceConfigTest(unittest.TestCase):
         dumped = json.dumps(st, ensure_ascii=False)
         self.assertNotIn("cred:acc-stub-1", dumped)
         self.assertIn("credential_refs", dumped)  # 只有计数，无具体 ref
+        # 终审 D2：口径必须显式声明为渠道名映射，禁止 resolved 误导性命名
+        self.assertIn("semantics", st["credential_refs"])
+        self.assertEqual(st["credential_refs"]["semantics"], "channel_name_mapped")
+        self.assertIn("mapped", st["credential_refs"])
+        self.assertIn("unmapped", st["credential_refs"])
+        self.assertNotIn("resolved", dumped)
+        self.assertEqual(st["credential_refs"]["mapped"], 0)     # stubchan 非真渠道
+        self.assertEqual(st["credential_refs"]["unmapped"], 1)
         self.assertIn("active_generation_id", dumped)
         self.assertIn("active_sha256", dumped)
 

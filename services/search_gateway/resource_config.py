@@ -16,11 +16,14 @@
   shadow 对照（external precedence 可由生成物开关）；capabilities 要求新旧矩阵
   100% 一致才允许 external precedence，否则自动保持 static。
 
-凭证解析口径（与 GPT §7 的差异，已记录）：生成物的 credential_ref 现网为
-账号级（cred:acc-*），无法在网关侧按渠道解析；未解析引用不阻断 swap（未知渠道
-本就不可路由，无法影响路由），只计数并写日志；已知名渠道的引用缺失由控制平面
-publish 前置校验拦截。这是"阻止整个发布"与"feature 不可用"之间的工程取舍，
-属设计稿 §9 语义在真实数据形态下的收紧实现。
+凭证解析口径（与 GPT §7 的差异，已记录，终审 D2 已修正命名）：生成物的
+credential_ref 现网为账号级（cred:acc-*），无法在网关侧按渠道解析。status 中
+credential_refs 的真实语义是"渠道名可映射计数"（该资源的 channel 名能在网关
+渠道表中找到），绝不代表 credential provider 已解析出可用凭据——因此终审 D2
+要求不得称 resolved，已改名为 mapped/unmapped，并携带 semantics=
+channel_name_mapped 显式声明口径。未映射引用不阻断 swap（未知渠道本就不可
+路由，无法影响路由），只计数并写日志；已知名渠道的引用缺失由控制平面 publish
+前置校验拦截。per-key 真实 resolution 明确放入阶段5（GPT R3 裁定）。
 
 失败保持链：live 文件 → 本模块内存 snapshot → gateway_resources.last_good.json。
 """
@@ -200,7 +203,7 @@ class ResourceConfigManager(object):
         resources = []
         pair_index = {}
         channel_res = {}
-        cred_total = cred_resolved = 0
+        cred_total = cred_mapped = 0
         try:
             import channels as _ch
             known_channels = set((_ch.CHANNELS or {}).keys())
@@ -213,7 +216,7 @@ class ResourceConfigManager(object):
             resources.append(snap)
             cred_total += 1
             if str(snap.get("channel")) in known_channels:
-                cred_resolved += 1
+                cred_mapped += 1
             st = snap["status"]
             snap["_expiry_ts"] = _expiry_ts(snap.get("expiry_at"))
             if st == "active" and snap["_expiry_ts"] is not None and now >= snap["_expiry_ts"]:
@@ -247,8 +250,9 @@ class ResourceConfigManager(object):
             "limits_precedence": limits_precedence,
             "caps_precedence": caps_effective,
             "caps_refused_reason": caps_refused_reason,
-            "cred": {"total": cred_total, "resolved": cred_resolved,
-                     "unresolved": cred_total - cred_resolved},
+            "cred": {"total": cred_total, "mapped": cred_mapped,
+                     "unmapped": cred_total - cred_mapped,
+                     "semantics": "channel_name_mapped"},
         }
 
     def _matrix_conflict(self, doc):
@@ -462,6 +466,7 @@ class ResourceConfigManager(object):
             m["capabilities_precedence"] = snap["caps_precedence"]
             if snap.get("caps_refused_reason"):
                 m["capabilities_refused_reason"] = snap["caps_refused_reason"]
+            # 终审 D2：口径为渠道名映射计数（非真实凭据解析），semantics 字段自声明
             m["credential_refs"] = snap["cred"]
         else:
             m["limits_precedence"] = "shadow"
