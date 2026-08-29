@@ -65,6 +65,8 @@ except Exception:  # noqa: BLE001
         """占位：rate_limit 模块不可用时保持 except 分支可解析。"""
 
 PORT = int(os.environ.get("API_GATEWAY_PORT", "3100"))
+# 绑定地址默认仅本机（GPT R1 建议安全收窄）；如需局域网接入用 API_GATEWAY_BIND=0.0.0.0 覆盖
+BIND_HOST = os.environ.get("API_GATEWAY_BIND", "127.0.0.1")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_JSON = os.path.join(channels.DATA_DIR, "api_state.json")
 EXPIRY_JSON = os.path.join(channels.DATA_DIR, "channel_expiry.json")
@@ -1218,7 +1220,7 @@ def _bind_server(port, handler):
         print("  CMD=%s" % (holder["cmd"] or "?"), flush=True)
         return None
     try:
-        return ThreadedServer(("0.0.0.0", port), handler)
+        return ThreadedServer((BIND_HOST, port), handler)
     except OSError as e:
         print("[FAIL-CLOSED] 端口 %s 绑定失败: %s" % (port, e), flush=True)
         return None
@@ -1258,7 +1260,7 @@ if __name__ == "__main__":
     if pre:
         print("❌ " + pre, flush=True)
         sys.exit(STORAGE_NOT_READY_EXIT)
-    print("🌐 [API 转发网关] http://0.0.0.0:" + str(PORT))
+    print("🌐 [API 转发网关] http://" + BIND_HOST + ":" + str(PORT))
     channels.warm_start()
     print("LLM 渠道：")
     for cid, h in channels.cached_health_all().items():
