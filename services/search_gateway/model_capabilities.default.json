@@ -20,13 +20,13 @@
         "chat": true,
         "stream": true,
         "vision": false,
-        "tools": false,
+        "tools": true,
         "json_object": false,
         "json_schema": false
       },
       "models": {
         "dots3-note-prev": {
-          "tools": false,
+          "tools": true,
           "vision": false
         }
       }
