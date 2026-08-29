@@ -134,7 +134,8 @@ def save_expiry(data):
 
 def _needs_auth(path):
     # 页面本体与静态图不保护；/api/* 与 /v1/* 全部纳入鉴权范围
-    if path in ("/", "/index.html"):
+    # /healthz 为免鉴权存活探针（不暴露任何渠道数据，供服务健康检查用）
+    if path in ("/", "/index.html", "/healthz"):
         return False
     if path.startswith("/img/"):
         return False
@@ -816,6 +817,8 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
         if path in ("/", "/index.html"):
             self._send(200, "text/html; charset=utf-8", _read_page().encode("utf-8"),
                        extra_headers={"Cache-Control": "no-cache"})
+        elif path == "/healthz":
+            self._send_json(200, {"ok": True})
         elif path == "/api/health":
             self._send_json(200, {"llm": channels.cached_health_all(),
                                   "hidden": channels.hidden_channels_meta(),
@@ -1169,47 +1172,92 @@ def time_str():
     return time.strftime("%H:%M:%S")
 
 
-def _bind_server(port, handler, retries=3):
-    """绑定端口；若被本机残留进程占用则清理后重试（服务模式自愈）。
-
-    只在 bind 失败（端口被占）时清理监听该端口的进程，正常路径不杀任何东西。
-    """
+def _port_holder(port):
+    """返回监听指定端口的进程诊断信息（pid/exe/cmd），无占用返回 None。"""
     import subprocess
-    for attempt in range(retries):
-        try:
-            return ThreadedServer(("0.0.0.0", port), handler)
-        except OSError:
+    try:
+        out = subprocess.run(
+            ["netstat", "-ano", "-p", "tcp"],
+            capture_output=True, text=True, timeout=5).stdout
+    except Exception:  # noqa: BLE001
+        return None
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) >= 5 and f":{port}" in parts[1] and parts[3] == "LISTENING":
+            pid = parts[4]
+            exe = cmd = ""
             try:
-                out = subprocess.run(
-                    ["netstat", "-ano", "-p", "tcp"],
-                    capture_output=True, text=True, timeout=5).stdout
+                info = subprocess.run(
+                    ["powershell", "-NoProfile", "-Command",
+                     "Get-CimInstance Win32_Process -Filter 'ProcessId={0}' | "
+                     "Select-Object ExecutablePath,CommandLine | ConvertTo-Json -Compress".format(pid)],
+                    capture_output=True, text=True, timeout=8).stdout.strip()
+                if info:
+                    obj = json.loads(info)
+                    exe = obj.get("ExecutablePath") or ""
+                    cmd = obj.get("CommandLine") or ""
             except Exception:  # noqa: BLE001
-                out = ""
-            pids = set()
-            for line in out.splitlines():
-                parts = line.split()
-                if len(parts) >= 5 and f":{port}" in parts[1] and parts[3] == "LISTENING":
-                    pids.add(parts[4])
-            killed = False
-            for pid in pids:
-                if pid == str(os.getpid()):
-                    continue
-                try:
-                    subprocess.run(["taskkill", "/F", "/PID", pid],
-                                   capture_output=True, timeout=5)
-                    killed = True
-                except Exception:  # noqa: BLE001
-                    pass
-            if killed:
-                print(f"[自愈] 已清理占用 {port} 的残留进程，重试 ({attempt + 1}/{retries})...")
-                time.sleep(2)
-                continue
-            raise
-    raise OSError(f"端口 {port} 绑定失败（{retries} 次尝试后仍被占用）")
+                pass
+            return {"pid": pid, "exe": exe, "cmd": cmd}
+    return None
+
+
+def _bind_server(port, handler):
+    """绑定端口；失败则 fail closed：记录占用方并返回 None，绝不自动杀进程。
+
+    GPT Extended 裁定 R1-04（2026-08-29）：崩溃进程退出后内核会关 socket，不会留下
+    残留 LISTENING；若 bind 失败说明存在另一活实例，应由 SCM 暴露问题而非自裁决杀死。
+    HTTPServer 默认 allow_reuse_address(SO_REUSEADDR)，Windows 下会"假绑定"成功但收不到
+    连接（被先占者抢走），故 bind 前先查占用，已占用同样 fail closed。
+    """
+    holder = _port_holder(port)
+    if holder:
+        print("[FAIL-CLOSED] 端口 %s 已被进程占用，未自动清理（如需接管请先停该进程）："
+              % port, flush=True)
+        print("  PID=%s  EXE=%s" % (holder["pid"], holder["exe"] or "?"), flush=True)
+        print("  CMD=%s" % (holder["cmd"] or "?"), flush=True)
+        return None
+    try:
+        return ThreadedServer(("0.0.0.0", port), handler)
+    except OSError as e:
+        print("[FAIL-CLOSED] 端口 %s 绑定失败: %s" % (port, e), flush=True)
+        return None
+
+
+# 服务模式退出码约定（NSSM 按码配置恢复策略：Default=Restart；3102/3103=Exit 不循环）
+PORT_BIND_FAILED_EXIT = 3102
+STORAGE_NOT_READY_EXIT = 3103
+
+
+def _readiness_preflight():
+    """服务启动前置检查：代码/data/runs 目录与关键配置就绪后才 bind。失败返回原因串。"""
+    base = os.path.dirname(os.path.abspath(__file__))
+    data_dir = channels.DATA_DIR
+    checks = []
+    if not os.path.isdir(base):
+        checks.append("code_dir 不存在: " + base)
+    if not os.path.isdir(data_dir):
+        checks.append("data_dir 不存在: " + data_dir)
+    cfg = os.path.join(data_dir, "channels.json")
+    if not (os.path.isfile(cfg) and os.access(cfg, os.R_OK)):
+        checks.append("channels.json 不可读: " + cfg)
+    runs_dir = os.path.join(base, "runs")
+    if not (os.path.isdir(runs_dir) and os.access(runs_dir, os.W_OK)):
+        checks.append("runs_dir 不可写: " + runs_dir)
+    return "; ".join(checks) if checks else None
 
 
 if __name__ == "__main__":
     import time
+    pre = _readiness_preflight()
+    deadline = time.time() + 30
+    while pre and time.time() < deadline:
+        print("⚠️  " + pre + " —— 5 秒后重试（等待 D 盘/存储就绪）...", flush=True)
+        time.sleep(5)
+        pre = _readiness_preflight()
+    if pre:
+        print("❌ " + pre, flush=True)
+        sys.exit(STORAGE_NOT_READY_EXIT)
     print("🌐 [API 转发网关] http://0.0.0.0:" + str(PORT))
     channels.warm_start()
     print("LLM 渠道：")
@@ -1226,6 +1274,8 @@ if __name__ == "__main__":
     except Exception as e:  # noqa: BLE001
         print("⚠️  心跳上报未启动: " + str(e)[:80])
     server = _bind_server(PORT, GatewayHandler)
+    if server is None:
+        sys.exit(PORT_BIND_FAILED_EXIT)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
