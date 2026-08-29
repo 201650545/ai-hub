@@ -1169,6 +1169,45 @@ def time_str():
     return time.strftime("%H:%M:%S")
 
 
+def _bind_server(port, handler, retries=3):
+    """绑定端口；若被本机残留进程占用则清理后重试（服务模式自愈）。
+
+    只在 bind 失败（端口被占）时清理监听该端口的进程，正常路径不杀任何东西。
+    """
+    import subprocess
+    for attempt in range(retries):
+        try:
+            return ThreadedServer(("0.0.0.0", port), handler)
+        except OSError:
+            try:
+                out = subprocess.run(
+                    ["netstat", "-ano", "-p", "tcp"],
+                    capture_output=True, text=True, timeout=5).stdout
+            except Exception:  # noqa: BLE001
+                out = ""
+            pids = set()
+            for line in out.splitlines():
+                parts = line.split()
+                if len(parts) >= 5 and f":{port}" in parts[1] and parts[3] == "LISTENING":
+                    pids.add(parts[4])
+            killed = False
+            for pid in pids:
+                if pid == str(os.getpid()):
+                    continue
+                try:
+                    subprocess.run(["taskkill", "/F", "/PID", pid],
+                                   capture_output=True, timeout=5)
+                    killed = True
+                except Exception:  # noqa: BLE001
+                    pass
+            if killed:
+                print(f"[自愈] 已清理占用 {port} 的残留进程，重试 ({attempt + 1}/{retries})...")
+                time.sleep(2)
+                continue
+            raise
+    raise OSError(f"端口 {port} 绑定失败（{retries} 次尝试后仍被占用）")
+
+
 if __name__ == "__main__":
     import time
     print("🌐 [API 转发网关] http://0.0.0.0:" + str(PORT))
@@ -1186,7 +1225,7 @@ if __name__ == "__main__":
         print("❤️  心跳上报已启动 (central " + heartbeat.CENTRAL_URL + ")")
     except Exception as e:  # noqa: BLE001
         print("⚠️  心跳上报未启动: " + str(e)[:80])
-    server = ThreadedServer(("0.0.0.0", PORT), GatewayHandler)
+    server = _bind_server(PORT, GatewayHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
