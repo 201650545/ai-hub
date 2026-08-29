@@ -651,8 +651,10 @@ DSH_SETTINGS = os.path.expanduser("~/.dsh/settings.yaml")
 
 def sync_dsh_models():
     """把统一模型组同步为 DSH 选择器清单（settings.yaml 热重载，免重启）。
-    只改 llm-pi-ai.providers.local-gateway.models（统一名=对外 id，display=显示名）；
-    默认模型若被删则回落到第一项；其余字段原样保留。任何失败不影响网关自身。"""
+    只托管 llm-pi-ai.providers.local-gateway.models 条目的 id（统一名）与
+    name（display）；条目上的其他自定义字段（如 DSH 侧手工调优的 maxTokens
+    输出预算）按 id 原样保留，编排改动不会抹掉它们；默认模型若被删则回落
+    到第一项；provider 其余字段原样保留。任何失败不影响网关自身。"""
     try:
         import yaml
         unified = load_unified()
@@ -673,6 +675,14 @@ def sync_dsh_models():
         prov = providers.get("local-gateway")
         if not isinstance(prov, dict):
             return  # 本机没有 local-gateway 路由，不同步
+        prev = {}
+        for m0 in (prov.get("models") or []):
+            if isinstance(m0, dict) and isinstance(m0.get("id"), str):
+                prev[m0["id"]] = m0
+        for m in entries:
+            for k, v in prev.get(m["id"], {}).items():
+                if k not in ("id", "name"):
+                    m[k] = v
         prov["models"] = entries
         adm = doc.get("agent-default-model")
         ids = [m["id"] for m in entries]
@@ -1191,7 +1201,7 @@ def chat_completion(channel_id, payload, route_info=None):
             headers["Accept"] = "text/event-stream"
         req = urllib.request.Request(url, data=body, headers=headers, method="POST")
         try:
-            resp = _urlopen(req, timeout=120, channel_id=channel_id)
+            resp = _urlopen(req, timeout=300, channel_id=channel_id)
         except urllib.error.HTTPError as he:
             if _rate_limit is not None:
                 ra = (he.headers or {}).get("Retry-After") if he.headers else None
