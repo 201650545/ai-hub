@@ -17,6 +17,8 @@
     N4 到期预警 / 授权 NOTE / 真源不可读退出码
   F 运维态与写侧（P1-4）：off/observe/enforce 三态、缺省 enforce、observe 窗口必填
     且 ≤7 天、到期转拦不静默续观、启动校验退出码 3106、原子写热载无残留、坏文档拒写
+  G 观测面（P2 缩窄版 peek_class）：类别与 verdict 一致但无放行语义、不读 PRICING_* env、
+    坏文件/缺文件不抛异常、陈旧降级与 global_default 回退
 """
 import datetime
 import itertools
@@ -585,12 +587,63 @@ def test_mode_and_write():
     return res
 
 
+def test_peek_class():
+    """G 观测面（P2 缩窄版）：peek_class 只报类别 —— 不具放行权、不读 env、绝不抛异常。"""
+    res = []
+
+    def t_peek_matches_verdict_but_no_allow():
+        p = write_doc(mkdoc({"m1": free_entry(), "m2": paid_entry()}))
+        for m in ("m1", "m2"):
+            pk = pricing.peek_class("testchan", m, NOW, p)
+            vd = pricing.verdict("testchan", m, NOW, p)
+            assert pk["class"] == vd["class"], (pk, vd)
+            assert "allow" not in pk, pk  # 观测结果不可被当作放行依据
+
+    def t_peek_ignores_env():
+        p = write_doc(mkdoc({"m3": {"class": "unknown", "verified_at": NOW.isoformat()}}))
+
+        def go():
+            return pricing.peek_class("testchan", "m3", NOW, p)
+
+        a = with_env(dict(PRICING_ENV_CLEAN, PRICING_UNKNOWN_POLICY="allow",
+                          PRICING_MODE="enforce"), go)
+        b = with_env(dict(PRICING_ENV_CLEAN), go)
+        assert a == b and a["class"] == "unknown", (a, b)
+        # 反证：同一 env 会改变 verdict 的放行结果 —— 所以观测面绝不复用 verdict
+        v_allow = with_env({"PRICING_UNKNOWN_POLICY": "allow"},
+                           lambda: pricing.verdict("testchan", "m3", NOW, p)["allow"])
+        v_deny = with_env(dict(PRICING_ENV_CLEAN),
+                          lambda: pricing.verdict("testchan", "m3", NOW, p)["allow"])
+        assert (v_allow, v_deny) == (True, False), (v_allow, v_deny)
+
+    def t_peek_corrupt_and_missing_never_raise():
+        bad = write_doc(None, raw='{"broken": ')
+        assert pricing.peek_class("testchan", "m1", NOW, bad) == \
+            {"class": "unknown", "source": "invalid", "stale": False}
+        gone = os.path.join(TMPDIR, "never_written.json")
+        r = pricing.peek_class("testchan", "m1", NOW, gone)
+        assert r["class"] == "unknown" and r["source"] == "missing", r
+
+    def t_peek_stale_downgrade_and_global_default():
+        p = write_doc(mkdoc({"old": free_entry(days_ago=40)}, gdefault="paid"))
+        pk = pricing.peek_class("testchan", "old", NOW, p)
+        assert pk["class"] == "unknown" and pk["stale"] is True, pk
+        other = pricing.peek_class("chan-not-in-doc", "any", NOW, p)
+        assert other == {"class": "paid", "source": "global_default", "stale": False}, other
+
+    case("G1 观测类别与 verdict 一致、但不含放行语义", t_peek_matches_verdict_but_no_allow, res)
+    case("G2 观测不受任何 PRICING_* env 影响（verdict 会）", t_peek_ignores_env, res)
+    case("G3 真源损坏/缺失：观测降级且绝不抛异常", t_peek_corrupt_and_missing_never_raise, res)
+    case("G4 陈旧降级与未登记 global_default 回退", t_peek_stale_downgrade_and_global_default, res)
+    return res
+
+
 def run_all():
     print()
     print("===== :3100 网关价格闸门（P1-2 判定 + P1-4 运维态/写侧）=====")
     out = []
     for group in (test_classes, test_staleness, test_load_failure, test_real_file,
-                  test_group_review, test_mode_and_write):
+                  test_group_review, test_mode_and_write, test_peek_class):
         out.extend(group())
     for r in out:
         print(" ", r)

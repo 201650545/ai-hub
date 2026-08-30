@@ -241,6 +241,32 @@ def verdict(channel_id, upstream_model, now=None, path=None):
                  detail="未验证定价，默认拦截（Q2 fail-closed）")
 
 
+def peek_class(channel_id, upstream_model, now=None, path=None):
+    """纯观测：只回答「这个候选是什么价格类别」，不判准入、不读任何 PRICING_* 环境变量。
+
+    与 verdict() 共用同一套类别解析（三级回退 + 新鲜度降级），但**没有 allow/deny 语义**，
+    因此本函数不可作为放行依据。任何异常返回 None —— 观测失败绝不影响调用方。
+    """
+    try:
+        now = now or datetime.date.today()
+        st = load_pricing(path)
+        kind = st.get("kind")
+        if kind != "ok":
+            return {"class": CLASS_UNKNOWN, "source": kind or "unknown", "stale": False}
+        doc = st.get("data") or {}
+        chan = (doc.get("channels") or {}).get(channel_id) or {}
+        entry = (chan.get("models") or {}).get(upstream_model)
+        cls, source, eff_entry = _entry_class(entry, chan, doc)
+        stale = False
+        if source == "model" and cls in (CLASS_FREE, CLASS_PAID):
+            stale, _window = _is_stale(eff_entry, now)
+            if stale:
+                cls = CLASS_UNKNOWN
+        return {"class": cls, "source": source, "stale": stale}
+    except Exception:  # noqa: BLE001  观测面：任何失败静默降级为 None
+        return None
+
+
 def _allow(cls, reason, source="", authorized=False, detail=""):
     return {"allow": True, "class": cls, "reason": reason, "detail": detail,
             "authorized": authorized, "stale": False, "source": source}

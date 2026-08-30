@@ -40,6 +40,7 @@ import ipaddress
 
 import upstream_outcome
 import capabilities
+import pricing
 
 # P4.2 资源控制平面（可选依赖）：模块缺失/损坏时网关按"无资源配置"运行，不阻断主链路。
 try:
@@ -229,13 +230,52 @@ _ROUTE_LOG = []
 _ROUTE_LOG_LOCK = threading.Lock()
 _ROUTE_LOG_MAX = 200  # 最多保留 200 条（用户 2026-08-29 要求扩大可见范围）
 
+# 价格观测（P2 缩窄版）：内存环形重启即丢，故另存 JSONL。
+# 本段代码是**纯观测**，不参与任何放行判定；写失败只损失该条 telemetry。
+_PRICING_TELEMETRY = os.path.join(channels.DATA_DIR, "pricing_telemetry.jsonl")
+_TELEMETRY_ERRORS = {"count": 0, "disabled": False}
+_TELEMETRY_MAX_ERRORS = 20  # 连续失败到阈值即自禁用，避免磁盘异常时反复撞 I/O
+_TELEMETRY_KEYS = ("ts", "client_model", "attempted", "attempted_class",
+                   "resolved_channel", "resolved_model", "resolved_class", "fallback_count")
+
+
+def _peek_chain(chain):
+    """给候选链每个位置贴价格类别标签（纯观测）。任何异常返回 []，不影响路由。"""
+    try:
+        out = []
+        for cid, real_model in chain:
+            p = pricing.peek_class(cid, real_model) or {}
+            out.append({"channel": cid, "model": real_model,
+                        "class": p.get("class"), "source": p.get("source")})
+        return out
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _write_telemetry(entry):
+    """落一行 JSONL：候选类别 + 实际落点 + fallback 深度，供离线统计。"""
+    if _TELEMETRY_ERRORS["disabled"]:
+        return
+    try:
+        rec = {k: entry.get(k) for k in _TELEMETRY_KEYS}
+        rec["epoch"] = int(time.time())
+        rec["failure_count"] = len(entry.get("failures") or [])
+        with open(_PRICING_TELEMETRY, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        _TELEMETRY_ERRORS["count"] = 0
+    except Exception:  # noqa: BLE001
+        _TELEMETRY_ERRORS["count"] += 1
+        if _TELEMETRY_ERRORS["count"] >= _TELEMETRY_MAX_ERRORS:
+            _TELEMETRY_ERRORS["disabled"] = True
+
 
 def _log_route(entry):
-    """记录一次路由决策（调用方填好 entry 后再锁）。"""
+    """记录一次路由决策（调用方填好 entry 后再锁）。内存 + JSONL 双写。"""
     with _ROUTE_LOG_LOCK:
-        _ROUTE_LOG.append(entry)
+        _ROUTE_LOG.append(dict(entry))
         if len(_ROUTE_LOG) > _ROUTE_LOG_MAX:
             del _ROUTE_LOG[:len(_ROUTE_LOG) - _ROUTE_LOG_MAX]
+    _write_telemetry(entry)
 
 
 class _BufferedResponse:
@@ -357,8 +397,10 @@ def route_completion(payload):
         "ts": time.strftime("%H:%M:%S"),
         "client_model": model,
         "attempted": attempted,
+        "attempted_class": _peek_chain(chain),  # 纯观测：不参与判定
         "resolved_channel": None,
         "resolved_model": None,
+        "resolved_class": None,
         "fallback_count": 0,
         "errors": [],
         "failures": [],
@@ -401,6 +443,7 @@ def route_completion(payload):
             p2["model"] = real_model  # 映射为该渠道实际模型名
             log_entry["resolved_channel"] = cid
             log_entry["resolved_model"] = real_model
+            log_entry["resolved_class"] = (pricing.peek_class(cid, real_model) or {}).get("class")
             log_entry["fallback_count"] = i
             resp = channels.chat_completion(cid, p2, route_info=dict(log_entry))
             used_key = getattr(resp, '_key', '')  # P0-2：保存实际使用的 key，避免后续 reassign 丢失
@@ -443,10 +486,7 @@ def route_completion(payload):
                 resp = _PrependResponse(head, resp)
                 # 验证通过后记录成功（P0-1：延迟到 peek 后，避免 200 提前清零 consec429）
                 channels.record_channel_success(cid, real_model, used_key)
-            with _ROUTE_LOG_LOCK:
-                _ROUTE_LOG.append(dict(log_entry))
-                if len(_ROUTE_LOG) > _ROUTE_LOG_MAX:
-                    del _ROUTE_LOG[:len(_ROUTE_LOG) - _ROUTE_LOG_MAX]
+            _log_route(log_entry)
             return cid, resp, log_entry
         except urllib.error.HTTPError as he:
             detail = he.read().decode("utf-8", "ignore")[:200]
@@ -476,10 +516,7 @@ def route_completion(payload):
 
     log_entry["errors"] = errors
     log_entry["failures"] = failures
-    with _ROUTE_LOG_LOCK:
-        _ROUTE_LOG.append(dict(log_entry))
-        if len(_ROUTE_LOG) > _ROUTE_LOG_MAX:
-            del _ROUTE_LOG[:len(_ROUTE_LOG) - _ROUTE_LOG_MAX]
+    _log_route(log_entry)
     return None, errors, log_entry
 
 
