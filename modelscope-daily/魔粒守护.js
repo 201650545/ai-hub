@@ -116,17 +116,34 @@ function browser(cmdArgs, timeoutMs) {
 
 // 在页面上下文里发同源 fetch，复用浏览器 Cookie
 function pageFetchJSON(apiPath) {
-  const js = `fetch(${JSON.stringify(apiPath)},{credentials:'include'}).then(r=>r.json()).then(j=>JSON.stringify(j)).catch(e=>JSON.stringify({__err:String(e)}))`;
+  // 浏览器侧用 r.text() 而非 r.json()：接口返回非 JSON（如 HTML 登录页）时
+  // 不会抛 "Failed to execute 'json' on 'Response'"；文本交给下方容错解析。
+  const js = `fetch(${JSON.stringify(apiPath)},{credentials:'include'}).then(r=>r.text()).then(t=>JSON.stringify({__text:t})).catch(e=>JSON.stringify({__err:String(e)}))`;
   const r = browser(['eval', js]);
   if (!r.ok) return { __err: r.out };
   const body = r.out;
   const start = body.indexOf('{');
   if (start < 0) return { __err: 'no json in output: ' + body.slice(0, 200) };
+  // opencli eval 偶发在 JSON 后附尾随行（更新提示等）：截取到第一个完整 JSON
+  // 对象的结束，忽略其后的非空白尾巴，避免 "Unexpected non-whitespace character
+  // after JSON" 类报错。
+  let obj;
   try {
-    return JSON.parse(body.slice(start));
+    obj = JSON.parse(body.slice(start));
   } catch (e) {
-    return { __err: 'parse fail: ' + body.slice(0, 200) };
+    const m = body.slice(start).match(/\{[\s\S]*?\}(?=\s|$)/);
+    if (!m) return { __err: 'parse fail: ' + body.slice(start, start + 200) };
+    try { obj = JSON.parse(m[0]); } catch (e2) {
+      return { __err: 'parse fail: ' + body.slice(start, start + 200) };
+    }
   }
+  if (obj.__err) return { __err: obj.__err };
+  if (obj.__text !== undefined) {
+    try { return JSON.parse(obj.__text); } catch (e) {
+      return { __err: 'not json: ' + obj.__text.slice(0, 200) };
+    }
+  }
+  return obj;
 }
 
 function sleep(sec) {
